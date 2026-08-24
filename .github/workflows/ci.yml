@@ -1,0 +1,85 @@
+name: backend-ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: sphere_test
+          POSTGRES_USER: sphere
+          POSTGRES_PASSWORD: sphere
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sphere -d sphere_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      NODE_ENV: test
+      PORT: 4000
+      DATABASE_URL: postgres://sphere:sphere@127.0.0.1:5432/sphere_test
+      JWT_SECRET: ci-only-secret-at-least-32-characters-long
+      JWT_EXPIRES_IN: 1h
+      PUBLIC_BASE_URL: http://localhost:4000
+      CORS_ORIGINS: http://localhost:3000
+      STORAGE_ROOT: ./.ci-storage
+      MAX_IMAGE_UPLOAD_BYTES: 52428800
+      MAX_IMAGE_PIXELS: 80000000
+      UPLOAD_SESSION_TTL_SECONDS: 3600
+      SIGNED_MEDIA_TTL_SECONDS: 900
+      MEDIA_WORKER_MODE: disabled
+      MEDIA_WORKER_POLL_MS: 50
+      MEDIA_JOB_LEASE_SECONDS: 900
+      LOG_LEVEL: silent
+      TRUST_PROXY: false
+      AUTO_MIGRATE: false
+      VIEWER_INTEGRATION_VERSION: psv-5.14.3-adapter-1
+      SPHERE_USE_CONFIGURED_POSTGRES: true
+      SPHERE_REQUIRE_REAL_POSTGRES: true
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Build production artifacts
+        run: npm run build
+
+      - name: Apply migrations to fresh PostgreSQL
+        run: npm run db:migrate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Integration tests
+        run: npm run test:integration
+
+      - name: Security tests
+        run: npm run test:security

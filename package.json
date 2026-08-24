@@ -1,0 +1,69 @@
+{
+  "name": "sphere-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Renderer-independent backend for the No-Code 360 Experience Platform",
+  "type": "commonjs",
+  "main": "dist/server.js",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "dev:worker": "tsx watch src/worker.ts",
+    "build": "tsc -p tsconfig.build.json && tsc -p tsconfig.migrations.json",
+    "start": "node dist/server.js",
+    "worker": "node dist/worker.js",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:security": "vitest run tests/security",
+    "test:coverage": "vitest run --coverage",
+    "test:all": "npm run lint && npm run typecheck && npm test && npm run build",
+    "db:migrate": "node dist/database/migrate.js up",
+    "db:migrate:undo": "node dist/database/migrate.js down",
+    "db:migrate:dev": "tsx src/database/migrate.ts up",
+    "db:migrate:undo:dev": "tsx src/database/migrate.ts down"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.0.1",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.16.3",
+    "pg-hstore": "^2.3.4",
+    "pino": "^9.9.0",
+    "pino-http": "^10.5.0",
+    "sanitize-html": "^2.17.0",
+    "sequelize": "^6.37.7",
+    "sharp": "^0.35.3",
+    "umzug": "^3.8.2",
+    "zod": "^4.1.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.34.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^24.3.0",
+    "@types/sanitize-html": "^2.16.0",
+    "@types/supertest": "^6.0.3",
+    "@vitest/coverage-v8": "^3.2.4",
+    "eslint": "^9.34.0",
+    "globals": "^16.3.0",
+    "pg-mem": "^3.0.5",
+    "supertest": "^7.1.4",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.41.0",
+    "vitest": "^3.2.4"
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
+  }
+}
