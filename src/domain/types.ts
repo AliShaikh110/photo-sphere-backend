@@ -34,6 +34,29 @@ export interface CanonicalNavigationSettings extends JsonObject {
   readonly keyboard?: boolean;
   readonly fullscreen?: boolean;
   readonly navigationButtons?: boolean;
+  readonly sceneNavigation?: boolean;
+}
+
+export interface CanonicalGallerySettings extends JsonObject {
+  readonly enabled?: boolean;
+  readonly showSceneNames?: boolean;
+  readonly showThumbnails?: boolean;
+}
+
+export interface CanonicalAutorotationSettings extends JsonObject {
+  readonly enabled?: boolean;
+  /** Product-level angular speed; renderer-specific units are resolved by the adapter. */
+  readonly speedDegreesPerSecond?: number;
+  readonly direction?: 'clockwise' | 'counterclockwise';
+  readonly startAutomatically?: boolean;
+}
+
+export interface CanonicalCompassSettings extends JsonObject {
+  readonly enabled?: boolean;
+}
+
+export interface CanonicalQualitySettings extends JsonObject {
+  readonly preference?: 'automatic' | 'standard' | 'high';
 }
 
 export interface CanonicalInformationSettings extends JsonObject {
@@ -46,6 +69,10 @@ export interface CanonicalInformationSettings extends JsonObject {
 export interface CanonicalProjectSettings extends JsonObject {
   readonly appearance?: CanonicalAppearanceSettings;
   readonly navigation?: CanonicalNavigationSettings;
+  readonly gallery?: CanonicalGallerySettings;
+  readonly autorotation?: CanonicalAutorotationSettings;
+  readonly compass?: CanonicalCompassSettings;
+  readonly quality?: CanonicalQualitySettings;
   readonly information?: CanonicalInformationSettings;
 }
 
@@ -109,6 +136,7 @@ export interface CanonicalHotspotContent extends JsonObject {
   readonly buttonLabel?: string;
   readonly externalUrl?: string;
   readonly imageAssetId?: string;
+  readonly videoAssetId?: string;
 }
 
 export type CanonicalHotspotAction =
@@ -136,6 +164,30 @@ export interface CanonicalHotspot {
   readonly visibilityRules?: CanonicalVisibilityRules;
 }
 
+export interface CanonicalSceneConnectionContent extends JsonObject {
+  readonly title?: string;
+  readonly description?: string;
+}
+
+export interface CanonicalSceneConnection {
+  readonly id: string;
+  readonly sourceSceneId: string;
+  readonly targetSceneId: string;
+  readonly triggerHotspotId?: string;
+  readonly label?: string;
+  readonly content?: CanonicalSceneConnectionContent;
+  /** A portable product hint from 0 (ordinary) through 100 (strongest). */
+  readonly importance?: number;
+  readonly preloadHint?: 'none' | 'normal' | 'high';
+  readonly createdAt?: Date | string;
+}
+
+export interface CanonicalSceneRuntimeHints extends JsonObject {
+  readonly preloadPriority?: number;
+  readonly likelyNextSceneIds?: string[];
+  readonly qualityPreference?: 'automatic' | 'standard' | 'high';
+}
+
 export interface CanonicalScene {
   readonly id: string;
   readonly projectId: string;
@@ -147,9 +199,9 @@ export interface CanonicalScene {
   readonly viewLimits?: CanonicalViewLimits;
   readonly hotspots: readonly CanonicalHotspot[];
   readonly overlays?: readonly JsonObject[];
-  readonly connections?: readonly JsonObject[];
+  readonly connections?: readonly CanonicalSceneConnection[];
   readonly spatialData?: JsonObject;
-  readonly runtimeHints?: JsonObject;
+  readonly runtimeHints?: CanonicalSceneRuntimeHints;
 }
 
 export interface CanonicalPublicationMetadata extends JsonObject {

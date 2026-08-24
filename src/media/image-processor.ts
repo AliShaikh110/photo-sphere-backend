@@ -2,6 +2,12 @@ import sharp, { type Metadata, type Sharp } from 'sharp';
 import { AppError } from '../errors/app-error';
 import { sha256 } from '../utils/hash';
 import type { SupportedImageMime } from './file-policy';
+import {
+  DEFAULT_PANORAMA_TILING_POLICY,
+  resolvePanoramaTilingPolicy,
+  type PanoramaTilingDecision,
+  type PanoramaTilingPolicy
+} from './panorama-quality-policy';
 import { extractGpanoMetadata, type GpanoMetadata } from './xmp';
 
 export type ImageInspection = {
@@ -24,17 +30,28 @@ export type PanoramaInspection = ImageInspection & {
   is360: true;
 };
 
+export type GeneratedStorageObject = {
+  storageKey: string;
+  mimeType: string;
+  sizeBytes: number;
+  checksum: string;
+  body: Buffer;
+  metadata: Record<string, string>;
+};
+
 export type GeneratedDerivative = {
-  kind: 'thumbnail' | 'lowResolutionBase' | 'standardWeb';
+  kind: 'thumbnail' | 'lowResolutionBase' | 'standardWeb' | 'tiledLevels';
   version: number;
   storageKey: string;
-  mimeType: SupportedImageMime;
+  mimeType: string;
   width: number;
   height: number;
   sizeBytes: number;
   checksum: string;
   body: Buffer;
   metadata: Record<string, unknown>;
+  /** Supporting immutable objects which must be stored before the parent object. */
+  supportingObjects?: readonly GeneratedStorageObject[];
 };
 
 export async function inspectPanorama(options: {
@@ -181,8 +198,237 @@ export async function generatePanoramaDerivatives(options: {
   version: number;
   bytes: Buffer;
   maxPixels: number;
+  inspection?: PanoramaInspection;
+  tilingPolicy?: PanoramaTilingPolicy;
 }): Promise<GeneratedDerivative[]> {
-  return generateDerivatives({ ...options, encoding: 'jpeg', mediaLabel: 'panorama' });
+  const baseline = await generateDerivatives({ ...options, encoding: 'jpeg', mediaLabel: 'panorama' });
+  const panorama = options.inspection ?? await inspectPanoramaForGeneration(options.bytes, options.maxPixels);
+  const decision = resolvePanoramaTilingPolicy({
+    width: panorama.width,
+    height: panorama.height,
+    sizeBytes: options.bytes.byteLength,
+    projection: panorama.projection
+  }, options.tilingPolicy ?? DEFAULT_PANORAMA_TILING_POLICY);
+  if (!decision.generateTiles) return baseline;
+  try {
+    const tiled = await generateTiledPanoramaDerivative({
+      ...options,
+      panorama,
+      policy: options.tilingPolicy ?? DEFAULT_PANORAMA_TILING_POLICY,
+      decision
+    });
+    return [...baseline, tiled];
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw new AppError('DERIVATIVE_GENERATION_FAILED', 'The tiled panorama derivative could not be generated.', {
+      status: 500,
+      retryable: true,
+      details: { kind: 'tiledLevels' },
+      cause: error
+    });
+  }
+}
+
+type PanoramaGenerationInspection = Pick<
+  PanoramaInspection,
+  'width' | 'height' | 'projection' | 'xmp'
+>;
+
+async function inspectPanoramaForGeneration(
+  bytes: Buffer,
+  maxPixels: number
+): Promise<PanoramaGenerationInspection> {
+  const metadata = await sharp(bytes, {
+    failOn: 'error',
+    limitInputPixels: maxPixels,
+    sequentialRead: true
+  }).metadata();
+  const width = metadata.autoOrient.width;
+  const height = metadata.autoOrient.height;
+  const xmp = extractGpanoMetadata(bytes);
+  const projection = xmp?.fullPanoWidthPixels !== undefined
+    && xmp.fullPanoHeightPixels !== undefined
+    && (xmp.fullPanoWidthPixels !== width || xmp.fullPanoHeightPixels !== height)
+    ? 'cropped_equirectangular' as const
+    : 'equirectangular' as const;
+  return { width, height, projection, ...(xmp === undefined ? {} : { xmp }) };
+}
+
+const TILED_PANORAMA_MANIFEST_SCHEMA = 'tiled-equirectangular-v1' as const;
+
+type TileDescriptor = {
+  level: number;
+  levelWidth: number;
+  levelHeight: number;
+  row: number;
+  column: number;
+  /** Stable grid aliases consumed by serving/compiler integration. */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  storageKey: string;
+  mimeType: 'image/jpeg';
+  sizeBytes: number;
+  checksumSha256: string;
+};
+
+type TiledLevelDescriptor = {
+  level: number;
+  width: number;
+  height: number;
+  columns: number;
+  rows: number;
+  tiles: TileDescriptor[];
+};
+
+async function generateTiledPanoramaDerivative(options: {
+  assetId: string;
+  version: number;
+  bytes: Buffer;
+  maxPixels: number;
+  panorama: PanoramaGenerationInspection;
+  policy: PanoramaTilingPolicy;
+  decision: PanoramaTilingDecision;
+}): Promise<GeneratedDerivative> {
+  const supportingObjects: GeneratedStorageObject[] = [];
+  const levels: TiledLevelDescriptor[] = [];
+  const sourceAspectRatio = options.panorama.width / options.panorama.height;
+
+  for (const [level, levelWidth] of options.decision.levelWidths.entries()) {
+    const levelHeight = Math.max(1, Math.round(levelWidth / sourceAspectRatio));
+    const columns = Math.ceil(levelWidth / options.policy.tileSize);
+    const rows = Math.ceil(levelHeight / options.policy.tileSize);
+    const tiles: TileDescriptor[] = [];
+    const resizedLevel = sharp(options.bytes, {
+      failOn: 'error',
+      limitInputPixels: options.maxPixels,
+      sequentialRead: true
+    })
+      .rotate()
+      .resize({ width: levelWidth, height: levelHeight, fit: 'fill' });
+
+    // Tile encoding is deliberately sequential: one policy-approved panorama
+    // cannot multiply native memory use by its full tile count.
+    for (let row = 0; row < rows; row += 1) {
+      for (let column = 0; column < columns; column += 1) {
+        const left = column * options.policy.tileSize;
+        const top = row * options.policy.tileSize;
+        const width = Math.min(options.policy.tileSize, levelWidth - left);
+        const height = Math.min(options.policy.tileSize, levelHeight - top);
+        const body = await resizedLevel
+          .clone()
+          .extract({ left, top, width, height })
+          .jpeg({ quality: options.policy.tileQuality, mozjpeg: true })
+          .toBuffer();
+        const checksum = sha256(body);
+        const storageKey = [
+          `derivatives/${options.assetId}/v${options.version}/tiledLevels`,
+          `${levelWidth}x${levelHeight}`,
+          `r${row}-c${column}-${checksum.slice(0, 16)}.jpg`
+        ].join('/');
+        const descriptor: TileDescriptor = {
+          level,
+          levelWidth,
+          levelHeight,
+          row,
+          column,
+          x: column,
+          y: row,
+          width,
+          height,
+          storageKey,
+          mimeType: 'image/jpeg',
+          sizeBytes: body.byteLength,
+          checksumSha256: checksum
+        };
+        tiles.push(descriptor);
+        supportingObjects.push({
+          storageKey,
+          mimeType: 'image/jpeg',
+          sizeBytes: body.byteLength,
+          checksum,
+          body,
+          metadata: {
+            checksumSha256: checksum,
+            role: 'panorama-tile',
+            level: String(level),
+            row: String(row),
+            column: String(column)
+          }
+        });
+      }
+    }
+    levels.push({ level, width: levelWidth, height: levelHeight, columns, rows, tiles });
+  }
+
+  const source = canonicalTiledSource(options.panorama);
+  const manifest = {
+    schema: TILED_PANORAMA_MANIFEST_SCHEMA,
+    assetId: options.assetId,
+    derivativeVersion: options.version,
+    strategy: 'tiled-equirectangular',
+    source,
+    tile: {
+      size: options.policy.tileSize,
+      encoding: 'jpeg',
+      mimeType: 'image/jpeg',
+      quality: options.policy.tileQuality
+    },
+    levels
+  };
+  const body = Buffer.from(JSON.stringify(manifest), 'utf8');
+  const checksum = sha256(body);
+  const tileObjects = levels.flatMap((level) => level.tiles);
+  const totalTileSizeBytes = supportingObjects.reduce((total, object) => total + object.sizeBytes, 0);
+  return {
+    kind: 'tiledLevels',
+    version: options.version,
+    storageKey: `derivatives/${options.assetId}/v${options.version}/tiledLevels-${checksum.slice(0, 16)}.json`,
+    mimeType: 'application/json',
+    width: options.panorama.width,
+    height: options.panorama.height,
+    sizeBytes: body.byteLength,
+    checksum,
+    body,
+    supportingObjects,
+    metadata: {
+      schema: TILED_PANORAMA_MANIFEST_SCHEMA,
+      strategy: 'tiled-equirectangular',
+      policyVersion: options.decision.policyVersion,
+      policyTrigger: options.decision.triggeredBy,
+      source,
+      tile: manifest.tile,
+      tileSize: options.policy.tileSize,
+      levels: levels.map(({ tiles, ...level }) => ({ ...level, tileCount: tiles.length })),
+      tiles: tileObjects,
+      tileCount: tileObjects.length,
+      totalTileSizeBytes,
+      manifestSizeBytes: body.byteLength
+    }
+  };
+}
+
+function canonicalTiledSource(panorama: PanoramaGenerationInspection): Record<string, unknown> {
+  const xmp = panorama.xmp;
+  const fullWidth = xmp?.fullPanoWidthPixels ?? panorama.width;
+  const fullHeight = xmp?.fullPanoHeightPixels ?? panorama.height;
+  const cropped = panorama.projection === 'cropped_equirectangular';
+  return {
+    projection: panorama.projection,
+    width: panorama.width,
+    height: panorama.height,
+    fullWidth,
+    fullHeight,
+    ...(cropped ? {
+      crop: {
+        width: xmp?.croppedAreaImageWidthPixels ?? panorama.width,
+        height: xmp?.croppedAreaImageHeightPixels ?? panorama.height,
+        left: xmp?.croppedAreaLeftPixels ?? Math.round((fullWidth - panorama.width) / 2),
+        top: xmp?.croppedAreaTopPixels ?? Math.round((fullHeight - panorama.height) / 2)
+      }
+    } : {})
+  };
 }
 
 /**

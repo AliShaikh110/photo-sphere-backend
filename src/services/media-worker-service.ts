@@ -16,7 +16,10 @@ import {
   generateDisplayImageDerivatives,
   generatePanoramaDerivatives,
   inspectImage,
-  inspectPanorama
+  inspectPanorama,
+  type GeneratedDerivative,
+  type GeneratedStorageObject,
+  type PanoramaInspection
 } from '../media/image-processor';
 import { validateImageUpload } from '../media/file-policy';
 import { Asset, AssetDerivative, MediaJob } from '../models';
@@ -220,6 +223,109 @@ async function persistFailure(asset: Asset, job: MediaJob, error: unknown): Prom
   });
 }
 
+function primaryStorageObject(derivative: GeneratedDerivative): GeneratedStorageObject {
+  return {
+    storageKey: derivative.storageKey,
+    mimeType: derivative.mimeType,
+    sizeBytes: derivative.body.byteLength,
+    checksum: derivative.checksum,
+    body: derivative.body,
+    metadata: {
+      checksumSha256: derivative.checksum,
+      role: derivative.kind === 'tiledLevels' ? 'panorama-tile-manifest' : 'derivative',
+      derivativeKind: derivative.kind
+    }
+  };
+}
+
+async function persistImmutableObject(
+  object: GeneratedStorageObject,
+  derivative: Pick<GeneratedDerivative, 'kind' | 'version'>,
+  storage: StorageProvider
+): Promise<void> {
+  if (object.body.byteLength !== object.sizeBytes || sha256(object.body) !== object.checksum) {
+    throw new AppError('DERIVATIVE_GENERATION_FAILED', 'Generated derivative object metadata is inconsistent.', {
+      status: 500,
+      retryable: true,
+      details: { kind: derivative.kind, version: derivative.version, storageKey: object.storageKey }
+    });
+  }
+
+  if (await storage.exists(object.storageKey)) {
+    const stored = await storage.get(object.storageKey);
+    if (sha256(stored.body) !== object.checksum) {
+      throw new AppError('DERIVATIVE_STORAGE_CONFLICT', 'A derivative storage conflict occurred.', {
+        status: 500,
+        retryable: false,
+        details: { kind: derivative.kind, version: derivative.version, storageKey: object.storageKey }
+      });
+    }
+    return;
+  }
+
+  try {
+    await storage.put(object.storageKey, object.body, {
+      contentType: object.mimeType,
+      immutable: true,
+      metadata: object.metadata
+    });
+  } catch (error) {
+    // An overlapping lease/retry may win the immutable create between exists
+    // and put. Treat it as success only after verifying the winning object.
+    if (!(error instanceof AppError) || error.code !== 'IMMUTABLE_OBJECT_EXISTS') throw error;
+    const stored = await storage.get(object.storageKey);
+    if (sha256(stored.body) !== object.checksum) {
+      throw new AppError('DERIVATIVE_STORAGE_CONFLICT', 'A derivative storage conflict occurred.', {
+        status: 500,
+        retryable: false,
+        details: { kind: derivative.kind, version: derivative.version, storageKey: object.storageKey }
+      });
+    }
+  }
+}
+
+async function persistDerivative(
+  assetId: string,
+  derivative: GeneratedDerivative,
+  storage: StorageProvider
+): Promise<void> {
+  // A visible manifest must never point at tile objects which have not yet
+  // been durably stored. Retries verify already-created objects by checksum.
+  for (const object of derivative.supportingObjects ?? []) {
+    await persistImmutableObject(object, derivative, storage);
+  }
+  await persistImmutableObject(primaryStorageObject(derivative), derivative, storage);
+
+  const [catalogEntry, created] = await AssetDerivative.findOrCreate({
+    where: { assetId, kind: derivative.kind, version: derivative.version },
+    defaults: {
+      assetId,
+      kind: derivative.kind,
+      version: derivative.version,
+      storageKey: derivative.storageKey,
+      mimeType: derivative.mimeType,
+      width: derivative.width,
+      height: derivative.height,
+      sizeBytes: String(derivative.sizeBytes),
+      metadata: { ...derivative.metadata, checksumSha256: derivative.checksum } as JsonObject
+    }
+  });
+  if (!created && (
+    catalogEntry.storageKey !== derivative.storageKey
+    || catalogEntry.mimeType !== derivative.mimeType
+    || catalogEntry.width !== derivative.width
+    || catalogEntry.height !== derivative.height
+    || String(catalogEntry.sizeBytes) !== String(derivative.sizeBytes)
+    || catalogEntry.metadata.checksumSha256 !== derivative.checksum
+  )) {
+    throw new AppError('DERIVATIVE_CATALOG_CONFLICT', 'An immutable derivative catalog conflict occurred.', {
+      status: 500,
+      retryable: false,
+      details: { kind: derivative.kind, version: derivative.version }
+    });
+  }
+}
+
 async function processClaimedJob(job: MediaJob, storage: StorageProvider): Promise<void> {
   const asset = await Asset.findByPk(job.assetId);
   if (!asset) {
@@ -277,43 +383,18 @@ async function processClaimedJob(job: MediaJob, storage: StorageProvider): Promi
       maxPixels: config.maxImagePixels
     };
     const derivatives = asset.mediaType === 'panorama_image'
-      ? await generatePanoramaDerivatives(derivativeOptions)
+      ? await generatePanoramaDerivatives({
+        ...derivativeOptions,
+        inspection: inspection as PanoramaInspection,
+        tilingPolicy: config.panoramaTilingPolicy
+      })
       : await generateDisplayImageDerivatives({
         ...derivativeOptions,
         mimeType: validated.mimeType
       });
     for (const derivative of derivatives) {
       await updateLeasedJob(job, { lockedAt: new Date() });
-      if (await storage.exists(derivative.storageKey)) {
-        const stored = await storage.get(derivative.storageKey);
-        if (sha256(stored.body) !== derivative.checksum) {
-          throw new AppError('DERIVATIVE_STORAGE_CONFLICT', 'A derivative storage conflict occurred.', {
-            status: 500,
-            retryable: false,
-            details: { kind: derivative.kind, version: derivative.version }
-          });
-        }
-      } else {
-        await storage.put(derivative.storageKey, derivative.body, {
-          contentType: derivative.mimeType,
-          immutable: true,
-          metadata: { checksumSha256: derivative.checksum }
-        });
-      }
-      await AssetDerivative.findOrCreate({
-        where: { assetId: asset.id, kind: derivative.kind, version: derivative.version },
-        defaults: {
-          assetId: asset.id,
-          kind: derivative.kind,
-          version: derivative.version,
-          storageKey: derivative.storageKey,
-          mimeType: derivative.mimeType,
-          width: derivative.width,
-          height: derivative.height,
-          sizeBytes: String(derivative.sizeBytes),
-          metadata: { ...derivative.metadata, checksumSha256: derivative.checksum } as JsonObject
-        }
-      });
+      await persistDerivative(asset.id, derivative, storage);
     }
     await sequelize.transaction(async (transaction) => {
       const lockedJob = await MediaJob.findOne({

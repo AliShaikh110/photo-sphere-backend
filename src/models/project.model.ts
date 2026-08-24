@@ -14,6 +14,7 @@ import type { Asset } from './asset.model';
 import { emptyJsonObject, PROJECT_TYPES } from './model.types';
 import type { JsonObject, ProjectType } from './model.types';
 import type { Publication } from './publication.model';
+import type { PublishedSceneDefinition } from './published-scene-definition.model';
 import type { RuntimeEvent } from './runtime-event.model';
 import type { Scene } from './scene.model';
 import type { User } from './user.model';
@@ -35,6 +36,7 @@ export class Project extends Model<InferAttributes<Project>, InferCreationAttrib
   declare assets?: NonAttribute<Asset[]>;
   declare scenes?: NonAttribute<Scene[]>;
   declare publications?: NonAttribute<Publication[]>;
+  declare publishedSceneDefinitions?: NonAttribute<PublishedSceneDefinition[]>;
   declare runtimeEvents?: NonAttribute<RuntimeEvent[]>;
 
   static initialize(sequelize: Sequelize): typeof Project {

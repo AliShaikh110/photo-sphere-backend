@@ -1,6 +1,8 @@
 import 'dotenv/config';
 import path from 'node:path';
 import { z } from 'zod';
+import type { PanoramaTilingPolicy } from '../media/panorama-quality-policy';
+import type { TourStrategyPolicyConfig } from '../runtime';
 
 const booleanFromString = z
   .enum(['true', 'false'])
@@ -27,6 +29,20 @@ const envSchema = z
     STORAGE_ROOT: z.string().default('./storage'),
     MAX_IMAGE_UPLOAD_BYTES: z.coerce.number().int().positive().default(50 * 1024 * 1024),
     MAX_IMAGE_PIXELS: z.coerce.number().int().positive().default(80_000_000),
+    PANORAMA_TILING_ENABLED: z
+      .enum(['true', 'false'])
+      .default('true')
+      .transform((value) => value === 'true'),
+    PANORAMA_TILING_MIN_WIDTH: z.coerce.number().int().positive().default(6_144),
+    PANORAMA_TILING_MIN_SOURCE_BYTES: z.coerce.number().int().positive().default(12 * 1024 * 1024),
+    PANORAMA_TILING_MIN_LEVEL_WIDTH: z.coerce.number().int().positive().default(4_096),
+    PANORAMA_TILE_SIZE: z.coerce.number().int().min(128).max(2_048).default(512),
+    PANORAMA_TILE_QUALITY: z.coerce.number().int().min(1).max(100).default(82),
+    PANORAMA_TILE_MAX_LEVELS: z.coerce.number().int().min(1).max(8).default(4),
+    TOUR_INLINE_MAX_SCENES: z.coerce.number().int().nonnegative().default(32),
+    TOUR_INLINE_MAX_MANIFEST_BYTES: z.coerce.number().int().nonnegative().default(1_048_576),
+    TOUR_INLINE_MAX_CONNECTIONS: z.coerce.number().int().nonnegative().default(128),
+    TOUR_INLINE_MAX_AVERAGE_CONNECTIONS: z.coerce.number().nonnegative().default(5),
     UPLOAD_SESSION_TTL_SECONDS: z.coerce.number().int().positive().default(3600),
     SIGNED_MEDIA_TTL_SECONDS: z.coerce.number().int().positive().default(900),
     MEDIA_WORKER_MODE: z.enum(['embedded', 'external', 'disabled']).default('embedded'),
@@ -64,6 +80,8 @@ export type AppConfig = {
   storageRoot: string;
   maxImageUploadBytes: number;
   maxImagePixels: number;
+  panoramaTilingPolicy: PanoramaTilingPolicy;
+  tourStrategyPolicy: TourStrategyPolicyConfig;
   uploadSessionTtlSeconds: number;
   signedMediaTtlSeconds: number;
   mediaWorkerMode: 'embedded' | 'external' | 'disabled';
@@ -88,6 +106,22 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
     storageRoot: path.resolve(value.STORAGE_ROOT),
     maxImageUploadBytes: value.MAX_IMAGE_UPLOAD_BYTES,
     maxImagePixels: value.MAX_IMAGE_PIXELS,
+    panoramaTilingPolicy: {
+      enabled: value.PANORAMA_TILING_ENABLED,
+      minimumSourceWidth: value.PANORAMA_TILING_MIN_WIDTH,
+      minimumSourceBytes: value.PANORAMA_TILING_MIN_SOURCE_BYTES,
+      minimumLevelWidth: value.PANORAMA_TILING_MIN_LEVEL_WIDTH,
+      tileSize: value.PANORAMA_TILE_SIZE,
+      tileQuality: value.PANORAMA_TILE_QUALITY,
+      maximumLevels: value.PANORAMA_TILE_MAX_LEVELS
+    },
+    tourStrategyPolicy: {
+      version: 1,
+      maxInlineSceneCount: value.TOUR_INLINE_MAX_SCENES,
+      maxInlineManifestBytes: value.TOUR_INLINE_MAX_MANIFEST_BYTES,
+      maxInlineConnectionCount: value.TOUR_INLINE_MAX_CONNECTIONS,
+      maxInlineAverageConnectionsPerScene: value.TOUR_INLINE_MAX_AVERAGE_CONNECTIONS
+    },
     uploadSessionTtlSeconds: value.UPLOAD_SESSION_TTL_SECONDS,
     signedMediaTtlSeconds: value.SIGNED_MEDIA_TTL_SECONDS,
     mediaWorkerMode: value.MEDIA_WORKER_MODE,

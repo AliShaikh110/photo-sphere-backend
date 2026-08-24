@@ -36,11 +36,13 @@ export type ValidationEntityType = 'project' | 'scene' | 'hotspot' | 'asset' | '
 
 export interface ValidationIssue {
   readonly code: CanonicalValidationCode | string;
+  readonly severity?: 'error' | 'warning';
   readonly message: string;
   readonly entityType: ValidationEntityType;
   readonly entityId?: string;
   readonly path: string;
   readonly retryable: boolean;
+  readonly alternatives?: readonly string[];
 }
 
 export interface CanonicalValidationResult {
@@ -169,6 +171,7 @@ export function validateCanonicalProject(
 
   const sceneIds = new Set<string>();
   const hotspotIds = new Set<string>();
+  const connectionIds = new Set<string>();
   for (const [sceneIndex, sceneValue] of scenes.entries()) {
     const scenePath = `scenes[${sceneIndex}]`;
     const scene = asRecord(sceneValue);
@@ -232,7 +235,15 @@ export function validateCanonicalProject(
 
     validateInitialView(scene.initialView, `${scenePath}.initialView`, sceneContext, issues);
     validateViewLimits(scene.viewLimits, `${scenePath}.viewLimits`, sceneContext, issues);
-    validateConnections(scene.connections, scenePath, sceneContext, issues);
+    validateConnections(
+      scene.connections,
+      sceneId,
+      scenePath,
+      sceneContext,
+      connectionIds,
+      issues,
+    );
+    validateRuntimeHints(scene.runtimeHints, scenePath, sceneContext, issues);
 
     const hotspots = Array.isArray(scene.hotspots) ? scene.hotspots : undefined;
     if (hotspots === undefined) {
@@ -258,7 +269,7 @@ export function validateCanonicalProject(
     }
   }
 
-  validateSceneReferences(project, sceneIds, issues);
+  validateSceneReferences(project, sceneIds, hotspotIds, issues);
   return result(issues);
 }
 
@@ -366,11 +377,79 @@ function validateSettings(
 
   validateBooleanObject(
     settings.navigation,
-    ['mouse', 'touch', 'zoom', 'keyboard', 'fullscreen', 'navigationButtons'],
+    ['mouse', 'touch', 'zoom', 'keyboard', 'fullscreen', 'navigationButtons', 'sceneNavigation'],
     'settings.navigation',
     projectContext,
     issues,
   );
+
+  validateBooleanObject(
+    settings.gallery,
+    ['enabled', 'showSceneNames', 'showThumbnails'],
+    'settings.gallery',
+    projectContext,
+    issues,
+  );
+  validateBooleanObject(
+    settings.compass,
+    ['enabled'],
+    'settings.compass',
+    projectContext,
+    issues,
+  );
+
+  const autorotation = asRecord(settings.autorotation);
+  if (settings.autorotation !== undefined && autorotation === undefined) {
+    issues.push(issue(
+      'INVALID_FIELD',
+      'settings.autorotation must be an object.',
+      withPath(projectContext, 'settings.autorotation'),
+    ));
+  } else if (autorotation !== undefined) {
+    for (const field of ['enabled', 'startAutomatically'] as const) {
+      if (autorotation[field] !== undefined && typeof autorotation[field] !== 'boolean') {
+        issues.push(issue(
+          'INVALID_FIELD',
+          `${field} must be a boolean.`,
+          withPath(projectContext, `settings.autorotation.${field}`),
+        ));
+      }
+    }
+    if (autorotation.speedDegreesPerSecond !== undefined) {
+      validateNumberRange(
+        autorotation.speedDegreesPerSecond,
+        0.1,
+        30,
+        'settings.autorotation.speedDegreesPerSecond',
+        projectContext,
+        issues,
+      );
+    }
+    if (autorotation.direction !== undefined
+      && !['clockwise', 'counterclockwise'].includes(String(autorotation.direction))) {
+      issues.push(issue(
+        'INVALID_FIELD',
+        'direction must be clockwise or counterclockwise.',
+        withPath(projectContext, 'settings.autorotation.direction'),
+      ));
+    }
+  }
+
+  const quality = asRecord(settings.quality);
+  if (settings.quality !== undefined && quality === undefined) {
+    issues.push(issue(
+      'INVALID_FIELD',
+      'settings.quality must be an object.',
+      withPath(projectContext, 'settings.quality'),
+    ));
+  } else if (quality?.preference !== undefined
+    && !['automatic', 'standard', 'high'].includes(String(quality.preference))) {
+    issues.push(issue(
+      'INVALID_FIELD',
+      'quality preference must be automatic, standard, or high.',
+      withPath(projectContext, 'settings.quality.preference'),
+    ));
+  }
 
   const information = asRecord(settings.information);
   if (settings.information !== undefined && information === undefined) {
@@ -437,8 +516,10 @@ function validateBranding(
 
 function validateConnections(
   value: unknown,
+  sourceSceneId: string | undefined,
   scenePath: string,
   context: IssueContext,
+  connectionIds: Set<string>,
   issues: ValidationIssue[],
 ): void {
   if (value === undefined) {
@@ -459,18 +540,111 @@ function validateConnections(
       issues.push(issue('INVALID_FIELD', 'Connection must be an object.', { ...context, path }));
       continue;
     }
-    if (connection.id !== undefined) {
-      requireNonEmptyString(connection.id, `${path}.id`, context, issues, true);
+    requireNonEmptyString(connection.id, `${path}.id`, context, issues, true);
+    if (typeof connection.id === 'string') {
+      if (connectionIds.has(connection.id)) {
+        issues.push(issue(
+          'DUPLICATE_ENTITY_ID',
+          'Connection IDs must be unique within a project.',
+          { ...context, path: `${path}.id` },
+        ));
+      }
+      connectionIds.add(connection.id);
     }
-    if (connection.targetSceneId !== undefined) {
-      requireNonEmptyString(
-        connection.targetSceneId,
-        `${path}.targetSceneId`,
-        context,
-        issues,
-        true,
-      );
+    requireNonEmptyString(
+      connection.sourceSceneId,
+      `${path}.sourceSceneId`,
+      context,
+      issues,
+      true,
+    );
+    requireNonEmptyString(
+      connection.targetSceneId,
+      `${path}.targetSceneId`,
+      context,
+      issues,
+      true,
+    );
+    if (sourceSceneId !== undefined && connection.sourceSceneId !== sourceSceneId) {
+      issues.push(issue(
+        'REFERENCE_FORBIDDEN',
+        'The connection source must match its containing scene.',
+        { ...context, path: `${path}.sourceSceneId` },
+      ));
     }
+    for (const field of ['triggerHotspotId', 'label'] as const) {
+      if (connection[field] !== undefined && typeof connection[field] !== 'string') {
+        issues.push(issue(
+          'INVALID_FIELD',
+          `${field} must be a string.`,
+          { ...context, path: `${path}.${field}` },
+        ));
+      }
+    }
+    if (connection.importance !== undefined) {
+      validateNumberRange(connection.importance, 0, 100, `${path}.importance`, context, issues);
+    }
+    if (connection.preloadHint !== undefined
+      && !['none', 'normal', 'high'].includes(String(connection.preloadHint))) {
+      issues.push(issue(
+        'INVALID_FIELD',
+        'preloadHint must be none, normal, or high.',
+        { ...context, path: `${path}.preloadHint` },
+      ));
+    }
+    const content = asRecord(connection.content);
+    if (connection.content !== undefined && content === undefined) {
+      issues.push(issue(
+        'INVALID_FIELD',
+        'Connection content must be an object.',
+        { ...context, path: `${path}.content` },
+      ));
+    } else if (content !== undefined) {
+      for (const field of ['title', 'description'] as const) {
+        if (content[field] !== undefined && typeof content[field] !== 'string') {
+          issues.push(issue(
+            'INVALID_FIELD',
+            `${field} must be a string.`,
+            { ...context, path: `${path}.content.${field}` },
+          ));
+        }
+      }
+    }
+  }
+}
+
+function validateRuntimeHints(
+  value: unknown,
+  scenePath: string,
+  context: IssueContext,
+  issues: ValidationIssue[],
+): void {
+  if (value === undefined) return;
+  const hints = asRecord(value);
+  const path = `${scenePath}.runtimeHints`;
+  if (hints === undefined) {
+    issues.push(issue('INVALID_FIELD', 'runtimeHints must be an object.', { ...context, path }));
+    return;
+  }
+  if (hints.preloadPriority !== undefined) {
+    validateNumberRange(hints.preloadPriority, 0, 100, `${path}.preloadPriority`, context, issues);
+  }
+  if (hints.qualityPreference !== undefined
+    && !['automatic', 'standard', 'high'].includes(String(hints.qualityPreference))) {
+    issues.push(issue(
+      'INVALID_FIELD',
+      'qualityPreference must be automatic, standard, or high.',
+      { ...context, path: `${path}.qualityPreference` },
+    ));
+  }
+  if (hints.likelyNextSceneIds !== undefined
+    && (!Array.isArray(hints.likelyNextSceneIds)
+      || hints.likelyNextSceneIds.some((id) => typeof id !== 'string'))) {
+    issues.push(issue(
+      'INVALID_FIELD',
+      'likelyNextSceneIds must be an array of scene IDs.',
+      { ...context, path: `${path}.likelyNextSceneIds` },
+    ));
   }
 }
 
@@ -668,6 +842,7 @@ function validateHotspotContent(
     'buttonLabel',
     'externalUrl',
     'imageAssetId',
+    'videoAssetId',
   ] as const) {
     if (content[key] !== undefined && typeof content[key] !== 'string') {
       issues.push(issue(
@@ -692,6 +867,18 @@ function validateHotspotContent(
       content.imageAssetId,
       ['panorama_image', 'image', 'logo'],
       `${hotspotPath}.content.imageAssetId`,
+      context,
+      project,
+      assets,
+      options,
+      issues,
+    );
+  }
+  if (typeof content.videoAssetId === 'string') {
+    validateAssetReference(
+      content.videoAssetId,
+      ['video'],
+      `${hotspotPath}.content.videoAssetId`,
       context,
       project,
       assets,
@@ -768,6 +955,7 @@ function validateHotspotAction(
 function validateSceneReferences(
   project: UnknownRecord,
   sceneIds: ReadonlySet<string>,
+  hotspotIds: ReadonlySet<string>,
   issues: ValidationIssue[],
 ): void {
   if (!Array.isArray(project.scenes)) {
@@ -795,6 +983,32 @@ function validateSceneReferences(
             {
               ...sceneContext,
               path: `scenes[${sceneIndex}].connections[${connectionIndex}].targetSceneId`,
+            },
+          ));
+        }
+        if (connection !== undefined && typeof connection.triggerHotspotId === 'string'
+          && !hotspotIds.has(connection.triggerHotspotId)) {
+          issues.push(issue(
+            'REFERENCE_NOT_FOUND',
+            'The connection trigger hotspot does not exist.',
+            {
+              ...sceneContext,
+              path: `scenes[${sceneIndex}].connections[${connectionIndex}].triggerHotspotId`,
+            },
+          ));
+        }
+      }
+    }
+    const runtimeHints = asRecord(scene.runtimeHints);
+    if (Array.isArray(runtimeHints?.likelyNextSceneIds)) {
+      for (const [hintIndex, targetId] of runtimeHints.likelyNextSceneIds.entries()) {
+        if (typeof targetId === 'string' && !sceneIds.has(targetId)) {
+          issues.push(issue(
+            'REFERENCE_NOT_FOUND',
+            'The suggested next scene does not exist.',
+            {
+              ...sceneContext,
+              path: `scenes[${sceneIndex}].runtimeHints.likelyNextSceneIds[${hintIndex}]`,
             },
           ));
         }

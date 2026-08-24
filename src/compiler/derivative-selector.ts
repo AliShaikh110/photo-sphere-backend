@@ -12,6 +12,7 @@ export const BASELINE_PANORAMA_DERIVATIVE_KINDS = [
 export interface SelectedPanoramaDerivatives {
   readonly lowResolutionBase: AssetDerivative;
   readonly standardWeb: AssetDerivative;
+  readonly tiledLevels?: AssetDerivative;
 }
 
 /** Catalog entries pre-dating per-derivative readiness are already persisted outputs. */
@@ -48,15 +49,31 @@ export function selectPreferredReadyDerivative(
 export function selectPanoramaDerivatives(
   asset: Pick<CanonicalAsset, 'id' | 'derivatives'>,
 ): SelectedPanoramaDerivatives | undefined {
-  const lowResolutionBase = selectLatestReadyDerivative(
-    asset.derivatives,
-    'lowResolutionBase',
-  );
-  const standardWeb = selectLatestReadyDerivative(asset.derivatives, 'standardWeb');
-  if (lowResolutionBase === undefined || standardWeb === undefined) {
-    return undefined;
+  const versions = [...new Set(asset.derivatives
+    .filter((candidate) => isDerivativeReady(candidate))
+    .map((candidate) => candidate.version))]
+    .sort((left, right) => right - left);
+  for (const version of versions) {
+    const versionDerivatives = asset.derivatives.filter(
+      (candidate) => candidate.version === version && isDerivativeReady(candidate),
+    );
+    const lowResolutionBase = versionDerivatives
+      .filter((candidate) => candidate.kind === 'lowResolutionBase')
+      .sort(compareDerivativeCandidates)[0];
+    const standardWeb = versionDerivatives
+      .filter((candidate) => candidate.kind === 'standardWeb')
+      .sort(compareDerivativeCandidates)[0];
+    if (lowResolutionBase === undefined || standardWeb === undefined) continue;
+    const tiledLevels = versionDerivatives
+      .filter((candidate) => candidate.kind === 'tiledLevels')
+      .sort(compareDerivativeCandidates)[0];
+    return Object.freeze({
+      lowResolutionBase,
+      standardWeb,
+      ...(tiledLevels === undefined ? {} : { tiledLevels }),
+    });
   }
-  return Object.freeze({ lowResolutionBase, standardWeb });
+  return undefined;
 }
 
 export class DerivativeSelectionError extends Error {
@@ -107,4 +124,3 @@ function timestamp(value: Date | string | undefined): number {
   const result = value instanceof Date ? value.getTime() : Date.parse(value);
   return Number.isFinite(result) ? result : 0;
 }
-

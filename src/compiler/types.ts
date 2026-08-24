@@ -9,11 +9,21 @@ import type {
   JsonObject,
   SphericalPosition,
 } from '../domain/types';
+import type {
+  AppliedCapabilityFallback,
+  CapabilityId,
+  RuntimeModuleDeclaration,
+} from '../capabilities/types';
+import type {
+  CompiledRuntimeCachePolicy,
+  SceneTransitionFailureCategory,
+} from '../runtime';
 import type { CompiledPanoramaCrop } from './panorama-metadata';
 
 export type { CompiledPanoramaCrop } from './panorama-metadata';
 
-export const COMPILED_MANIFEST_VERSION = 1 as const;
+export const COMPILED_MANIFEST_VERSION = 2 as const;
+export const COMPILED_SCENE_VERSION = 1 as const;
 
 export type CompileTarget = 'preview' | 'publication';
 export type PublicationVisibility = 'public' | 'private';
@@ -25,6 +35,8 @@ export interface CompileExperienceInput {
   readonly target: CompileTarget;
   readonly publicationRevision?: number;
   readonly visibility?: PublicationVisibility;
+  /** Required for revision-pinned progressive scene URLs in published output. */
+  readonly publicationSlug?: string;
 }
 
 export interface MediaUrlResolutionRequest {
@@ -66,6 +78,23 @@ export interface CompiledPanoramaMedia {
   readonly crop?: CompiledPanoramaCrop;
   readonly base: CompiledMediaReference;
   readonly primary: CompiledMediaReference;
+  readonly tiles?: CompiledTiledPanoramaMedia;
+}
+
+export interface CompiledTileLevel {
+  readonly level: number;
+  readonly width: number;
+  readonly height: number;
+  readonly columns: number;
+  readonly rows: number;
+}
+
+export interface CompiledTiledPanoramaMedia {
+  readonly manifest: CompiledMediaReference;
+  /** A delivery URL template using {level}, {x}, and {y} placeholders. */
+  readonly tileUrlTemplate: string;
+  readonly tileSize: number;
+  readonly levels: readonly CompiledTileLevel[];
 }
 
 export interface CompiledInformationButton {
@@ -91,7 +120,9 @@ export interface CompiledHotspotContent {
   readonly buttonLabel?: string;
   readonly externalUrl?: string;
   readonly imageAssetId?: string;
+  readonly videoAssetId?: string;
   readonly image?: CompiledMediaReference;
+  readonly video?: CompiledMediaReference;
   readonly properties: JsonObject;
 }
 
@@ -128,6 +159,28 @@ export interface CompiledScene {
   readonly connections: readonly JsonObject[];
   readonly spatialData: JsonObject;
   readonly runtimeHints: JsonObject;
+  readonly preloadSceneIds: readonly string[];
+}
+
+export interface CompiledSceneIndexEntry {
+  readonly id: string;
+  readonly name: string;
+  readonly sortOrder: number;
+  readonly isPrimary: boolean;
+  readonly panoramaAssetId: string;
+  /** Lightweight/base media used by gallery UIs without fetching the full scene definition. */
+  readonly thumbnail: CompiledMediaReference;
+  readonly hasHotspots: boolean;
+  readonly connectionTargetSceneIds: readonly string[];
+}
+
+export type TourDeliveryStrategy = 'embedded' | 'progressive';
+
+export interface CompiledTourDelivery {
+  readonly strategy: TourDeliveryStrategy;
+  readonly sceneIndexVersion: string;
+  readonly sceneIndex: readonly CompiledSceneIndexEntry[];
+  readonly sceneDefinitionUrlTemplate?: string;
 }
 
 export interface CompiledBranding {
@@ -145,15 +198,32 @@ export interface CompiledBranding {
 }
 
 export interface RuntimeCapabilityDeclaration {
-  readonly id: string;
+  readonly id: CapabilityId;
   readonly required: boolean;
   readonly fallback?: string;
 }
 
+export interface CompiledRuntimeCacheContract {
+  readonly defaultProfile: 'standard';
+  readonly profiles: {
+    readonly constrained: CompiledRuntimeCachePolicy;
+    readonly standard: CompiledRuntimeCachePolicy;
+    readonly capable: CompiledRuntimeCachePolicy;
+  };
+}
+
 export interface RuntimeDeclarations {
   readonly modules: readonly string[];
+  readonly moduleDeclarations: readonly RuntimeModuleDeclaration[];
+  readonly capabilityFallbacks: readonly AppliedCapabilityFallback[];
+  readonly preload: {
+    readonly strategy: 'selective-adjacent';
+    readonly maxScenesPerSource: 2;
+    readonly content: 'scene-definition-and-base-media';
+  };
+  readonly cache: CompiledRuntimeCacheContract;
   readonly fallbackPolicy: {
-    readonly panorama: 'low-resolution-base-then-standard-web';
+    readonly panorama: 'low-resolution-base-then-standard-or-tiled-detail';
     readonly optionalCapabilities: 'continue-without-capability';
   };
 }
@@ -162,8 +232,10 @@ export const BASELINE_TELEMETRY_EVENTS = [
   'experience_load_started',
   'first_panorama_visible',
   'time_to_interactive',
+  'scene_changed',
   'hotspot_clicked',
   'asset_failed',
+  'scene_transition_failed',
   'viewer_error',
   'experience_exited',
 ] as const;
@@ -175,6 +247,7 @@ export interface CompiledTelemetryMetadata {
   readonly publicationRevision: number | null;
   readonly viewerIntegrationVersion: string;
   readonly events: readonly (typeof BASELINE_TELEMETRY_EVENTS)[number][];
+  readonly sceneTransitionFailureCategories: readonly SceneTransitionFailureCategory[];
 }
 
 /** This opaque JSON is renderer-specific and may only be created by an adapter. */
@@ -184,16 +257,40 @@ export interface ViewerIntegrationOutput {
   readonly config: JsonObject;
 }
 
+export interface ViewerSceneIntegrationOutput {
+  readonly rendererId: string;
+  readonly viewerIntegrationVersion: string;
+  readonly sceneId: string;
+  readonly config: JsonObject;
+}
+
 export interface ViewerIntegrationInput {
   readonly initialSceneId: string;
   readonly settings: CanonicalProjectSettings;
   readonly branding: CompiledBranding;
   readonly scenes: readonly CompiledScene[];
+  /** Complete lightweight index, including scenes delivered progressively. */
+  readonly sceneIndex?: readonly CompiledSceneIndexEntry[];
 }
 
 export interface ViewerIntegrationAdapter {
   readonly viewerIntegrationVersion: string;
   adapt(input: ViewerIntegrationInput): ViewerIntegrationOutput;
+  adaptScene(scene: CompiledScene): ViewerSceneIntegrationOutput;
+}
+
+export interface CompiledPublishedSceneDefinition {
+  readonly sceneDefinitionVersion: typeof COMPILED_SCENE_VERSION;
+  readonly experienceId: string;
+  readonly publicationRevision: number;
+  readonly viewerIntegrationVersion: string;
+  readonly scene: CompiledScene;
+  readonly viewerIntegration: ViewerSceneIntegrationOutput;
+}
+
+export interface CompiledExperienceBundle {
+  readonly manifest: CompiledExperienceManifest;
+  readonly sceneDefinitions: readonly CompiledPublishedSceneDefinition[];
 }
 
 export interface CompiledExperienceManifest {
@@ -210,7 +307,9 @@ export interface CompiledExperienceManifest {
   readonly initialSceneId: string;
   readonly settings: CanonicalProjectSettings;
   readonly branding: CompiledBranding;
+  /** All definitions for embedded tours; only the initial definition for progressive tours. */
   readonly scenes: readonly CompiledScene[];
+  readonly tour: CompiledTourDelivery;
   readonly capabilities: readonly RuntimeCapabilityDeclaration[];
   readonly runtime: RuntimeDeclarations;
   readonly telemetry: CompiledTelemetryMetadata;

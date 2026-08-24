@@ -312,7 +312,7 @@ export const CAPABILITY_DEFINITIONS = Object.freeze(
 
 export function getCapabilityDefinition<Id extends CapabilityId>(
   id: Id,
-): CapabilityDefinition<Id> {
+): CapabilityRegistry[Id] {
   return CAPABILITY_REGISTRY[id];
 }
 

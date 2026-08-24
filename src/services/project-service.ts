@@ -1,8 +1,9 @@
 import { Op, type Transaction } from 'sequelize';
 import { sequelize } from '../database';
 import { AppError, conflict, notFound } from '../errors/app-error';
-import { Asset, Hotspot, Project, Scene, User } from '../models';
+import { Asset, Hotspot, Project, Scene, SceneConnection, User } from '../models';
 import type { JsonObject, JsonValue } from '../models/model.types';
+import { sanitizePlainText } from '../security';
 import {
   sanitizeBranding,
   sanitizeHotspotAction,
@@ -114,6 +115,21 @@ function hotspotPayload(hotspot: Hotspot): Record<string, unknown> {
   };
 }
 
+function connectionPayload(connection: SceneConnection): Record<string, unknown> {
+  return {
+    id: connection.id,
+    sourceSceneId: connection.sourceSceneId,
+    targetSceneId: connection.targetSceneId,
+    ...(connection.triggerHotspotId === null ? {} : { triggerHotspotId: connection.triggerHotspotId }),
+    ...(connection.label === null ? {} : { label: connection.label }),
+    content: connection.content,
+    ...(connection.importance === null ? {} : { importance: connection.importance }),
+    ...(connection.preloadHint === null ? {} : { preloadHint: connection.preloadHint }),
+    createdAt: connection.createdAt,
+    updatedAt: connection.updatedAt
+  };
+}
+
 function scenePayload(scene: Scene): Record<string, unknown> {
   return {
     id: scene.id,
@@ -125,7 +141,7 @@ function scenePayload(scene: Scene): Record<string, unknown> {
     initialView: scene.initialView,
     viewLimits: scene.viewLimits,
     overlays: scene.overlays,
-    connections: scene.connections,
+    connections: scene.connections?.map(connectionPayload) ?? [],
     spatialData: scene.spatialData,
     runtimeHints: scene.runtimeHints,
     hotspots: scene.hotspots?.map(hotspotPayload) ?? [],
@@ -181,12 +197,21 @@ export async function readProject(projectId: string, ownerId: string): Promise<R
   const project = await Project.findOne({
     where: { id: projectId, ownerId },
     include: [
-      { model: Scene, as: 'scenes', include: [{ model: Hotspot, as: 'hotspots' }] },
+      {
+        model: Scene,
+        as: 'scenes',
+        include: [
+          { model: Hotspot, as: 'hotspots' },
+          { model: SceneConnection, as: 'connections' }
+        ]
+      },
       { model: Asset, as: 'assets' }
     ],
     order: [
       [{ model: Scene, as: 'scenes' }, 'sortOrder', 'ASC'],
-      [{ model: Scene, as: 'scenes' }, { model: Hotspot, as: 'hotspots' }, 'sortOrder', 'ASC']
+      [{ model: Scene, as: 'scenes' }, 'id', 'ASC'],
+      [{ model: Scene, as: 'scenes' }, { model: Hotspot, as: 'hotspots' }, 'sortOrder', 'ASC'],
+      [{ model: Scene, as: 'scenes' }, { model: SceneConnection, as: 'connections' }, 'id', 'ASC']
     ]
   });
   if (!project) throw notFound('project', projectId);
@@ -292,6 +317,32 @@ async function assertDisplayAsset(
   }
 }
 
+async function assertVideoAsset(
+  assetId: string,
+  projectId: string,
+  ownerId: string,
+  transaction: Transaction,
+  path: string
+): Promise<void> {
+  const asset = await Asset.findOne({
+    where: {
+      id: assetId,
+      ownerId,
+      mediaType: 'video',
+      [Op.or]: [{ projectId }, { projectId: null }]
+    },
+    transaction,
+    lock: transaction.LOCK.KEY_SHARE
+  });
+  if (!asset) {
+    throw new AppError('INVALID_ASSET_REFERENCE', 'The video asset is not available to this project.', {
+      status: 422,
+      entityId: assetId,
+      path
+    });
+  }
+}
+
 async function validateHotspotAssetReferences(
   input: HotspotInput,
   projectId: string,
@@ -306,14 +357,26 @@ async function validateHotspotAssetReferences(
   if (typeof imageAssetId === 'string') {
     await assertDisplayAsset(imageAssetId, projectId, ownerId, transaction, 'content.imageAssetId');
   }
+  const videoAssetId = input.content?.videoAssetId;
+  if (typeof videoAssetId === 'string') {
+    await assertVideoAsset(videoAssetId, projectId, ownerId, transaction, 'content.videoAssetId');
+  }
 }
 
 export async function listScenes(projectId: string, ownerId: string): Promise<Record<string, unknown>[]> {
   await getOwnedProject(projectId, ownerId);
   const scenes = await Scene.findAll({
     where: { projectId },
-    include: [{ model: Hotspot, as: 'hotspots' }],
-    order: [['sortOrder', 'ASC'], [{ model: Hotspot, as: 'hotspots' }, 'sortOrder', 'ASC']]
+    include: [
+      { model: Hotspot, as: 'hotspots' },
+      { model: SceneConnection, as: 'connections' }
+    ],
+    order: [
+      ['sortOrder', 'ASC'],
+      ['id', 'ASC'],
+      [{ model: Hotspot, as: 'hotspots' }, 'sortOrder', 'ASC'],
+      [{ model: SceneConnection, as: 'connections' }, 'id', 'ASC']
+    ]
   });
   return scenes.map(scenePayload);
 }
@@ -322,11 +385,29 @@ export async function getScene(projectId: string, sceneId: string, ownerId: stri
   await getOwnedProject(projectId, ownerId);
   const scene = await Scene.findOne({
     where: { id: sceneId, projectId },
-    include: [{ model: Hotspot, as: 'hotspots' }]
+    include: [
+      { model: Hotspot, as: 'hotspots' },
+      { model: SceneConnection, as: 'connections' }
+    ],
+    order: [
+      [{ model: Hotspot, as: 'hotspots' }, 'sortOrder', 'ASC'],
+      [{ model: SceneConnection, as: 'connections' }, 'id', 'ASC']
+    ]
   });
   if (!scene) throw notFound('scene', sceneId);
   return scenePayload(scene);
 }
+
+type SceneConnectionInput = {
+  id?: string;
+  sourceSceneId?: string;
+  targetSceneId: string;
+  triggerHotspotId?: string | null;
+  label?: string | null;
+  content?: Record<string, unknown>;
+  importance?: number | null;
+  preloadHint?: 'none' | 'normal' | 'high' | null;
+};
 
 type SceneInput = {
   projectRevision: number;
@@ -335,10 +416,210 @@ type SceneInput = {
   initialView?: Record<string, unknown>;
   viewLimits?: Record<string, unknown>;
   overlays?: Record<string, unknown>[];
-  connections?: Record<string, unknown>[];
+  connections?: SceneConnectionInput[];
   spatialData?: Record<string, unknown>;
   runtimeHints?: Record<string, unknown>;
 };
+
+function sanitizeSceneConnection(input: SceneConnectionInput): {
+  targetSceneId: string;
+  triggerHotspotId: string | null;
+  label: string | null;
+  content: JsonObject;
+  importance: number | null;
+  preloadHint: 'none' | 'normal' | 'high' | null;
+} {
+  const label = input.label === undefined || input.label === null
+    ? null
+    : sanitizePlainText(input.label).trim() || null;
+  const content: JsonObject = {};
+  if (input.content?.title !== undefined) {
+    content.title = sanitizePlainText(input.content.title).trim();
+  }
+  if (input.content?.description !== undefined) {
+    content.description = sanitizePlainText(input.content.description).trim();
+  }
+  return {
+    targetSceneId: input.targetSceneId,
+    triggerHotspotId: input.triggerHotspotId ?? null,
+    label,
+    content,
+    importance: input.importance ?? null,
+    preloadHint: input.preloadHint ?? null
+  };
+}
+
+async function validateSceneConnections(
+  projectId: string,
+  sourceSceneId: string,
+  connections: readonly SceneConnectionInput[],
+  transaction: Transaction
+): Promise<void> {
+  const inputIds = new Set<string>();
+  for (const [index, connection] of connections.entries()) {
+    if (connection.sourceSceneId !== undefined && connection.sourceSceneId !== sourceSceneId) {
+      throw new AppError('INVALID_CONNECTION_SOURCE', 'The connection source must match the scene being saved.', {
+        status: 422,
+        entityId: connection.sourceSceneId,
+        path: `connections[${index}].sourceSceneId`
+      });
+    }
+    if (connection.targetSceneId === sourceSceneId) {
+      throw new AppError('INVALID_SCENE_REFERENCE', 'A scene cannot connect to itself.', {
+        status: 422,
+        entityId: sourceSceneId,
+        path: `connections[${index}].targetSceneId`
+      });
+    }
+    if (connection.id !== undefined) {
+      if (inputIds.has(connection.id)) {
+        throw new AppError('DUPLICATE_CONNECTION_ID', 'Connection IDs must be unique within a scene.', {
+          status: 422,
+          entityId: connection.id,
+          path: `connections[${index}].id`
+        });
+      }
+      inputIds.add(connection.id);
+    }
+  }
+
+  const targetIds = [...new Set(connections.map((connection) => connection.targetSceneId))];
+  const targets = targetIds.length === 0
+    ? []
+    : await Scene.findAll({
+      where: { id: { [Op.in]: targetIds }, projectId },
+      attributes: ['id'],
+      transaction,
+      lock: transaction.LOCK.KEY_SHARE
+    });
+  const availableTargetIds = new Set(targets.map((target) => target.id));
+  for (const [index, connection] of connections.entries()) {
+    if (!availableTargetIds.has(connection.targetSceneId)) {
+      throw new AppError('INVALID_SCENE_REFERENCE', 'The connection target scene does not exist in this project.', {
+        status: 422,
+        entityId: connection.targetSceneId,
+        path: `connections[${index}].targetSceneId`
+      });
+    }
+  }
+
+  const triggerIds = [...new Set(connections.flatMap((connection) => (
+    connection.triggerHotspotId ? [connection.triggerHotspotId] : []
+  )))];
+  const triggers = triggerIds.length === 0
+    ? []
+    : await Hotspot.findAll({
+      where: { id: { [Op.in]: triggerIds }, sceneId: sourceSceneId },
+      attributes: ['id'],
+      transaction,
+      lock: transaction.LOCK.KEY_SHARE
+    });
+  const availableTriggerIds = new Set(triggers.map((hotspot) => hotspot.id));
+  for (const [index, connection] of connections.entries()) {
+    if (connection.triggerHotspotId && !availableTriggerIds.has(connection.triggerHotspotId)) {
+      throw new AppError(
+        'INVALID_HOTSPOT_REFERENCE',
+        'The connection trigger hotspot must belong to the source scene.',
+        {
+          status: 422,
+          entityId: connection.triggerHotspotId,
+          path: `connections[${index}].triggerHotspotId`
+        }
+      );
+    }
+  }
+
+  if (inputIds.size > 0) {
+    const ownedConnections = await SceneConnection.findAll({
+      where: { id: { [Op.in]: [...inputIds] } },
+      attributes: ['id', 'sourceSceneId'],
+      transaction,
+      lock: transaction.LOCK.KEY_SHARE
+    });
+    const conflicting = ownedConnections.find((connection) => connection.sourceSceneId !== sourceSceneId);
+    if (conflicting) {
+      const index = connections.findIndex((connection) => connection.id === conflicting.id);
+      throw new AppError('CONNECTION_ID_CONFLICT', 'That connection ID belongs to a different scene.', {
+        status: 409,
+        entityId: conflicting.id,
+        path: `connections[${index}].id`
+      });
+    }
+  }
+}
+
+async function replaceSceneConnections(
+  projectId: string,
+  sourceSceneId: string,
+  inputs: readonly SceneConnectionInput[],
+  transaction: Transaction
+): Promise<void> {
+  await validateSceneConnections(projectId, sourceSceneId, inputs, transaction);
+  const existing = await SceneConnection.findAll({
+    where: { sourceSceneId },
+    transaction,
+    lock: transaction.LOCK.UPDATE
+  });
+  const existingById = new Map(existing.map((connection) => [connection.id, connection]));
+  const retainedIds = new Set<string>();
+
+  for (const input of inputs) {
+    const values = sanitizeSceneConnection(input);
+    const current = input.id === undefined ? undefined : existingById.get(input.id);
+    if (current) {
+      retainedIds.add(current.id);
+      await current.update(values, { transaction });
+      continue;
+    }
+    const created = await SceneConnection.create(
+      {
+        ...(input.id === undefined ? {} : { id: input.id }),
+        sourceSceneId,
+        ...values
+      },
+      { transaction }
+    );
+    retainedIds.add(created.id);
+  }
+
+  const removedIds = existing
+    .filter((connection) => !retainedIds.has(connection.id))
+    .map((connection) => connection.id);
+  if (removedIds.length > 0) {
+    await SceneConnection.destroy({ where: { id: { [Op.in]: removedIds } }, transaction });
+  }
+}
+
+async function loadSceneGraph(
+  projectId: string,
+  sceneId: string,
+  transaction: Transaction
+): Promise<Scene> {
+  const scene = await Scene.findOne({
+    where: { id: sceneId, projectId },
+    include: [
+      { model: Hotspot, as: 'hotspots' },
+      { model: SceneConnection, as: 'connections' }
+    ],
+    order: [
+      [{ model: Hotspot, as: 'hotspots' }, 'sortOrder', 'ASC'],
+      [{ model: SceneConnection, as: 'connections' }, 'id', 'ASC']
+    ],
+    transaction
+  });
+  if (!scene) throw notFound('scene', sceneId);
+  return scene;
+}
+
+async function normalizeSceneRows(scenes: readonly Scene[], transaction: Transaction): Promise<void> {
+  const primary = scenes.find((scene) => scene.isPrimary) ?? scenes[0];
+  for (const [sortOrder, scene] of scenes.entries()) {
+    const isPrimary = scene.id === primary?.id;
+    if (scene.sortOrder !== sortOrder || scene.isPrimary !== isPrimary) {
+      await scene.update({ sortOrder, isPrimary }, { transaction });
+    }
+  }
+}
 
 export async function createScene(
   projectId: string,
@@ -348,31 +629,36 @@ export async function createScene(
   return sequelize.transaction(async (transaction) => {
     await getOwnedProject(projectId, ownerId, transaction);
     await assertPanoramaAsset(input.panoramaAssetId, projectId, ownerId, transaction);
+    const existingScenes = await Scene.findAll({
+      where: { projectId },
+      order: [['sortOrder', 'ASC'], ['createdAt', 'ASC'], ['id', 'ASC']],
+      transaction
+    });
+    await normalizeSceneRows(existingScenes, transaction);
     const revision = await bumpProjectRevision({
       projectId,
       ownerId,
       expectedRevision: input.projectRevision,
       transaction
     });
-    const count = await Scene.count({ where: { projectId }, transaction });
-    const maxSort = Number((await Scene.max('sortOrder', { where: { projectId }, transaction })) ?? -1);
     const scene = await Scene.create(
       {
         projectId,
         name: sanitizeRequiredPlainText(input.name, 'name'),
         panoramaAssetId: input.panoramaAssetId ?? null,
-        sortOrder: maxSort + 1,
-        isPrimary: count === 0,
+        sortOrder: existingScenes.length,
+        isPrimary: existingScenes.length === 0,
         initialView: (input.initialView ?? {}) as JsonObject,
         viewLimits: (input.viewLimits ?? {}) as JsonObject,
         overlays: (input.overlays ?? []) as JsonValue[],
-        connections: (input.connections ?? []) as JsonValue[],
         spatialData: (input.spatialData ?? {}) as JsonObject,
         runtimeHints: (input.runtimeHints ?? {}) as JsonObject
       },
       { transaction }
     );
-    return { scene: scenePayload(scene), projectRevision: revision };
+    await replaceSceneConnections(projectId, scene.id, input.connections ?? [], transaction);
+    const hydrated = await loadSceneGraph(projectId, scene.id, transaction);
+    return { scene: scenePayload(hydrated), projectRevision: revision };
   });
 }
 
@@ -404,20 +690,78 @@ export async function updateScene(
         ...(input.initialView === undefined ? {} : { initialView: input.initialView as JsonObject }),
         ...(input.viewLimits === undefined ? {} : { viewLimits: input.viewLimits as JsonObject }),
         ...(input.overlays === undefined ? {} : { overlays: input.overlays as JsonValue[] }),
-        ...(input.connections === undefined ? {} : { connections: input.connections as JsonValue[] }),
         ...(input.spatialData === undefined ? {} : { spatialData: input.spatialData as JsonObject }),
         ...(input.runtimeHints === undefined ? {} : { runtimeHints: input.runtimeHints as JsonObject })
       },
       { transaction }
     );
-    return { scene: scenePayload(scene), projectRevision: revision };
+    if (input.connections !== undefined) {
+      await replaceSceneConnections(projectId, scene.id, input.connections, transaction);
+    }
+    const hydrated = await loadSceneGraph(projectId, scene.id, transaction);
+    return { scene: scenePayload(hydrated), projectRevision: revision };
   });
 }
 
-function sceneReferencesTarget(scene: Scene, targetSceneId: string): boolean {
-  return scene.connections.some((connection) => {
-    if (!connection || typeof connection !== 'object' || Array.isArray(connection)) return false;
-    return (connection as JsonObject).targetSceneId === targetSceneId;
+export async function reorderScenes(
+  projectId: string,
+  ownerId: string,
+  input: { projectRevision: number; sceneIds: string[] }
+): Promise<Record<string, unknown>> {
+  return sequelize.transaction(async (transaction) => {
+    await getOwnedProject(projectId, ownerId, transaction);
+    const scenes = await Scene.findAll({
+      where: { projectId },
+      order: [['sortOrder', 'ASC'], ['createdAt', 'ASC'], ['id', 'ASC']],
+      transaction
+    });
+    const sceneById = new Map(scenes.map((scene) => [scene.id, scene]));
+    const requestedIds = new Set(input.sceneIds);
+    const missingSceneIds = scenes
+      .filter((scene) => !requestedIds.has(scene.id))
+      .map((scene) => scene.id);
+    const unknownSceneIds = input.sceneIds.filter((sceneId) => !sceneById.has(sceneId));
+    if (
+      input.sceneIds.length !== scenes.length
+      || requestedIds.size !== input.sceneIds.length
+      || missingSceneIds.length > 0
+      || unknownSceneIds.length > 0
+    ) {
+      throw new AppError('INVALID_SCENE_ORDER', 'The scene order must include every project scene exactly once.', {
+        status: 422,
+        path: 'sceneIds',
+        details: { missingSceneIds, unknownSceneIds }
+      });
+    }
+    const orderedScenes = input.sceneIds.map((sceneId) => sceneById.get(sceneId));
+    if (orderedScenes.some((scene) => scene === undefined)) {
+      throw new AppError('INVALID_SCENE_ORDER', 'The requested scene order is invalid.', {
+        status: 422,
+        path: 'sceneIds'
+      });
+    }
+    const revision = await bumpProjectRevision({
+      projectId,
+      ownerId,
+      expectedRevision: input.projectRevision,
+      transaction
+    });
+    await normalizeSceneRows(orderedScenes as Scene[], transaction);
+    const hydrated = await Scene.findAll({
+      where: { projectId },
+      include: [
+        { model: Hotspot, as: 'hotspots' },
+        { model: SceneConnection, as: 'connections' }
+      ],
+      order: [
+        ['sortOrder', 'ASC'],
+        ['id', 'ASC'],
+        [{ model: Hotspot, as: 'hotspots' }, 'sortOrder', 'ASC'],
+        [{ model: SceneConnection, as: 'connections' }, 'id', 'ASC']
+      ],
+      transaction
+    });
+    return { scenes: hydrated.map(scenePayload), projectRevision: revision };
   });
 }
 
@@ -433,16 +777,75 @@ export async function deleteScene(
     if (!scene) {
       throw notFound('scene', sceneId);
     }
-    const scenes = await Scene.findAll({ where: { projectId, id: { [Op.ne]: sceneId } }, transaction });
-    const hotspots = await Hotspot.findAll({
-      include: [{ model: Scene, as: 'scene', required: true, where: { projectId } }],
+    const scenes = await Scene.findAll({
+      where: { projectId, id: { [Op.ne]: sceneId } },
+      order: [['sortOrder', 'ASC'], ['createdAt', 'ASC'], ['id', 'ASC']],
       transaction
     });
-    const referenced = scenes.some((candidate) => sceneReferencesTarget(candidate, sceneId)) || hotspots.some(
+    const inboundConnections = await SceneConnection.findAll({
+      where: { targetSceneId: sceneId },
+      include: [{
+        model: Scene,
+        as: 'sourceScene',
+        required: true,
+        where: { projectId },
+        attributes: ['id', 'name']
+      }],
+      order: [['id', 'ASC']],
+      transaction
+    });
+    const hotspots = await Hotspot.findAll({
+      include: [{
+        model: Scene,
+        as: 'scene',
+        required: true,
+        where: { projectId, id: { [Op.ne]: sceneId } }
+      }],
+      transaction
+    });
+    const referringHotspots = hotspots.filter(
       (hotspot) => hotspot.action.kind === 'goToScene' && hotspot.action.sceneId === sceneId
     );
-    if (referenced) {
-      throw conflict('SCENE_IN_USE', 'The scene is referenced by another scene or hotspot.', { sceneId });
+    const runtimeHintReferences = scenes.flatMap((candidate) => {
+      const likelyNextSceneIds = candidate.runtimeHints.likelyNextSceneIds;
+      if (!Array.isArray(likelyNextSceneIds)) return [];
+      return likelyNextSceneIds.flatMap((targetSceneId, index) => (
+        targetSceneId === sceneId
+          ? [{
+              type: 'runtimeHint',
+              sourceSceneId: candidate.id,
+              path: `runtimeHints.likelyNextSceneIds[${index}]`
+            }]
+          : []
+      ));
+    });
+    if (
+      inboundConnections.length > 0
+      || referringHotspots.length > 0
+      || runtimeHintReferences.length > 0
+    ) {
+      throw conflict(
+        'SCENE_IN_USE',
+        'Remove the listed scene references before deleting this scene.',
+        {
+          sceneId,
+          references: [
+            ...inboundConnections.map((connection) => ({
+              type: 'sceneConnection',
+              id: connection.id,
+              sourceSceneId: connection.sourceSceneId,
+              ...(connection.label === null ? {} : { label: connection.label })
+            })),
+            ...referringHotspots.map((hotspot) => ({
+              type: 'hotspotAction',
+              id: hotspot.id,
+              sourceSceneId: hotspot.sceneId,
+              path: 'action.sceneId'
+            })),
+            ...runtimeHintReferences
+          ]
+        }
+      );
     }
     const revision = await bumpProjectRevision({
       projectId,
@@ -451,7 +854,7 @@ export async function deleteScene(
       transaction
     });
     await scene.destroy({ transaction });
-    if (scene.isPrimary && scenes[0]) await scenes[0].update({ isPrimary: true }, { transaction });
+    await normalizeSceneRows(scenes, transaction);
     return { deleted: true, sceneId, projectRevision: revision };
   });
 }
@@ -587,6 +990,27 @@ export async function deleteHotspot(
     });
     if (!hotspot) {
       throw notFound('hotspot', hotspotId);
+    }
+    const triggeredConnections = await SceneConnection.findAll({
+      where: { sourceSceneId: sceneId, triggerHotspotId: hotspotId },
+      attributes: ['id', 'targetSceneId', 'label'],
+      order: [['id', 'ASC']],
+      transaction
+    });
+    if (triggeredConnections.length > 0) {
+      throw conflict(
+        'HOTSPOT_IN_USE',
+        'Remove this hotspot from the listed scene connections before deleting it.',
+        {
+          hotspotId,
+          references: triggeredConnections.map((connection) => ({
+            type: 'sceneConnectionTrigger',
+            id: connection.id,
+            targetSceneId: connection.targetSceneId,
+            ...(connection.label === null ? {} : { label: connection.label })
+          }))
+        }
+      );
     }
     const revision = await bumpProjectRevision({
       projectId,

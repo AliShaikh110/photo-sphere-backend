@@ -9,6 +9,7 @@ import {
   listProjects,
   listScenes,
   readProject,
+  reorderScenes,
   updateHotspot,
   updateProject,
   updateScene
@@ -55,6 +56,11 @@ export async function readScene(request: Request, response: Response): Promise<v
 export async function addScene(request: Request, response: Response): Promise<void> {
   const result = await createScene(routeParam(request, 'projectId'), ownerId(request), request.body);
   sendData(response, result, { status: 201, message: 'Scene created.' });
+}
+
+export async function reorderProjectScenes(request: Request, response: Response): Promise<void> {
+  const result = await reorderScenes(routeParam(request, 'projectId'), ownerId(request), request.body);
+  sendData(response, result, { message: 'Scenes reordered.' });
 }
 
 export async function patchScene(request: Request, response: Response): Promise<void> {

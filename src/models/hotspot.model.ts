@@ -13,6 +13,7 @@ import {
 import { emptyJsonObject } from './model.types';
 import type { JsonObject } from './model.types';
 import type { Scene } from './scene.model';
+import type { SceneConnection } from './scene-connection.model';
 
 export class Hotspot extends Model<InferAttributes<Hotspot>, InferCreationAttributes<Hotspot>> {
   declare id: CreationOptional<string>;
@@ -28,6 +29,7 @@ export class Hotspot extends Model<InferAttributes<Hotspot>, InferCreationAttrib
   declare updatedAt: CreationOptional<Date>;
 
   declare scene?: NonAttribute<Scene>;
+  declare triggeredConnections?: NonAttribute<SceneConnection[]>;
 
   static initialize(sequelize: Sequelize): typeof Hotspot {
     if (sequelize.models.Hotspot === Hotspot) {

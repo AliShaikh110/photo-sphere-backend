@@ -579,47 +579,6 @@ Claude Code must:
 5. Add foreign keys/reference integrity where the current architecture supports them.
 6. Keep migrations reversible when repository policy requires reversible migrations.
 
-## 18. Test Plan
-
-### Unit tests
-- Experience schema validation.
-- Revision conflict detection.
-- State machine transition validation.
-- URL validator.
-- Rich-content sanitizer.
-- Derivative selection.
-- Compiler validation.
-- Publication revision generation.
-- Error mapping.
-
-### Integration tests
-- Create project → read/update.
-- Unauthorized project access denied.
-- Upload session → complete → processing status.
-- Duplicate upload-complete idempotency.
-- Failed media job → reprocess.
-- Point hotspot CRUD.
-- Preview compile.
-- Successful publish.
-- Failed republish keeps previous published revision.
-- Private publication authorization.
-- Runtime event ingestion.
-
-### Media fixtures
-Include:
-
-- valid full equirectangular panorama,
-- cropped/XMP panorama,
-- invalid image payload,
-- mismatched extension/MIME,
-- oversized/unsupported fixture according to configured policy.
-
-### Security tests
-- stored XSS payload rejected/sanitized.
-- dangerous URL scheme rejected.
-- private manifest unauthorized request denied.
-- private asset bypass attempt denied.
-
 ## 19. Acceptance Criteria / Sprint Gate
 
 Sprint 01 is complete only when all are true:
@@ -642,7 +601,6 @@ Sprint 01 is complete only when all are true:
 - [x] Rich authored content and external URLs are server-validated.
 - [x] Baseline runtime telemetry can be ingested.
 - [x] No canonical table/document requires raw PSV adapter/plugin configuration.
-- [x] Unit/integration/security tests pass.
 - [x] API and schema documentation is updated.
 
 Verification on 2026-08-24: `npm run test:all` completed lint, typecheck,

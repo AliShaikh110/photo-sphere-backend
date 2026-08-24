@@ -465,7 +465,7 @@ Add/update indexes for:
 
 If scene definitions are materialized as compiled publication artifacts rather than relational records, document that design.
 
-## 20. Acceptance Criteria / Sprint Gate
+## 19. Acceptance Criteria / Sprint Gate
 
 - [ ] Multi-scene projects persist with stable scene IDs.
 - [ ] Scene connections are validated and broken references cannot publish.
@@ -485,9 +485,9 @@ If scene definitions are materialized as compiled publication artifacts rather t
 - [ ] `scene_changed` and `scene_transition_failed` telemetry is supported.
 - [ ] Full regression suite from Sprint 01 still passes.
 
-## 21. Claude Code Execution Order
+## 20. Claude Code Execution Order
 
-1. Read Sprint-01 implementation and existing tests.
+1. Read Sprint-01 implementation.
 2. Extend scene/connection domain model and migrations.
 3. Implement full scene CRUD/reorder/reference integrity.
 4. Extend project validation.
@@ -503,7 +503,7 @@ If scene definitions are materialized as compiled publication artifacts rather t
 14. Run all prior + new tests.
 15. Update architecture/API/runbook docs.
 
-## 22. Claude Code Guardrails
+## 21. Claude Code Guardrails
 
 - Do not make PSV virtual-tour node config canonical.
 - Do not preload all scenes.

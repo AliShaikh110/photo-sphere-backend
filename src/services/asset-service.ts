@@ -16,6 +16,7 @@ import {
   MediaJob,
   Project,
   Publication,
+  PublishedSceneDefinition,
   Scene,
   UploadSession,
   User
@@ -374,6 +375,17 @@ function jsonContains(value: unknown, id: string): boolean {
   return false;
 }
 
+function derivativeSupportingStorageKeys(metadata: JsonObject): string[] {
+  const tiles = metadata.tiles;
+  if (!Array.isArray(tiles)) return [];
+  return tiles.flatMap((tile) => {
+    if (!tile || typeof tile !== 'object' || Array.isArray(tile)) return [];
+    return typeof tile.storageKey === 'string' && tile.storageKey.length > 0
+      ? [tile.storageKey]
+      : [];
+  });
+}
+
 export async function deleteAsset(
   assetId: string,
   ownerId: string,
@@ -430,14 +442,30 @@ export async function deleteAsset(
         attributes: ['compiledManifest'],
         transaction
       });
+    const publishedSceneDefinitions = projectIds.length === 0
+      ? []
+      : await PublishedSceneDefinition.findAll({
+        where: { projectId: { [Op.in]: projectIds } },
+        attributes: ['compiledScene'],
+        transaction
+      });
     const publicationReference = publications.some((publication) =>
       jsonContains(publication.compiledManifest, assetId)
         || derivativeIds.some((derivativeId) => jsonContains(publication.compiledManifest, derivativeId))
+    ) || publishedSceneDefinitions.some((definition) =>
+      jsonContains(definition.compiledScene, assetId)
+        || derivativeIds.some((derivativeId) => jsonContains(definition.compiledScene, derivativeId))
     );
     if (sceneReference > 0 || embeddedReference || publicationReference) {
       throw conflict('ASSET_IN_USE', 'The asset is referenced by an experience and cannot be deleted.', { assetId });
     }
-    const storageKeys = [asset.sourceStorageKey, ...derivatives.map((derivative) => derivative.storageKey)];
+    const storageKeys = [...new Set([
+      asset.sourceStorageKey,
+      ...derivatives.flatMap((derivative) => [
+        derivative.storageKey,
+        ...derivativeSupportingStorageKeys(derivative.metadata)
+      ])
+    ])];
     await enqueueStorageDeletions({ assetId, storageKeys, transaction });
     await MediaJob.destroy({ where: { assetId }, transaction });
     await AssetDerivative.destroy({ where: { assetId }, transaction });

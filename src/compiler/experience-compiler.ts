@@ -11,18 +11,35 @@ import type { ValidationIssue } from '../domain/validation';
 import { sanitizePlainText, sanitizeRichHtml } from '../security/html-sanitizer';
 import { validateSafeUrl } from '../security/url-validator';
 import {
+  DEFAULT_ADJACENT_SCENE_PRELOAD_POLICY,
+  DEFAULT_RUNTIME_CACHE_POLICY,
+  DEFAULT_TOUR_STRATEGY_POLICY,
+  SCENE_TRANSITION_FAILURE_CATEGORIES,
+  resolveRuntimeCachePolicy,
+  selectAdjacentScenePreloads,
+  selectTourRuntimeStrategy,
+} from '../runtime';
+import type {
+  AdjacentScenePreloadPolicyConfig,
+  RuntimeCachePolicyConfig,
+  TourStrategyPolicyConfig,
+} from '../runtime';
+import {
   requirePanoramaDerivatives,
   selectPreferredReadyDerivative,
 } from './derivative-selector';
 import { preflightExperience } from './preflight';
 import { readPanoramaCrop } from './panorama-metadata';
+import { readTiledPanoramaMetadata } from './tiled-panorama';
 import {
   BASELINE_TELEMETRY_EVENTS,
   COMPILED_MANIFEST_VERSION,
+  COMPILED_SCENE_VERSION,
 } from './types';
 import type {
   CompileExperienceInput,
   CompiledBranding,
+  CompiledExperienceBundle,
   CompiledExperienceManifest,
   CompiledHotspot,
   CompiledHotspotAction,
@@ -44,6 +61,9 @@ export interface ExperienceCompilerDependencies {
   readonly mediaUrlResolver: MediaUrlResolver;
   readonly viewerIntegrationAdapter?: ViewerIntegrationAdapter;
   readonly viewerIntegrationVersion?: string;
+  readonly tourStrategyPolicy?: TourStrategyPolicyConfig;
+  readonly preloadPolicy?: AdjacentScenePreloadPolicyConfig;
+  readonly cachePolicy?: RuntimeCachePolicyConfig;
 }
 
 interface ResolutionContext {
@@ -84,11 +104,17 @@ export class ExperienceCompilationError extends Error {
 export class ExperienceCompiler {
   private readonly mediaUrlResolver: MediaUrlResolver;
   private readonly viewerIntegrationAdapter: ViewerIntegrationAdapter;
+  private readonly tourStrategyPolicy: TourStrategyPolicyConfig;
+  private readonly preloadPolicy: AdjacentScenePreloadPolicyConfig;
+  private readonly cachePolicy: RuntimeCachePolicyConfig;
 
   constructor(dependencies: ExperienceCompilerDependencies) {
     this.mediaUrlResolver = dependencies.mediaUrlResolver;
     this.viewerIntegrationAdapter = dependencies.viewerIntegrationAdapter
       ?? new PhotoSphereViewerIntegrationAdapter(dependencies.viewerIntegrationVersion);
+    this.tourStrategyPolicy = dependencies.tourStrategyPolicy ?? DEFAULT_TOUR_STRATEGY_POLICY;
+    this.preloadPolicy = dependencies.preloadPolicy ?? DEFAULT_ADJACENT_SCENE_PRELOAD_POLICY;
+    this.cachePolicy = dependencies.cachePolicy ?? DEFAULT_RUNTIME_CACHE_POLICY;
     if (dependencies.viewerIntegrationVersion !== undefined
       && this.viewerIntegrationAdapter.viewerIntegrationVersion
         !== dependencies.viewerIntegrationVersion) {
@@ -101,10 +127,16 @@ export class ExperienceCompiler {
   }
 
   async compile(input: CompileExperienceInput): Promise<CompiledExperienceManifest> {
+    return (await this.compileBundle(input)).manifest;
+  }
+
+  async compileBundle(input: CompileExperienceInput): Promise<CompiledExperienceBundle> {
     const preflight = this.preflight(input);
     if (!preflight.valid) {
       throw new ExperienceCompilationError(preflight.issues);
     }
+    const capabilityResolution = preflight.capabilityResolution;
+    const tiledPanoramaEnabled = capabilityResolution.capabilities.includes('tiledPanorama');
 
     const visibility = resolveVisibility(input);
     const access: MediaAccess = input.target === 'preview' || visibility === 'private'
@@ -146,6 +178,31 @@ export class ExperienceCompiler {
           path: `scenes[${sceneIndex}].panoramaAssetId`,
         },
       );
+      const qualityPreference = scene.runtimeHints?.qualityPreference
+        ?? input.project.settings.quality?.preference
+        ?? 'automatic';
+      let tiles: CompiledScene['panorama']['tiles'];
+      if (tiledPanoramaEnabled
+        && qualityPreference !== 'standard'
+        && derivatives.tiledLevels !== undefined) {
+        const tileMetadata = readTiledPanoramaMetadata(derivatives.tiledLevels)!;
+        const tileManifest = await this.resolveDerivative(
+          panoramaAsset,
+          derivatives.tiledLevels,
+          context,
+          {
+            entityType: 'scene',
+            entityId: scene.id,
+            path: `scenes[${sceneIndex}].panoramaAssetId`,
+          },
+        );
+        tiles = {
+          manifest: tileManifest,
+          tileUrlTemplate: buildTileUrlTemplate(tileManifest.url),
+          tileSize: tileMetadata.tileSize,
+          levels: tileMetadata.levels,
+        };
+      }
 
       const hotspots: CompiledHotspot[] = [];
       for (const [hotspotIndex, hotspot] of scene.hotspots.entries()) {
@@ -177,25 +234,94 @@ export class ExperienceCompiler {
             : {}),
           base,
           primary,
+          ...(tiles === undefined ? {} : { tiles }),
         },
         initialView: { ...initialView },
-        ...(scene.viewLimits === undefined ? {} : { viewLimits: { ...scene.viewLimits } }),
+        ...(scene.viewLimits === undefined || Object.keys(scene.viewLimits).length === 0
+          ? {}
+          : { viewLimits: { ...scene.viewLimits } }),
         hotspots,
         overlays: cloneJsonArray(scene.overlays ?? []),
         connections: cloneJsonArray(scene.connections ?? []),
         spatialData: cloneJsonObject(scene.spatialData ?? {}),
         runtimeHints: cloneJsonObject(scene.runtimeHints ?? {}),
+        preloadSceneIds: [],
       });
     }
 
-    const frozenScenes = deepFreeze(scenes);
-    const capabilities = deepFreeze(buildCapabilities(frozenScenes));
-    const runtimeModules = deepFreeze(buildRuntimeModules(capabilities));
+    const scenePreloadPriorities = Object.fromEntries(scenes.flatMap((scene) => (
+      typeof scene.runtimeHints.preloadPriority === 'number'
+        ? [[scene.id, scene.runtimeHints.preloadPriority] as const]
+        : []
+    )));
+    const scenesWithPreloads = scenes.map((scene) => ({
+      ...scene,
+      preloadSceneIds: selectAdjacentScenePreloads({
+        currentSceneId: scene.id,
+        connections: scene.connections.flatMap((connection) => {
+          const sourceSceneId = connection.sourceSceneId;
+          const targetSceneId = connection.targetSceneId;
+          if (typeof sourceSceneId !== 'string' || typeof targetSceneId !== 'string') return [];
+          return [{
+            sourceSceneId,
+            targetSceneId,
+            ...(typeof connection.importance === 'number'
+              ? { importance: connection.importance }
+              : {}),
+            ...(connection.preloadHint === 'none'
+              || connection.preloadHint === 'normal'
+              || connection.preloadHint === 'high'
+              ? { preloadHint: connection.preloadHint }
+              : {}),
+          }];
+        }),
+        likelyNextSceneIds: readStringArray(scene.runtimeHints.likelyNextSceneIds),
+        scenePreloadPriorities,
+      }, this.preloadPolicy),
+    }));
+    const frozenScenes = deepFreeze(scenesWithPreloads);
+    const connectionCount = frozenScenes.reduce(
+      (total, scene) => total + scene.connections.length,
+      0,
+    );
+    const tourDecision = selectTourRuntimeStrategy({
+      sceneCount: frozenScenes.length,
+      estimatedManifestBytes: Buffer.byteLength(JSON.stringify(frozenScenes)),
+      connectionCount,
+    }, this.tourStrategyPolicy);
+    const progressive = input.target === 'publication'
+      && tourDecision.sceneDelivery === 'progressive';
+    const manifestScenes = progressive
+      ? frozenScenes.filter((scene) => scene.id === initialSceneId)
+      : frozenScenes;
+    const sceneIndexVersion = `scene-index-${COMPILED_SCENE_VERSION}-${input.publicationRevision ?? input.project.revision}`;
+    const sceneIndex = frozenScenes.map((scene) => ({
+      id: scene.id,
+      name: scene.name,
+      sortOrder: scene.sortOrder,
+      isPrimary: scene.isPrimary,
+      panoramaAssetId: scene.panorama.assetId,
+      thumbnail: scene.panorama.base,
+      hasHotspots: scene.hotspots.length > 0,
+      connectionTargetSceneIds: scene.connections.flatMap((connection) => (
+        typeof connection.targetSceneId === 'string' ? [connection.targetSceneId] : []
+      )),
+    }));
+    const capabilities: RuntimeCapabilityDeclaration[] = capabilityResolution.capabilities.map((id) => {
+      const fallback = capabilityResolution.fallbacks.find((candidate) => candidate.capabilityId === id);
+      return {
+        id,
+        required: id === 'basicPanorama',
+        ...(fallback === undefined ? {} : { fallback: fallback.message }),
+      };
+    });
+    const runtimeModules = capabilityResolution.runtimeModules;
     const adapterOutput = this.viewerIntegrationAdapter.adapt({
       initialSceneId,
       settings,
       branding,
-      scenes: frozenScenes,
+      scenes: manifestScenes,
+      sceneIndex,
     });
     if (adapterOutput.viewerIntegrationVersion
       !== this.viewerIntegrationAdapter.viewerIntegrationVersion) {
@@ -227,12 +353,44 @@ export class ExperienceCompiler {
       initialSceneId,
       settings,
       branding,
-      scenes: frozenScenes,
-      capabilities,
+      scenes: manifestScenes,
+      tour: {
+        strategy: progressive ? 'progressive' : 'embedded',
+        sceneIndexVersion,
+        sceneIndex,
+        ...(progressive
+          ? { sceneDefinitionUrlTemplate: publishedSceneUrlTemplate(input) }
+          : {}),
+      },
+      capabilities: deepFreeze(capabilities),
       runtime: {
         modules: runtimeModules,
+        moduleDeclarations: capabilityResolution.moduleDeclarations,
+        capabilityFallbacks: capabilityResolution.fallbacks,
+        preload: {
+          strategy: 'selective-adjacent',
+          maxScenesPerSource: 2,
+          content: 'scene-definition-and-base-media',
+        },
+        cache: {
+          defaultProfile: 'standard',
+          profiles: {
+            constrained: resolveRuntimeCachePolicy(
+              { deviceClass: 'constrained', mediaClass: 'image-tour' },
+              this.cachePolicy,
+            ),
+            standard: resolveRuntimeCachePolicy(
+              { deviceClass: 'standard', mediaClass: 'image-tour' },
+              this.cachePolicy,
+            ),
+            capable: resolveRuntimeCachePolicy(
+              { deviceClass: 'capable', mediaClass: 'image-tour' },
+              this.cachePolicy,
+            ),
+          },
+        },
         fallbackPolicy: {
-          panorama: 'low-resolution-base-then-standard-web',
+          panorama: 'low-resolution-base-then-standard-or-tiled-detail',
           optionalCapabilities: 'continue-without-capability',
         },
       },
@@ -243,11 +401,22 @@ export class ExperienceCompiler {
         publicationRevision,
         viewerIntegrationVersion,
         events: [...BASELINE_TELEMETRY_EVENTS],
+        sceneTransitionFailureCategories: [...SCENE_TRANSITION_FAILURE_CATEGORIES],
       },
       viewerIntegration: adapterOutput,
     };
+    const sceneDefinitions = input.target === 'publication'
+      ? frozenScenes.map((scene) => ({
+        sceneDefinitionVersion: COMPILED_SCENE_VERSION,
+        experienceId: input.project.id,
+        publicationRevision: input.publicationRevision!,
+        viewerIntegrationVersion,
+        scene,
+        viewerIntegration: this.viewerIntegrationAdapter.adaptScene(scene),
+      }))
+      : [];
 
-    return deepFreeze(manifest);
+    return deepFreeze({ manifest, sceneDefinitions });
   }
 
   private async compileBranding(
@@ -416,6 +585,7 @@ export class ExperienceCompiler {
         ? {}
         : { externalUrl: normalizeTrustedUrl(content.externalUrl) }),
       ...(content.imageAssetId === undefined ? {} : { imageAssetId: content.imageAssetId }),
+      ...(content.videoAssetId === undefined ? {} : { videoAssetId: content.videoAssetId }),
     };
     const image = content.imageAssetId === undefined
       ? undefined
@@ -427,6 +597,18 @@ export class ExperienceCompiler {
           entityType: 'hotspot',
           entityId: hotspot.id,
           path: `${path}.content.imageAssetId`,
+        },
+      );
+    const video = content.videoAssetId === undefined
+      ? undefined
+      : await this.resolveDisplayAsset(
+        content.videoAssetId,
+        assetsById,
+        context,
+        {
+          entityType: 'hotspot',
+          entityId: hotspot.id,
+          path: `${path}.content.videoAssetId`,
         },
       );
     return {
@@ -445,7 +627,9 @@ export class ExperienceCompiler {
         ? {}
         : { externalUrl: normalizeTrustedUrl(content.externalUrl) }),
       ...(content.imageAssetId === undefined ? {} : { imageAssetId: content.imageAssetId }),
+      ...(content.videoAssetId === undefined ? {} : { videoAssetId: content.videoAssetId }),
       ...(image === undefined ? {} : { image }),
+      ...(video === undefined ? {} : { video }),
       properties,
     };
   }
@@ -489,7 +673,12 @@ export class ExperienceCompiler {
     location: IssueLocation,
   ): Promise<CompiledMediaReference> {
     const asset = assetsById.get(assetId)!;
-    const derivative = selectPreferredReadyDerivative(asset)!;
+    const derivative = selectPreferredReadyDerivative(
+      asset,
+      asset.mediaType === 'video'
+        ? ['mobileVideoProfile', 'desktopVideoProfile']
+        : undefined,
+    )!;
     return this.resolveDerivative(asset, derivative, context, location);
   }
 
@@ -572,6 +761,13 @@ export async function compileExperience(
   return new ExperienceCompiler(dependencies).compile(input);
 }
 
+export async function compileExperienceBundle(
+  input: CompileExperienceInput,
+  dependencies: ExperienceCompilerDependencies,
+): Promise<CompiledExperienceBundle> {
+  return new ExperienceCompiler(dependencies).compileBundle(input);
+}
+
 export const compileExperienceManifest = compileExperience;
 
 export function createMediaUrlResolver(
@@ -611,6 +807,48 @@ function compileSettings(
       ...(settings.navigation.navigationButtons === undefined
         ? {}
         : { navigationButtons: settings.navigation.navigationButtons }),
+      ...(settings.navigation.sceneNavigation === undefined
+        ? {}
+        : { sceneNavigation: settings.navigation.sceneNavigation }),
+    };
+  }
+  if (settings.gallery !== undefined) {
+    compiled.gallery = {
+      ...(settings.gallery.enabled === undefined ? {} : { enabled: settings.gallery.enabled }),
+      ...(settings.gallery.showSceneNames === undefined
+        ? {}
+        : { showSceneNames: settings.gallery.showSceneNames }),
+      ...(settings.gallery.showThumbnails === undefined
+        ? {}
+        : { showThumbnails: settings.gallery.showThumbnails }),
+    };
+  }
+  if (settings.autorotation !== undefined) {
+    compiled.autorotation = {
+      ...(settings.autorotation.enabled === undefined
+        ? {}
+        : { enabled: settings.autorotation.enabled }),
+      ...(settings.autorotation.speedDegreesPerSecond === undefined
+        ? {}
+        : { speedDegreesPerSecond: settings.autorotation.speedDegreesPerSecond }),
+      ...(settings.autorotation.direction === undefined
+        ? {}
+        : { direction: settings.autorotation.direction }),
+      ...(settings.autorotation.startAutomatically === undefined
+        ? {}
+        : { startAutomatically: settings.autorotation.startAutomatically }),
+    };
+  }
+  if (settings.compass !== undefined) {
+    compiled.compass = {
+      ...(settings.compass.enabled === undefined ? {} : { enabled: settings.compass.enabled }),
+    };
+  }
+  if (settings.quality !== undefined) {
+    compiled.quality = {
+      ...(settings.quality.preference === undefined
+        ? {}
+        : { preference: settings.quality.preference }),
     };
   }
   if (settings.information !== undefined) {
@@ -649,53 +887,6 @@ function resolveVisibility(input: CompileExperienceInput): PublicationVisibility
   return visibility === 'public' ? 'public' : 'private';
 }
 
-function buildCapabilities(scenes: readonly CompiledScene[]): RuntimeCapabilityDeclaration[] {
-  const declarations = new Map<string, RuntimeCapabilityDeclaration>();
-  declarations.set('panorama.image', {
-    id: 'panorama.image',
-    required: true,
-    fallback: 'low-resolution-base',
-  });
-  declarations.set('media.progressive-baseline', {
-    id: 'media.progressive-baseline',
-    required: true,
-  });
-  for (const scene of scenes) {
-    for (const hotspot of scene.hotspots) {
-      declarations.set('hotspot.point', { id: 'hotspot.point', required: false });
-      if (hotspot.action.kind === 'showInformation') {
-        declarations.set('content.information', { id: 'content.information', required: false });
-      } else if (hotspot.action.kind === 'goToScene') {
-        declarations.set('navigation.scene', { id: 'navigation.scene', required: false });
-      } else if (hotspot.action.kind === 'openUrl') {
-        declarations.set('link.safe-navigation', {
-          id: 'link.safe-navigation',
-          required: false,
-        });
-      } else if (hotspot.action.kind === 'openAsset') {
-        declarations.set('content.image', { id: 'content.image', required: false });
-      }
-    }
-  }
-  return [...declarations.values()].sort((left, right) => left.id.localeCompare(right.id));
-}
-
-function buildRuntimeModules(capabilities: readonly RuntimeCapabilityDeclaration[]): string[] {
-  const modules = new Set(['experience-core', 'panorama-image']);
-  for (const capability of capabilities) {
-    if (capability.id === 'hotspot.point') {
-      modules.add('point-hotspots');
-    } else if (capability.id === 'content.information') {
-      modules.add('information-panels');
-    } else if (capability.id === 'navigation.scene') {
-      modules.add('scene-navigation');
-    } else if (capability.id === 'content.image') {
-      modules.add('image-content');
-    }
-  }
-  return [...modules].sort((left, right) => left.localeCompare(right));
-}
-
 function deepFreeze<T>(value: T): T {
   if (typeof value !== 'object' || value === null || Object.isFrozen(value)) {
     return value;
@@ -711,6 +902,26 @@ function cloneJsonObject(value: JsonObject): Record<string, JsonValue> {
   return JSON.parse(JSON.stringify(value)) as Record<string, JsonValue>;
 }
 
-function cloneJsonArray(value: readonly JsonObject[]): JsonObject[] {
+function cloneJsonArray(value: readonly unknown[]): JsonObject[] {
   return JSON.parse(JSON.stringify(value)) as JsonObject[];
+}
+
+function buildTileUrlTemplate(manifestUrl: string): string {
+  const queryIndex = manifestUrl.indexOf('?');
+  const path = queryIndex === -1 ? manifestUrl : manifestUrl.slice(0, queryIndex);
+  const query = queryIndex === -1 ? '' : manifestUrl.slice(queryIndex);
+  return `${path}/tiles/{level}/{x}/{y}${query}`;
+}
+
+function readStringArray(value: JsonValue | undefined): string[] {
+  return Array.isArray(value)
+    ? value.filter((candidate): candidate is string => typeof candidate === 'string')
+    : [];
+}
+
+function publishedSceneUrlTemplate(input: CompileExperienceInput): string {
+  if (input.publicationSlug === undefined || input.publicationRevision === undefined) {
+    throw new Error('Progressive publication compilation requires a slug and revision.');
+  }
+  return `/view/${input.publicationSlug}/revisions/${input.publicationRevision}/scenes/{sceneId}`;
 }

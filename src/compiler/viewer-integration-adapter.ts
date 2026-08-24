@@ -6,6 +6,7 @@ import type {
   ViewerIntegrationAdapter,
   ViewerIntegrationInput,
   ViewerIntegrationOutput,
+  ViewerSceneIntegrationOutput,
 } from './types';
 
 export const PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION = 'psv-5.14.3-adapter-1' as const;
@@ -30,14 +31,27 @@ export class PhotoSphereViewerIntegrationAdapter implements ViewerIntegrationAda
       throw new Error('Viewer adapter could not resolve the initial scene.');
     }
 
+    const sceneCount = input.sceneIndex?.length ?? input.scenes.length;
     const config: JsonObject = {
-      adapter: 'equirectangular',
+      adapter: initialScene.panorama.tiles === undefined
+        ? 'equirectangular'
+        : 'equirectangular-tiles',
       initialSceneId: input.initialSceneId,
       navbar: buildNavbar(input),
       mousewheel: input.settings.navigation?.zoom ?? true,
-      mousemove: (input.settings.navigation?.mouse ?? true)
-        && (input.settings.navigation?.touch ?? true),
+      mousemove: input.settings.navigation?.mouse ?? true,
+      touchControlsEnabled: input.settings.navigation?.touch ?? true,
       keyboard: input.settings.navigation?.keyboard ?? true,
+      sceneNavigation: input.settings.navigation?.sceneNavigation ?? sceneCount > 1,
+      ...(input.settings.gallery?.enabled === true
+        ? { gallery: buildGalleryConfiguration(input) }
+        : {}),
+      ...(input.settings.compass?.enabled === true
+        ? { compass: { enabled: true } }
+        : {}),
+      ...(input.settings.autorotation?.enabled === true
+        ? { autorotation: buildAutorotationConfiguration(input) }
+        : {}),
       startup: buildSceneConfiguration(initialScene),
       scenes: input.scenes.map(buildSceneConfiguration),
     };
@@ -46,6 +60,15 @@ export class PhotoSphereViewerIntegrationAdapter implements ViewerIntegrationAda
       rendererId: 'photo-sphere-viewer',
       viewerIntegrationVersion: this.viewerIntegrationVersion,
       config: deepFreeze(config),
+    });
+  }
+
+  adaptScene(scene: CompiledScene): ViewerSceneIntegrationOutput {
+    return Object.freeze({
+      rendererId: 'photo-sphere-viewer',
+      viewerIntegrationVersion: this.viewerIntegrationVersion,
+      sceneId: scene.id,
+      config: deepFreeze(buildSceneConfiguration(scene)),
     });
   }
 }
@@ -62,14 +85,63 @@ function buildNavbar(input: ViewerIntegrationInput): JsonValue[] {
   if (controls?.fullscreen ?? true) {
     navbar.push('fullscreen');
   }
+  if (input.settings.compass?.enabled ?? false) {
+    navbar.push('compass');
+  }
+  if (input.settings.gallery?.enabled ?? false) {
+    navbar.push('gallery');
+  }
   return navbar;
+}
+
+function buildGalleryConfiguration(input: ViewerIntegrationInput): JsonObject {
+  const gallery = input.settings.gallery;
+  const index = input.sceneIndex ?? input.scenes;
+  return {
+    enabled: gallery?.enabled ?? false,
+    showSceneNames: gallery?.showSceneNames ?? true,
+    showThumbnails: gallery?.showThumbnails ?? true,
+    items: (gallery?.enabled ?? false)
+      ? index.map((entry) => {
+        const compiledScene = input.scenes.find((scene) => scene.id === entry.id);
+        const thumbnail = 'thumbnail' in entry
+          ? entry.thumbnail.url
+          : compiledScene?.panorama.base.url;
+        return {
+          id: entry.id,
+          name: entry.name,
+          ...(thumbnail === undefined ? {} : { thumbnail }),
+        };
+      })
+      : [],
+  };
+}
+
+function buildAutorotationConfiguration(input: ViewerIntegrationInput): JsonObject {
+  const autorotation = input.settings.autorotation;
+  const direction = autorotation?.direction ?? 'clockwise';
+  const speed = autorotation?.speedDegreesPerSecond ?? 1;
+  return {
+    enabled: autorotation?.enabled ?? false,
+    startAutomatically: autorotation?.startAutomatically ?? false,
+    speedDegreesPerSecond: direction === 'counterclockwise' ? -speed : speed,
+  };
 }
 
 function buildSceneConfiguration(scene: CompiledScene): JsonObject {
   const initialView = scene.initialView;
+  const tiles = scene.panorama.tiles;
   return {
     id: scene.id,
-    panorama: scene.panorama.primary.url,
+    adapter: tiles === undefined ? 'equirectangular' : 'equirectangular-tiles',
+    panorama: tiles === undefined
+      ? scene.panorama.primary.url
+      : {
+        baseUrl: scene.panorama.base.url,
+        tileUrlTemplate: tiles.tileUrlTemplate,
+        tileSize: tiles.tileSize,
+        levels: tiles.levels.map((level) => ({ ...level })),
+      },
     basePanorama: scene.panorama.base.url,
     ...(scene.panorama.crop === undefined
       ? {}
@@ -77,7 +149,32 @@ function buildSceneConfiguration(scene: CompiledScene): JsonObject {
     defaultYaw: degreesToRadians(initialView.headingDegrees ?? 0),
     defaultPitch: degreesToRadians(initialView.pitchDegrees ?? 0),
     defaultZoomLvl: fieldOfViewToZoomLevel(initialView.horizontalFovDegrees),
+    ...(scene.viewLimits === undefined ? {} : { visibleRange: buildVisibleRange(scene) }),
     markers: scene.hotspots.map(buildMarkerConfiguration),
+    links: scene.connections.flatMap((connection) => {
+      const targetSceneId = connection.targetSceneId;
+      if (typeof targetSceneId !== 'string') return [];
+      return [{
+        id: typeof connection.id === 'string' ? connection.id : `${scene.id}:${targetSceneId}`,
+        nodeId: targetSceneId,
+        ...(typeof connection.label === 'string' ? { label: connection.label } : {}),
+      }];
+    }),
+    preloadSceneIds: [...scene.preloadSceneIds],
+  };
+}
+
+function buildVisibleRange(scene: CompiledScene): JsonObject {
+  const limits = scene.viewLimits!;
+  return {
+    longitude: [
+      degreesToRadians(limits.minHeadingDegrees ?? -180),
+      degreesToRadians(limits.maxHeadingDegrees ?? 180),
+    ],
+    latitude: [
+      degreesToRadians(limits.minPitchDegrees ?? -90),
+      degreesToRadians(limits.maxPitchDegrees ?? 90),
+    ],
   };
 }
 

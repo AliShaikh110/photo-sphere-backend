@@ -8,6 +8,7 @@ import {
   patchScene,
   read,
   readScene,
+  reorderProjectScenes,
   removeHotspot,
   removeScene,
   scenes,
@@ -31,6 +32,7 @@ import {
   projectMutationRevisionSchema,
   projectRevisionSchema,
   publishSchema,
+  reorderScenesSchema,
   sceneParams,
   updateHotspotSchema,
   updateProjectSchema,
@@ -79,6 +81,12 @@ projectRouter.post(
   validate('params', projectIdParams),
   validate('body', createSceneSchema),
   asyncHandler(addScene)
+);
+projectRouter.post(
+  '/:projectId/scenes/reorder',
+  validate('params', projectIdParams),
+  validate('body', reorderScenesSchema),
+  asyncHandler(reorderProjectScenes)
 );
 projectRouter.get('/:projectId/scenes/:sceneId', validate('params', sceneParams), asyncHandler(readScene));
 projectRouter.patch(

@@ -15,6 +15,7 @@ import type { Hotspot } from './hotspot.model';
 import { emptyJsonArray, emptyJsonObject } from './model.types';
 import type { JsonObject, JsonValue } from './model.types';
 import type { Project } from './project.model';
+import type { SceneConnection } from './scene-connection.model';
 
 export class Scene extends Model<InferAttributes<Scene>, InferCreationAttributes<Scene>> {
   declare id: CreationOptional<string>;
@@ -26,7 +27,6 @@ export class Scene extends Model<InferAttributes<Scene>, InferCreationAttributes
   declare initialView: CreationOptional<JsonObject>;
   declare viewLimits: CreationOptional<JsonObject>;
   declare overlays: CreationOptional<JsonValue[]>;
-  declare connections: CreationOptional<JsonValue[]>;
   declare spatialData: CreationOptional<JsonObject>;
   declare runtimeHints: CreationOptional<JsonObject>;
   declare createdAt: CreationOptional<Date>;
@@ -35,6 +35,8 @@ export class Scene extends Model<InferAttributes<Scene>, InferCreationAttributes
   declare project?: NonAttribute<Project>;
   declare panoramaAsset?: NonAttribute<Asset>;
   declare hotspots?: NonAttribute<Hotspot[]>;
+  declare connections?: NonAttribute<SceneConnection[]>;
+  declare inboundConnections?: NonAttribute<SceneConnection[]>;
 
   static initialize(sequelize: Sequelize): typeof Scene {
     if (sequelize.models.Scene === Scene) {
@@ -90,11 +92,6 @@ export class Scene extends Model<InferAttributes<Scene>, InferCreationAttributes
           field: 'view_limits',
         },
         overlays: {
-          type: DataTypes.JSONB,
-          allowNull: false,
-          defaultValue: emptyJsonArray,
-        },
-        connections: {
           type: DataTypes.JSONB,
           allowNull: false,
           defaultValue: emptyJsonArray,

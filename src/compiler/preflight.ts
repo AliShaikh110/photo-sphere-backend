@@ -1,3 +1,4 @@
+import { resolveCapabilities, type CapabilityResolutionResult } from '../capabilities';
 import { validateCanonicalProject } from '../domain/validation';
 import type { ValidationIssue } from '../domain/validation';
 import type { CanonicalAsset } from '../domain/types';
@@ -7,10 +8,13 @@ import {
 } from './derivative-selector';
 import type { CompileExperienceInput } from './types';
 import { readPanoramaCrop } from './panorama-metadata';
+import { readTiledPanoramaMetadata } from './tiled-panorama';
+import { analyzeProjectCapabilities } from './capability-analysis';
 
 export interface CompilerPreflightResult {
   readonly valid: boolean;
   readonly issues: readonly ValidationIssue[];
+  readonly capabilityResolution: CapabilityResolutionResult;
 }
 
 export function preflightExperience(input: CompileExperienceInput): CompilerPreflightResult {
@@ -39,19 +43,26 @@ export function preflightExperience(input: CompileExperienceInput): CompilerPref
       'publicationRevision',
     ));
   }
+  if (input.target === 'publication'
+    && (input.publicationSlug === undefined
+      || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(input.publicationSlug))) {
+    issues.push(projectIssue(
+      input.project.id,
+      'INVALID_FIELD',
+      'publicationSlug must be a valid publication slug.',
+      'publicationSlug',
+    ));
+  }
 
   for (const [sceneIndex, scene] of input.project.scenes.entries()) {
     for (const [field, value] of [
       ['overlays', scene.overlays ?? []],
-      ['connections', scene.connections ?? []],
       ['spatialData', scene.spatialData ?? {}],
-      ['runtimeHints', scene.runtimeHints ?? {}],
-      ['viewLimits', scene.viewLimits ?? {}],
     ] as const) {
       if (Array.isArray(value) ? value.length > 0 : Object.keys(value).length > 0) {
         issues.push({
           code: 'CAPABILITY_UNSUPPORTED',
-          message: `${field} is persisted for forward compatibility but is not supported by Sprint 01 runtime compilation.`,
+          message: `${field} is reserved for a later experience capability.`,
           entityType: 'scene',
           entityId: scene.id,
           path: `scenes[${sceneIndex}].${field}`,
@@ -67,7 +78,7 @@ export function preflightExperience(input: CompileExperienceInput): CompilerPref
         && panorama.projection !== 'cropped_equirectangular') {
         issues.push({
           code: 'UNSUPPORTED_PANORAMA_PROJECTION',
-          message: 'Sprint 01 supports equirectangular panoramas only.',
+          message: 'This release supports equirectangular panoramas only.',
           entityType: 'scene',
           entityId: scene.id,
           path: `scenes[${sceneIndex}].panoramaAssetId`,
@@ -94,6 +105,17 @@ export function preflightExperience(input: CompileExperienceInput): CompilerPref
           retryable: true,
         });
       }
+      const tiled = selectPanoramaDerivatives(panorama)?.tiledLevels;
+      if (tiled !== undefined && readTiledPanoramaMetadata(tiled) === undefined) {
+        issues.push({
+          code: 'TILED_DERIVATIVE_INVALID',
+          message: 'The optimized high-quality panorama metadata is incomplete.',
+          entityType: 'asset',
+          entityId: panorama.id,
+          path: `assets.${panorama.id}.derivatives.${tiled.id}`,
+          retryable: true,
+        });
+      }
     }
 
     for (const [hotspotIndex, hotspot] of scene.hotspots.entries()) {
@@ -108,16 +130,6 @@ export function preflightExperience(input: CompileExperienceInput): CompilerPref
           retryable: false,
         });
       }
-      if (hotspot.action.kind === 'goToScene' || hotspot.action.kind === 'openAsset') {
-        issues.push({
-          code: 'CAPABILITY_UNSUPPORTED',
-          message: 'Sprint 01 runtime supports information and safe-link hotspot actions only.',
-          entityType: 'hotspot',
-          entityId: hotspot.id,
-          path: `${path}.action.kind`,
-          retryable: false,
-        });
-      }
       const referencedImages = [
         hotspot.appearance?.iconAssetId,
         hotspot.content?.imageAssetId,
@@ -128,13 +140,45 @@ export function preflightExperience(input: CompileExperienceInput): CompilerPref
           requireDisplayDerivative(referencedId, path, hotspot.id, assetsById, issues);
         }
       }
+      if (hotspot.content?.videoAssetId !== undefined) {
+        requireDisplayDerivative(
+          hotspot.content.videoAssetId,
+          `${path}.content.videoAssetId`,
+          hotspot.id,
+          assetsById,
+          issues,
+        );
+      }
     }
   }
 
+  const capabilityResolution = resolveCapabilities(
+    analyzeProjectCapabilities(input.project, input.assets),
+  );
+  issues.push(...capabilityResolution.issues.map((capabilityIssue): ValidationIssue => ({
+    code: capabilityIssue.code,
+    severity: capabilityIssue.severity,
+    message: capabilityIssue.message,
+    entityType: validationEntityType(capabilityIssue.path),
+    entityId: capabilityIssue.entityId,
+    path: capabilityIssue.path,
+    retryable: ['CONTENT_ASSET_NOT_READY', 'FEATURE_MEDIA_REQUIRED'].includes(capabilityIssue.code),
+    alternatives: capabilityIssue.alternatives,
+  })));
+
   return Object.freeze({
-    valid: issues.length === 0,
+    valid: issues.every((issue) => issue.severity === 'warning'),
     issues: Object.freeze(issues),
+    capabilityResolution,
   });
+}
+
+function validationEntityType(path: string): ValidationIssue['entityType'] {
+  if (path.includes('.hotspots') || path.startsWith('hotspots')) return 'hotspot';
+  if (path.startsWith('scenes')) return 'scene';
+  if (path.startsWith('assets')) return 'asset';
+  if (path.startsWith('branding')) return 'branding';
+  return 'project';
 }
 
 function requireDisplayDerivative(
@@ -149,10 +193,18 @@ function requireDisplayDerivative(
   if (asset === undefined || asset.processingStatus !== 'ready') {
     return;
   }
-  if (selectPreferredReadyDerivative(asset) === undefined) {
+  const derivative = selectPreferredReadyDerivative(
+    asset,
+    asset.mediaType === 'video'
+      ? ['mobileVideoProfile', 'desktopVideoProfile']
+      : undefined,
+  );
+  if (derivative === undefined) {
     issues.push({
       code: 'REQUIRED_DERIVATIVE_MISSING',
-      message: 'The referenced image requires a ready web derivative.',
+      message: asset.mediaType === 'video'
+        ? 'The referenced video requires a ready playback derivative.'
+        : 'The referenced image requires a ready web derivative.',
       entityType,
       entityId,
       path,

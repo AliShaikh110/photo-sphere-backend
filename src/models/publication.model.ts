@@ -17,6 +17,7 @@ import type {
   PublicationVisibility,
 } from './model.types';
 import type { Project } from './project.model';
+import type { PublishedSceneDefinition } from './published-scene-definition.model';
 
 const IMMUTABLE_PUBLICATION_FIELDS = [
   'projectId',
@@ -49,6 +50,7 @@ export class Publication extends Model<
   declare updatedAt: CreationOptional<Date>;
 
   declare project?: NonAttribute<Project>;
+  declare sceneDefinitions?: NonAttribute<PublishedSceneDefinition[]>;
 
   static initialize(sequelize: Sequelize): typeof Publication {
     if (sequelize.models.Publication === Publication) {

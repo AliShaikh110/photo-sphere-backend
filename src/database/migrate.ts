@@ -12,7 +12,7 @@ interface MigrationModule {
   down?: MigrationFn<QueryInterface>;
 }
 
-export const REQUIRED_MIGRATION_NAME = '20260824000000-initial-schema';
+export const REQUIRED_MIGRATION_NAME = '20260824010000-sprint-02-tour-persistence';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;

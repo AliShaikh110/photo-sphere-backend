@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SCENE_TRANSITION_FAILURE_CATEGORIES } from '../runtime';
 
 const id = z.string().uuid();
 const databaseRevision = z.number().int().positive().max(2_147_483_647);
@@ -74,14 +75,41 @@ const navigationSchema = z
     zoom: z.boolean().optional(),
     keyboard: z.boolean().optional(),
     fullscreen: z.boolean().optional(),
-    navigationButtons: z.boolean().optional()
+    navigationButtons: z.boolean().optional(),
+    sceneNavigation: z.boolean().optional()
   })
+  .strict();
+
+const gallerySchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    showSceneNames: z.boolean().optional(),
+    showThumbnails: z.boolean().optional()
+  })
+  .strict();
+
+const autorotationSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    speedDegreesPerSecond: z.number().min(0.1).max(30).optional(),
+    direction: z.enum(['clockwise', 'counterclockwise']).optional(),
+    startAutomatically: z.boolean().optional()
+  })
+  .strict();
+
+const compassSchema = z.object({ enabled: z.boolean().optional() }).strict();
+const qualitySchema = z
+  .object({ preference: z.enum(['automatic', 'standard', 'high']).optional() })
   .strict();
 
 export const projectSettingsSchema = z
   .object({
     appearance: appearanceSchema.optional(),
     navigation: navigationSchema.optional(),
+    gallery: gallerySchema.optional(),
+    autorotation: autorotationSchema.optional(),
+    compass: compassSchema.optional(),
+    quality: qualitySchema.optional(),
     information: z
       .object({
         title: z.string().trim().max(240).optional(),
@@ -149,6 +177,49 @@ const viewLimitsSchema = z
   })
   .strict();
 
+const sceneConnectionContentSchema = z
+  .object({
+    title: z.string().trim().max(240).optional(),
+    description: richText.optional()
+  })
+  .strict();
+
+const sceneConnectionSchema = z
+  .object({
+    id: id.optional(),
+    sourceSceneId: id.optional(),
+    targetSceneId: id,
+    triggerHotspotId: id.nullable().optional(),
+    label: z.string().trim().max(240).nullable().optional(),
+    content: sceneConnectionContentSchema.optional(),
+    importance: z.number().int().min(0).max(100).nullable().optional(),
+    preloadHint: z.enum(['none', 'normal', 'high']).nullable().optional()
+  })
+  .strict();
+
+const sceneConnectionsSchema = z.array(sceneConnectionSchema).max(100).superRefine((connections, context) => {
+  const ids = new Set<string>();
+  for (const [index, connection] of connections.entries()) {
+    if (connection.id === undefined) continue;
+    if (ids.has(connection.id)) {
+      context.addIssue({
+        code: 'custom',
+        path: [index, 'id'],
+        message: 'Connection IDs must be unique within a scene.'
+      });
+    }
+    ids.add(connection.id);
+  }
+});
+
+const sceneRuntimeHintsSchema = z
+  .object({
+    preloadPriority: z.number().min(0).max(100).optional(),
+    likelyNextSceneIds: z.array(id).max(100).optional(),
+    qualityPreference: z.enum(['automatic', 'standard', 'high']).optional()
+  })
+  .strict();
+
 export const createSceneSchema = z
   .object({
     projectRevision: databaseRevision,
@@ -157,9 +228,9 @@ export const createSceneSchema = z
     initialView: initialViewSchema.optional(),
     viewLimits: viewLimitsSchema.optional(),
     overlays: z.array(canonicalJsonRecord).max(100).optional(),
-    connections: z.array(canonicalJsonRecord).max(100).optional(),
+    connections: sceneConnectionsSchema.optional(),
     spatialData: canonicalJsonRecord.optional(),
-    runtimeHints: canonicalJsonRecord.optional()
+    runtimeHints: sceneRuntimeHintsSchema.optional()
   })
   .strict();
 
@@ -171,11 +242,22 @@ export const updateSceneSchema = z
     initialView: initialViewSchema.optional(),
     viewLimits: viewLimitsSchema.optional(),
     overlays: z.array(canonicalJsonRecord).max(100).optional(),
-    connections: z.array(canonicalJsonRecord).max(100).optional(),
+    connections: sceneConnectionsSchema.optional(),
     spatialData: canonicalJsonRecord.optional(),
-    runtimeHints: canonicalJsonRecord.optional()
+    runtimeHints: sceneRuntimeHintsSchema.optional()
   })
   .strict();
+
+export const reorderScenesSchema = z
+  .object({
+    projectRevision: databaseRevision,
+    sceneIds: z.array(id).min(1).max(5_000)
+  })
+  .strict()
+  .refine((value) => new Set(value.sceneIds).size === value.sceneIds.length, {
+    path: ['sceneIds'],
+    message: 'Scene IDs must not contain duplicates.'
+  });
 
 const pointPositionSchema = z
   .object({
@@ -193,7 +275,8 @@ const hotspotContentSchema = z
     tooltip: z.string().trim().max(500).optional(),
     buttonLabel: z.string().trim().max(120).optional(),
     externalUrl: z.string().trim().max(2048).optional(),
-    imageAssetId: id.optional()
+    imageAssetId: id.optional(),
+    videoAssetId: id.optional()
   })
   .strict();
 
@@ -269,25 +352,62 @@ export const runtimeEventNameSchema = z.enum([
   'experience_load_started',
   'first_panorama_visible',
   'time_to_interactive',
+  'scene_changed',
   'hotspot_clicked',
   'asset_failed',
+  'scene_transition_failed',
   'viewer_error',
   'experience_exited'
 ]);
 
-export const runtimeEventSchema = z
+const runtimeEventBaseSchema = z
   .object({
     eventId: id,
-    eventName: runtimeEventNameSchema,
     experienceId: id,
     publicationRevision: databaseRevision,
     viewerIntegrationVersion: z.string().trim().min(1).max(64),
     sessionId: z.string().trim().min(8).max(128),
     deviceContext: jsonRecord.default({}),
-    payload: jsonRecord.default({}),
+    runtimeContext: jsonRecord.default({}),
     occurredAt: z.iso.datetime({ offset: true })
+  });
+
+const existingRuntimeEventSchema = runtimeEventBaseSchema
+  .extend({
+    eventName: z.enum([
+      'experience_load_started',
+      'first_panorama_visible',
+      'time_to_interactive',
+      'scene_changed',
+      'hotspot_clicked',
+      'asset_failed',
+      'viewer_error',
+      'experience_exited'
+    ]),
+    payload: jsonRecord.default({})
   })
   .strict();
+
+export const sceneTransitionFailurePayloadSchema = z
+  .object({
+    sourceSceneId: id,
+    targetSceneId: id,
+    failureCategory: z.enum(SCENE_TRANSITION_FAILURE_CATEGORIES),
+    assetId: id.optional()
+  })
+  .passthrough();
+
+const sceneTransitionFailureEventSchema = runtimeEventBaseSchema
+  .extend({
+    eventName: z.literal('scene_transition_failed'),
+    payload: sceneTransitionFailurePayloadSchema
+  })
+  .strict();
+
+export const runtimeEventSchema = z.discriminatedUnion('eventName', [
+  existingRuntimeEventSchema,
+  sceneTransitionFailureEventSchema
+]);
 
 export const runtimeEventsSchema = z.union([
   runtimeEventSchema.transform((event) => ({ events: [event] })),
@@ -300,12 +420,33 @@ export const uploadSessionParams = z.object({ uploadSessionId: id });
 export const sceneParams = z.object({ projectId: id, sceneId: id });
 export const hotspotParams = z.object({ projectId: id, sceneId: id, hotspotId: id });
 export const derivativeParams = z.object({ derivativeId: id });
+const nonNegativePathInteger = z.string().regex(/^(0|[1-9][0-9]*)$/).refine(
+  (value) => Number.isSafeInteger(Number(value)),
+  { message: 'Path integer exceeds the supported range.' }
+);
+const publicationRevisionParam = z.string().regex(/^[1-9][0-9]*$/).refine(
+  (value) => Number(value) <= 2_147_483_647,
+  { message: 'Publication revision exceeds the supported range.' }
+);
+
+export const mediaTileParams = z.object({
+  derivativeId: id,
+  level: nonNegativePathInteger,
+  x: nonNegativePathInteger,
+  y: nonNegativePathInteger
+});
 export const publicationMediaParams = z.object({
   projectId: id,
-  publicationRevision: z.string().regex(/^[1-9][0-9]*$/).refine(
-    (value) => Number(value) <= 2_147_483_647,
-    { message: 'Publication revision exceeds the supported range.' }
-  ),
+  publicationRevision: publicationRevisionParam,
   derivativeId: id
 });
+export const publicationMediaTileParams = publicationMediaParams.extend({
+  level: nonNegativePathInteger,
+  x: nonNegativePathInteger,
+  y: nonNegativePathInteger
+});
 export const slugParams = z.object({ slug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(100) });
+export const publishedSceneParams = slugParams.extend({ sceneId: id });
+export const revisionedPublishedSceneParams = publishedSceneParams.extend({
+  publicationRevision: publicationRevisionParam
+});

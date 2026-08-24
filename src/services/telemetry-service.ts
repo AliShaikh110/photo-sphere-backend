@@ -11,6 +11,7 @@ export type RuntimeEventInput = {
   viewerIntegrationVersion: string;
   sessionId: string;
   deviceContext: Record<string, unknown>;
+  runtimeContext?: Record<string, unknown>;
   payload: Record<string, unknown>;
   occurredAt: string;
 };
@@ -29,7 +30,7 @@ export async function ingestRuntimeEvents(events: RuntimeEventInput[]): Promise<
       where: {
         projectId: key.experienceId,
         publicationRevision: key.publicationRevision,
-        status: 'published'
+        status: { [Op.in]: ['published', 'retired'] }
       },
       attributes: ['id', 'compiledManifest']
     });
@@ -79,7 +80,7 @@ export async function ingestRuntimeEvents(events: RuntimeEventInput[]): Promise<
         viewerIntegrationVersion: event.viewerIntegrationVersion,
         sessionId: event.sessionId,
         deviceContext: event.deviceContext as JsonObject,
-        runtimeContext: {},
+        runtimeContext: (event.runtimeContext ?? {}) as JsonObject,
         payload: event.payload as JsonObject,
         occurredAt: new Date(event.occurredAt),
         receivedAt: new Date()

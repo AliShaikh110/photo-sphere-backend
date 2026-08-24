@@ -6,6 +6,7 @@ import {
   ExperienceCompiler,
   COMPILED_MANIFEST_VERSION,
   type CompileExperienceInput,
+  type CompiledExperienceBundle,
   type CompiledExperienceManifest,
   type CompilerPreflightResult,
   type MediaUrlResolver,
@@ -22,6 +23,8 @@ import type {
   CanonicalProject,
   CanonicalProjectSettings,
   CanonicalScene,
+  CanonicalSceneConnection,
+  CanonicalSceneConnectionContent,
   CanonicalViewLimits,
   CanonicalVisibilityRules,
   JsonObject as CanonicalJsonObject,
@@ -29,9 +32,20 @@ import type {
 } from '../domain';
 import { sequelize } from '../database';
 import { AppError, conflict, notFound } from '../errors/app-error';
-import { Asset, AssetDerivative, Hotspot, Project, Publication, Scene, User } from '../models';
+import {
+  Asset,
+  AssetDerivative,
+  Hotspot,
+  Project,
+  Publication,
+  PublishedSceneDefinition,
+  Scene,
+  SceneConnection,
+  User
+} from '../models';
 import type { IdempotencyRecord } from '../models';
 import type { JsonObject } from '../models/model.types';
+import { sha256, stableJson } from '../utils/hash';
 import {
   completeIdempotencyLease,
   failIdempotencyLeasePersisted
@@ -57,7 +71,8 @@ const mediaUrlResolver: MediaUrlResolver = {
 
 const compiler = new ExperienceCompiler({
   mediaUrlResolver,
-  viewerIntegrationVersion: config.viewerIntegrationVersion
+  viewerIntegrationVersion: config.viewerIntegrationVersion,
+  tourStrategyPolicy: config.tourStrategyPolicy
 });
 
 function asCanonicalJson(value: JsonObject): CanonicalJsonObject {
@@ -77,6 +92,20 @@ function mapHotspot(hotspot: Hotspot): CanonicalHotspot {
   };
 }
 
+function mapSceneConnection(connection: SceneConnection): CanonicalSceneConnection {
+  return {
+    id: connection.id,
+    sourceSceneId: connection.sourceSceneId,
+    targetSceneId: connection.targetSceneId,
+    ...(connection.triggerHotspotId === null ? {} : { triggerHotspotId: connection.triggerHotspotId }),
+    ...(connection.label === null ? {} : { label: connection.label }),
+    content: connection.content as unknown as CanonicalSceneConnectionContent,
+    ...(connection.importance === null ? {} : { importance: connection.importance }),
+    ...(connection.preloadHint === null ? {} : { preloadHint: connection.preloadHint }),
+    createdAt: connection.createdAt
+  };
+}
+
 function mapScene(scene: Scene): CanonicalScene {
   return {
     id: scene.id,
@@ -89,7 +118,7 @@ function mapScene(scene: Scene): CanonicalScene {
     viewLimits: scene.viewLimits as unknown as CanonicalViewLimits,
     hotspots: (scene.hotspots ?? []).map(mapHotspot),
     overlays: scene.overlays as unknown as readonly CanonicalJsonObject[],
-    connections: scene.connections as unknown as readonly CanonicalJsonObject[],
+    connections: (scene.connections ?? []).map(mapSceneConnection),
     spatialData: asCanonicalJson(scene.spatialData),
     runtimeHints: asCanonicalJson(scene.runtimeHints)
   };
@@ -149,11 +178,16 @@ async function loadExperience(options: {
     include: [{
       model: Scene,
       as: 'scenes',
-      include: [{ model: Hotspot, as: 'hotspots' }]
+      include: [
+        { model: Hotspot, as: 'hotspots' },
+        { model: SceneConnection, as: 'connections' }
+      ]
     }],
     order: [
       [{ model: Scene, as: 'scenes' }, 'sortOrder', 'ASC'],
-      [{ model: Scene, as: 'scenes' }, { model: Hotspot, as: 'hotspots' }, 'sortOrder', 'ASC']
+      [{ model: Scene, as: 'scenes' }, 'id', 'ASC'],
+      [{ model: Scene, as: 'scenes' }, { model: Hotspot, as: 'hotspots' }, 'sortOrder', 'ASC'],
+      [{ model: Scene, as: 'scenes' }, { model: SceneConnection, as: 'connections' }, 'id', 'ASC']
     ],
     ...(options.transaction === undefined ? {} : { transaction: options.transaction })
   });
@@ -275,11 +309,12 @@ export async function publishExperience(options: {
         assets: loaded.assets,
         target: 'publication',
         publicationRevision,
-        visibility: options.visibility
+        visibility: options.visibility,
+        publicationSlug: options.slug
       };
-      let manifest: CompiledExperienceManifest;
+      let bundle: CompiledExperienceBundle;
       try {
-        manifest = await compiler.compile(compileInput);
+        bundle = await compiler.compileBundle(compileInput);
       } catch (error) {
         if (!(error instanceof ExperienceCompilationError)) throw error;
         const compilationError = compilationAppError(error);
@@ -320,6 +355,7 @@ export async function publishExperience(options: {
         }
         return { compilationError };
       }
+      const manifest = bundle.manifest;
       const slugOwner = await Publication.findOne({
         where: {
           slug: options.slug,
@@ -352,6 +388,18 @@ export async function publishExperience(options: {
           failureError: null,
           publishedAt: new Date()
         },
+        { transaction }
+      );
+      await PublishedSceneDefinition.bulkCreate(
+        bundle.sceneDefinitions.map((definition) => ({
+          publicationId: publication.id,
+          projectId: options.projectId,
+          publicationRevision,
+          sceneId: definition.scene.id,
+          compiledSceneVersion: String(definition.sceneDefinitionVersion),
+          compiledScene: definition as unknown as JsonObject,
+          checksum: sha256(stableJson(definition))
+        })),
         { transaction }
       );
       await loaded.project.update(
@@ -435,44 +483,91 @@ export async function resolveManifest(
   return { manifest, publication: serializePublication(publication) };
 }
 
+async function publishedScenePublication(options: {
+  slug: string;
+  publicationRevision?: number;
+}): Promise<Publication> {
+  const revisionPinned = options.publicationRevision !== undefined;
+  const publication = await Publication.findOne({
+    where: {
+      slug: options.slug,
+      ...(revisionPinned
+        ? {
+            publicationRevision: options.publicationRevision,
+            status: { [Op.in]: ['published', 'retired'] }
+          }
+        : { isCurrent: true, status: 'published' })
+    },
+    include: [{ model: Project, as: 'project', attributes: ['id', 'ownerId'] }]
+  });
+  if (!publication?.project) throw notFound('publication');
+  return publication;
+}
+
+function assertPublicationAccess(publication: Publication, authenticatedUserId?: string): void {
+  if (publication.visibility !== 'private') return;
+  if (publication.project?.ownerId === authenticatedUserId) return;
+  throw new AppError(
+    'PRIVATE_PUBLICATION_ACCESS_DENIED',
+    'Authentication is required for this private experience.',
+    { status: authenticatedUserId ? 403 : 401 }
+  );
+}
+
+export async function resolvePublishedScene(options: {
+  slug: string;
+  sceneId: string;
+  publicationRevision?: number;
+  authenticatedUserId?: string;
+}): Promise<{
+  sceneDefinition: JsonObject;
+  checksum: string;
+  revisionPinned: boolean;
+  visibility: PublicationVisibility;
+}> {
+  const publication = await publishedScenePublication(options);
+  assertPublicationAccess(publication, options.authenticatedUserId);
+  const definition = await PublishedSceneDefinition.findOne({
+    where: {
+      publicationId: publication.id,
+      projectId: publication.projectId,
+      publicationRevision: publication.publicationRevision,
+      sceneId: options.sceneId
+    }
+  });
+  if (!definition) throw notFound('published scene', options.sceneId);
+  const sceneDefinition = publication.visibility === 'private'
+    ? hydrateProtectedMediaUrls(definition.compiledScene, publication.id)
+    : definition.compiledScene;
+  return {
+    sceneDefinition,
+    checksum: definition.checksum,
+    revisionPinned: options.publicationRevision !== undefined,
+    visibility: publication.visibility === 'public' ? 'public' : 'private'
+  };
+}
+
 function record(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown>
     : undefined;
 }
 
-function mediaReferenceMatches(value: unknown, derivativeId: string): boolean {
-  return record(value)?.derivativeId === derivativeId;
-}
-
 function compilerOwnedMediaReferences(value: unknown): Record<string, unknown>[] {
-  const manifest = record(value);
-  if (!manifest) return [];
   const references: Record<string, unknown>[] = [];
-  const add = (candidate: unknown): void => {
-    const reference = record(candidate);
-    if (reference && typeof reference.derivativeId === 'string' && typeof reference.url === 'string') {
-      references.push(reference);
+  const visit = (candidate: unknown): void => {
+    if (Array.isArray(candidate)) {
+      candidate.forEach(visit);
+      return;
     }
+    const object = record(candidate);
+    if (!object) return;
+    if (typeof object.derivativeId === 'string' && typeof object.url === 'string') {
+      references.push(object);
+    }
+    Object.values(object).forEach(visit);
   };
-  const branding = record(manifest.branding);
-  add(branding?.logo);
-  add(branding?.favicon);
-  add(branding?.watermark);
-  if (!Array.isArray(manifest.scenes)) return references;
-  for (const sceneValue of manifest.scenes) {
-    const scene = record(sceneValue);
-    const panorama = record(scene?.panorama);
-    add(panorama?.base);
-    add(panorama?.primary);
-    if (!Array.isArray(scene?.hotspots)) continue;
-    for (const hotspotValue of scene.hotspots) {
-      const hotspot = record(hotspotValue);
-      add(record(hotspot?.appearance)?.icon);
-      add(record(hotspot?.content)?.image);
-      add(record(hotspot?.action)?.media);
-    }
-  }
+  visit(value);
   return references;
 }
 
@@ -482,41 +577,25 @@ function hydrateProtectedMediaUrls(manifest: JsonObject, publicationId: string):
     const derivativeId = reference.derivativeId as string;
     const currentUrl = reference.url as string;
     const token = createMediaToken({ derivativeId, publicationId });
-    replacements.set(currentUrl, `${currentUrl.split('?')[0]}?token=${encodeURIComponent(token)}`);
+    const queryIndex = currentUrl.indexOf('?');
+    const mediaPath = queryIndex === -1 ? currentUrl : currentUrl.slice(0, queryIndex);
+    replacements.set(mediaPath, encodeURIComponent(token));
   }
-  return JSON.parse(JSON.stringify(manifest, (_key, value: unknown) => (
-    typeof value === 'string' ? replacements.get(value) ?? value : value
-  ))) as JsonObject;
+  return JSON.parse(JSON.stringify(manifest, (_key, value: unknown) => {
+    if (typeof value !== 'string') return value;
+    for (const [mediaPath, token] of replacements) {
+      if (value === mediaPath || value.startsWith(`${mediaPath}/`)) {
+        return `${value}${value.includes('?') ? '&' : '?'}token=${token}`;
+      }
+    }
+    return value;
+  })) as JsonObject;
 }
 
 function manifestReferencesDerivative(value: unknown, derivativeId: string): boolean {
-  const manifest = record(value);
-  if (!manifest) return false;
-  const branding = record(manifest.branding);
-  if (
-    mediaReferenceMatches(branding?.logo, derivativeId)
-    || mediaReferenceMatches(branding?.favicon, derivativeId)
-    || mediaReferenceMatches(branding?.watermark, derivativeId)
-  ) return true;
-  if (!Array.isArray(manifest.scenes)) return false;
-  return manifest.scenes.some((sceneValue) => {
-    const scene = record(sceneValue);
-    const panorama = record(scene?.panorama);
-    if (
-      mediaReferenceMatches(panorama?.base, derivativeId)
-      || mediaReferenceMatches(panorama?.primary, derivativeId)
-    ) return true;
-    if (!Array.isArray(scene?.hotspots)) return false;
-    return scene.hotspots.some((hotspotValue) => {
-      const hotspot = record(hotspotValue);
-      const appearance = record(hotspot?.appearance);
-      const content = record(hotspot?.content);
-      const action = record(hotspot?.action);
-      return mediaReferenceMatches(appearance?.icon, derivativeId)
-        || mediaReferenceMatches(content?.image, derivativeId)
-        || mediaReferenceMatches(action?.media, derivativeId);
-    });
-  });
+  return compilerOwnedMediaReferences(value).some(
+    (reference) => reference.derivativeId === derivativeId
+  );
 }
 
 export async function authorizeDerivative(
@@ -548,16 +627,69 @@ export async function authorizePublishedDerivative(options: {
       projectId: options.projectId,
       publicationRevision: options.publicationRevision,
       visibility: 'public',
-      status: 'published',
-      isCurrent: true
+      status: { [Op.in]: ['published', 'retired'] }
     },
-    attributes: ['compiledManifest']
+    attributes: ['id', 'compiledManifest']
   });
-  if (!publication?.compiledManifest
-    || !manifestReferencesDerivative(publication.compiledManifest, options.derivativeId)) {
+  if (!publication) {
+    throw new AppError('MEDIA_ACCESS_DENIED', 'You do not have access to this media.', { status: 403 });
+  }
+  let referenced = publication.compiledManifest !== null
+    && manifestReferencesDerivative(publication.compiledManifest, options.derivativeId);
+  if (!referenced) {
+    const definitions = await PublishedSceneDefinition.findAll({
+      where: {
+        publicationId: publication.id,
+        projectId: options.projectId,
+        publicationRevision: options.publicationRevision
+      },
+      attributes: ['compiledScene']
+    });
+    referenced = definitions.some((definition) => (
+      manifestReferencesDerivative(definition.compiledScene, options.derivativeId)
+    ));
+  }
+  if (!referenced) {
     throw new AppError('MEDIA_ACCESS_DENIED', 'You do not have access to this media.', { status: 403 });
   }
   const derivative = await AssetDerivative.findByPk(options.derivativeId);
   if (!derivative) throw notFound('media');
   return derivative;
+}
+
+export interface DerivativeTileDescriptor {
+  readonly storageKey: string;
+  readonly mimeType: string;
+  readonly sizeBytes: number;
+  readonly checksumSha256: string;
+}
+
+export function resolveDerivativeTile(
+  derivative: AssetDerivative,
+  level: number,
+  x: number,
+  y: number
+): DerivativeTileDescriptor {
+  if (derivative.kind !== 'tiledLevels' || !Array.isArray(derivative.metadata.tiles)) {
+    throw notFound('media tile');
+  }
+  const match = derivative.metadata.tiles.find((candidate) => {
+    const tile = record(candidate);
+    return tile?.level === level && tile.x === x && tile.y === y;
+  });
+  const tile = record(match);
+  if (
+    typeof tile?.storageKey !== 'string'
+    || typeof tile.mimeType !== 'string'
+    || typeof tile.sizeBytes !== 'number'
+    || typeof tile.checksumSha256 !== 'string'
+  ) {
+    throw notFound('media tile');
+  }
+  return {
+    storageKey: tile.storageKey,
+    mimeType: tile.mimeType,
+    sizeBytes: tile.sizeBytes,
+    checksumSha256: tile.checksumSha256
+  };
 }
