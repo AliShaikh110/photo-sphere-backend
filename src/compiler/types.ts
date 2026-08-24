@@ -3,18 +3,24 @@ import type {
   AssetDerivativeKind,
   CanonicalAsset,
   CanonicalInitialView,
+  CanonicalLayerAnchor,
   CanonicalProject,
   CanonicalProjectSettings,
+  CanonicalSpatialData,
+  CanonicalSpatialCoordinateSystem,
   CanonicalTimelineInteraction,
   CanonicalTimelineInteractionKind,
   CanonicalViewpoint,
   CanonicalViewLimits,
   JsonObject,
+  PanoramaDerivativeFamily,
   SphericalPosition,
 } from '../domain/types';
 import type {
   AppliedCapabilityFallback,
   CapabilityId,
+  DeferredDeviceCapability,
+  DeviceRequirement,
   RuntimeModuleDeclaration,
 } from '../capabilities/types';
 import type {
@@ -23,12 +29,13 @@ import type {
   VideoPlaybackProfileId,
   VideoProfileCandidate,
 } from '../runtime';
+import type { ExtensionRegistrySnapshot } from '../extensions/types';
 import type { CompiledPanoramaCrop } from './panorama-metadata';
 
 export type { CompiledPanoramaCrop } from './panorama-metadata';
 
-export const COMPILED_MANIFEST_VERSION = 3 as const;
-export const COMPILED_SCENE_VERSION = 1 as const;
+export const COMPILED_MANIFEST_VERSION = 4 as const;
+export const COMPILED_SCENE_VERSION = 2 as const;
 
 export type CompileTarget = 'preview' | 'publication';
 export type PublicationVisibility = 'public' | 'private';
@@ -42,6 +49,8 @@ export interface CompileExperienceInput {
   readonly visibility?: PublicationVisibility;
   /** Required for revision-pinned progressive scene URLs in published output. */
   readonly publicationSlug?: string;
+  /** Enables custom interaction validation and runtime module allow-listing. */
+  readonly extensions?: ExtensionRegistrySnapshot;
 }
 
 export interface MediaUrlResolutionRequest {
@@ -79,11 +88,15 @@ export interface CompiledMediaReference {
 
 export interface CompiledPanoramaMedia {
   readonly assetId: string;
-  readonly projection: 'equirectangular' | 'cropped_equirectangular';
+  readonly projection: 'equirectangular' | 'cropped_equirectangular' | 'cubemap';
+  /** The delivery family chosen by the quality policy for this scene. */
+  readonly family: PanoramaDerivativeFamily;
+  readonly fallbackFamilies: readonly PanoramaDerivativeFamily[];
   readonly crop?: CompiledPanoramaCrop;
   readonly base: CompiledMediaReference;
   readonly primary: CompiledMediaReference;
   readonly tiles?: CompiledTiledPanoramaMedia;
+  readonly cubemap?: CompiledMediaReference;
 }
 
 export interface CompiledTileLevel {
@@ -140,15 +153,107 @@ export interface CompiledHotspotAppearance {
   readonly icon?: CompiledMediaReference;
 }
 
+/**
+ * Compiled interaction geometry. Layer assets are already resolved to delivery
+ * references, and a custom geometry carries the allow-listed runtime module
+ * rather than an arbitrary client entry point.
+ */
+export type CompiledInteractionGeometry =
+  | { readonly kind: 'point' }
+  | { readonly kind: 'polygon'; readonly vertices: readonly SphericalPosition[] }
+  | { readonly kind: 'polyline'; readonly vertices: readonly SphericalPosition[] }
+  | {
+      readonly kind: 'imageLayer';
+      readonly media: CompiledMediaReference;
+      readonly anchor: CanonicalLayerAnchor;
+    }
+  | {
+      readonly kind: 'videoLayer';
+      readonly media: CompiledMediaReference;
+      readonly anchor: CanonicalLayerAnchor;
+    }
+  | {
+      readonly kind: 'custom';
+      readonly extensionId: string;
+      readonly extensionVersion: string;
+      readonly runtimeModule: string;
+      readonly payload: JsonObject;
+    };
+
 export interface CompiledHotspot {
   readonly id: string;
-  readonly geometry: { readonly kind: 'point' };
+  readonly geometry: CompiledInteractionGeometry;
   readonly position: SphericalPosition;
   readonly appearance?: CompiledHotspotAppearance;
   readonly content?: CompiledHotspotContent;
   readonly action: CompiledHotspotAction;
   readonly enabled: boolean;
   readonly visibilityRules: JsonObject;
+}
+
+export interface CompiledOverlayAppearance {
+  readonly label?: string;
+  readonly color?: string;
+  readonly fillOpacity?: number;
+  readonly strokeWidth?: number;
+  readonly emphasis?: 'normal' | 'prominent' | 'subtle';
+  readonly properties: JsonObject;
+}
+
+export interface CompiledOverlay {
+  readonly id: string;
+  readonly name?: string;
+  readonly geometry: CompiledInteractionGeometry;
+  readonly position?: SphericalPosition;
+  readonly appearance?: CompiledOverlayAppearance;
+  readonly content?: CompiledHotspotContent;
+  readonly action: CompiledHotspotAction;
+  readonly enabled: boolean;
+  readonly visibilityRules: JsonObject;
+}
+
+/** A scene's position in the world and/or on a plan, ready for the player. */
+export interface CompiledSceneSpatial {
+  readonly coordinateSystem?: CanonicalSpatialCoordinateSystem;
+  readonly latitude?: number;
+  readonly longitude?: number;
+  readonly altitudeMeters?: number;
+  readonly headingDegrees?: number;
+  readonly planId?: string;
+  readonly mapX?: number;
+  readonly mapY?: number;
+}
+
+export interface CompiledPlan {
+  readonly id: string;
+  readonly name: string;
+  readonly coordinateSystem: Exclude<CanonicalSpatialCoordinateSystem, 'wgs84'>;
+  readonly sortOrder: number;
+  readonly image?: CompiledMediaReference;
+  readonly sceneIds: readonly string[];
+  readonly metadata: JsonObject;
+}
+
+export interface CompiledSpatialIndexEntry {
+  readonly sceneId: string;
+  readonly name: string;
+  readonly spatial: CompiledSceneSpatial;
+}
+
+/**
+ * Everything the map and plan views need without fetching scene definitions.
+ * A large tour can therefore draw its whole map from the initial manifest.
+ */
+export interface CompiledSpatialIndex {
+  readonly hasWorldCoordinates: boolean;
+  readonly hasPlanCoordinates: boolean;
+  readonly entries: readonly CompiledSpatialIndexEntry[];
+  readonly bounds?: {
+    readonly minLatitude: number;
+    readonly maxLatitude: number;
+    readonly minLongitude: number;
+    readonly maxLongitude: number;
+  };
 }
 
 export interface CompiledScene {
@@ -160,9 +265,9 @@ export interface CompiledScene {
   readonly initialView: CanonicalInitialView;
   readonly viewLimits?: CanonicalViewLimits;
   readonly hotspots: readonly CompiledHotspot[];
-  readonly overlays: readonly JsonObject[];
+  readonly overlays: readonly CompiledOverlay[];
   readonly connections: readonly JsonObject[];
-  readonly spatialData: JsonObject;
+  readonly spatialData: CompiledSceneSpatial;
   readonly runtimeHints: JsonObject;
   readonly preloadSceneIds: readonly string[];
 }
@@ -176,6 +281,8 @@ export interface CompiledSceneIndexEntry {
   /** Lightweight/base media used by gallery UIs without fetching the full scene definition. */
   readonly thumbnail: CompiledMediaReference;
   readonly hasHotspots: boolean;
+  readonly hasOverlays: boolean;
+  readonly spatial?: CompiledSceneSpatial;
   readonly connectionTargetSceneIds: readonly string[];
 }
 
@@ -186,6 +293,10 @@ export interface CompiledTourDelivery {
   readonly sceneIndexVersion: string;
   readonly sceneIndex: readonly CompiledSceneIndexEntry[];
   readonly sceneDefinitionUrlTemplate?: string;
+  /** Present when the index is too large to ship whole; see `sceneIndexUrl`. */
+  readonly sceneIndexSegmented?: boolean;
+  readonly sceneIndexUrl?: string;
+  readonly sceneCount: number;
 }
 
 export interface CompiledBranding {
@@ -206,6 +317,9 @@ export interface RuntimeCapabilityDeclaration {
   readonly id: CapabilityId;
   readonly required: boolean;
   readonly fallback?: string;
+  /** Requirements the player must confirm before enabling the capability. */
+  readonly deviceRequirements?: readonly DeviceRequirement[];
+  readonly resolution: 'compile-time' | 'runtime';
 }
 
 export interface CompiledRuntimeCacheContract {
@@ -227,12 +341,16 @@ export interface RuntimeFallbackPolicy {
   readonly panorama?: 'low-resolution-base-then-standard-or-tiled-detail';
   readonly video?: 'ordered-playback-profile-candidates';
   readonly optionalCapabilities: 'continue-without-capability';
+  /** Motion, stereo and immersive viewing always degrade to normal 360. */
+  readonly immersive?: 'continue-in-normal-360';
 }
 
 export interface RuntimeDeclarations {
   readonly modules: readonly string[];
   readonly moduleDeclarations: readonly RuntimeModuleDeclaration[];
   readonly capabilityFallbacks: readonly AppliedCapabilityFallback[];
+  /** Capabilities whose device support the player decides, with their fallback. */
+  readonly deferredDeviceCapabilities: readonly DeferredDeviceCapability[];
   readonly preload: RuntimePreloadDeclaration;
   readonly cache: CompiledRuntimeCacheContract;
   readonly fallbackPolicy: RuntimeFallbackPolicy;
@@ -248,6 +366,13 @@ export const BASELINE_TELEMETRY_EVENTS = [
   'scene_transition_failed',
   'viewer_error',
   'experience_exited',
+  'capability_fallback',
+] as const;
+
+/** Added when an experience publishes advanced spatial or overlay features. */
+export const SPATIAL_TELEMETRY_EVENTS = [
+  'overlay_clicked',
+  'map_interaction',
 ] as const;
 
 /** Added for video360 experiences on top of the baseline event set. */
@@ -266,7 +391,8 @@ export const VIDEO_TELEMETRY_EVENTS = [
 
 export type CompiledTelemetryEvent =
   | (typeof BASELINE_TELEMETRY_EVENTS)[number]
-  | (typeof VIDEO_TELEMETRY_EVENTS)[number];
+  | (typeof VIDEO_TELEMETRY_EVENTS)[number]
+  | (typeof SPATIAL_TELEMETRY_EVENTS)[number];
 
 export interface CompiledTelemetryMetadata {
   readonly enabled: true;
@@ -300,6 +426,9 @@ export interface ViewerIntegrationInput {
   readonly scenes: readonly CompiledScene[];
   /** Complete lightweight index, including scenes delivered progressively. */
   readonly sceneIndex?: readonly CompiledSceneIndexEntry[];
+  readonly plans?: readonly CompiledPlan[];
+  readonly spatialIndex?: CompiledSpatialIndex;
+  readonly capabilities?: readonly CapabilityId[];
 }
 
 export interface ViewerVideoIntegrationInput {
@@ -382,7 +511,12 @@ export type CompiledTimelineAction =
   | { readonly kind: 'openAsset'; readonly media: CompiledMediaReference }
   | { readonly kind: 'setViewpoint' };
 
-export type { CanonicalTimelineInteraction, VideoProfileCandidate };
+export type {
+  CanonicalLayerAnchor,
+  CanonicalSpatialData,
+  CanonicalTimelineInteraction,
+  VideoProfileCandidate,
+};
 
 export interface CompiledPublishedSceneDefinition {
   readonly sceneDefinitionVersion: typeof COMPILED_SCENE_VERSION;
@@ -413,6 +547,8 @@ export interface CompiledExperienceManifestBase {
   readonly capabilities: readonly RuntimeCapabilityDeclaration[];
   readonly runtime: RuntimeDeclarations;
   readonly telemetry: CompiledTelemetryMetadata;
+  /** Extension id to version, pinned so a later registry change cannot alter this revision. */
+  readonly pinnedExtensions: Readonly<Record<string, string>>;
   readonly viewerIntegration: ViewerIntegrationOutput;
 }
 
@@ -422,6 +558,8 @@ export interface CompiledImageExperienceManifest extends CompiledExperienceManif
   /** All definitions for embedded tours; only the initial definition for progressive tours. */
   readonly scenes: readonly CompiledScene[];
   readonly tour: CompiledTourDelivery;
+  readonly plans: readonly CompiledPlan[];
+  readonly spatialIndex: CompiledSpatialIndex;
 }
 
 export interface CompiledVideoExperienceManifest extends CompiledExperienceManifestBase {

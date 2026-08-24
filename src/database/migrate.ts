@@ -12,7 +12,7 @@ interface MigrationModule {
   down?: MigrationFn<QueryInterface>;
 }
 
-export const REQUIRED_MIGRATION_NAME = '20260824020000-sprint-03-video-timeline';
+export const REQUIRED_MIGRATION_NAME = '20260824030000-sprint-04-spatial-analytics-scale';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;

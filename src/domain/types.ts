@@ -83,6 +83,36 @@ export interface CanonicalVideoSettings extends JsonObject {
   readonly qualityPreference?: 'automatic' | 'dataSaver' | 'high';
 }
 
+/** Creator intent for a world-map experience. Tile providers are infrastructure. */
+export interface CanonicalMapSettings extends JsonObject {
+  readonly enabled?: boolean;
+  readonly showSceneMarkers?: boolean;
+  readonly showHeadingCone?: boolean;
+  readonly defaultZoom?: number;
+}
+
+/** Creator intent for a floor/site plan experience. */
+export interface CanonicalPlanSettings extends JsonObject {
+  readonly enabled?: boolean;
+  readonly defaultPlanId?: string;
+  readonly showSceneMarkers?: boolean;
+  readonly showHeadingCone?: boolean;
+}
+
+/**
+ * Motion navigation is requested by the creator; whether a visitor's device can
+ * actually deliver it is decided by the player at runtime, never at publish.
+ */
+export interface CanonicalMotionNavigationSettings extends JsonObject {
+  readonly enabled?: boolean;
+  readonly requestPermissionOnStart?: boolean;
+}
+
+export interface CanonicalImmersiveViewingSettings extends JsonObject {
+  readonly stereoEnabled?: boolean;
+  readonly immersiveEnabled?: boolean;
+}
+
 export interface CanonicalProjectSettings extends JsonObject {
   readonly appearance?: CanonicalAppearanceSettings;
   readonly navigation?: CanonicalNavigationSettings;
@@ -92,6 +122,10 @@ export interface CanonicalProjectSettings extends JsonObject {
   readonly quality?: CanonicalQualitySettings;
   readonly information?: CanonicalInformationSettings;
   readonly video?: CanonicalVideoSettings;
+  readonly map?: CanonicalMapSettings;
+  readonly plan?: CanonicalPlanSettings;
+  readonly motionNavigation?: CanonicalMotionNavigationSettings;
+  readonly immersiveViewing?: CanonicalImmersiveViewingSettings;
 }
 
 export interface CanonicalBranding extends JsonObject {
@@ -124,7 +158,35 @@ export interface CanonicalViewLimits extends JsonObject {
   readonly maxPitchDegrees?: number;
 }
 
-export type CanonicalHotspotGeometry =
+export const INTERACTION_GEOMETRY_KINDS = [
+  'point',
+  'polygon',
+  'polyline',
+  'imageLayer',
+  'videoLayer',
+  'custom',
+] as const;
+export type CanonicalInteractionGeometryKind = (typeof INTERACTION_GEOMETRY_KINDS)[number];
+
+/**
+ * Placement of a media layer on the sphere. Sizes are angular, never renderer
+ * mesh or texture parameters: the integration adapter owns that translation.
+ */
+export interface CanonicalLayerAnchor extends JsonObject {
+  readonly widthDegrees: number;
+  readonly heightDegrees: number;
+  readonly rotationDegrees?: number;
+  readonly opacity?: number;
+  readonly chromaKeyColor?: string;
+}
+
+/** A versioned reference into the platform extension registry. */
+export interface CanonicalExtensionReference extends JsonObject {
+  readonly extensionId: string;
+  readonly extensionVersion: string;
+}
+
+export type CanonicalInteractionGeometry =
   | { readonly kind: 'point' }
   | {
       readonly kind: 'polygon';
@@ -135,9 +197,25 @@ export type CanonicalHotspotGeometry =
       readonly vertices: readonly SphericalPosition[];
     }
   | {
-      readonly kind: 'layer';
-      readonly layerAssetId: string;
+      readonly kind: 'imageLayer';
+      readonly assetId: string;
+      readonly anchor: CanonicalLayerAnchor;
+    }
+  | {
+      readonly kind: 'videoLayer';
+      readonly assetId: string;
+      readonly anchor: CanonicalLayerAnchor;
+    }
+  | {
+      readonly kind: 'custom';
+      readonly extensionId: string;
+      readonly extensionVersion: string;
+      /** Validated against the registered extension schema before persistence. */
+      readonly payload: JsonObject;
     };
+
+/** Retained name for the hotspot-shaped subset of the interaction geometry union. */
+export type CanonicalHotspotGeometry = CanonicalInteractionGeometry;
 
 export interface CanonicalHotspotAppearance extends JsonObject {
   readonly label?: string;
@@ -206,6 +284,66 @@ export interface CanonicalSceneRuntimeHints extends JsonObject {
   readonly qualityPreference?: 'automatic' | 'standard' | 'high';
 }
 
+/**
+ * Where a scene sits in the world or on a plan. The two families are optional
+ * and independent: a floor-plan-only experience never needs invented GPS data.
+ */
+export const SPATIAL_COORDINATE_SYSTEMS = ['wgs84', 'plan_normalized', 'plan_pixels'] as const;
+export type CanonicalSpatialCoordinateSystem = (typeof SPATIAL_COORDINATE_SYSTEMS)[number];
+
+export interface CanonicalSpatialData extends JsonObject {
+  readonly coordinateSystem?: CanonicalSpatialCoordinateSystem;
+  readonly latitude?: number;
+  readonly longitude?: number;
+  readonly altitudeMeters?: number;
+  /** Real-world orientation of the scene's zero heading, in degrees from north. */
+  readonly headingDegrees?: number;
+  /** The plan (floor) this scene is placed on, when plan coordinates are used. */
+  readonly planId?: string;
+  readonly mapX?: number;
+  readonly mapY?: number;
+}
+
+/** A floor or site plan image that scenes can be positioned on. */
+export interface CanonicalPlan {
+  readonly id: string;
+  readonly projectId: string;
+  readonly name: string;
+  readonly assetId: string | null;
+  readonly coordinateSystem: Exclude<CanonicalSpatialCoordinateSystem, 'wgs84'>;
+  readonly metadata?: JsonObject;
+  readonly sortOrder?: number;
+  readonly createdAt?: Date | string;
+  readonly updatedAt?: Date | string;
+}
+
+export interface CanonicalOverlayAppearance extends JsonObject {
+  readonly label?: string;
+  readonly color?: string;
+  readonly fillOpacity?: number;
+  readonly strokeWidth?: number;
+  readonly emphasis?: 'normal' | 'prominent' | 'subtle';
+}
+
+/**
+ * A scene-layer visual element. Overlays share the hotspot content, action and
+ * sanitization contracts; only the geometry family is richer.
+ */
+export interface CanonicalOverlay {
+  readonly id: string;
+  readonly sceneId: string;
+  readonly name?: string;
+  readonly geometry: CanonicalInteractionGeometry;
+  readonly position?: SphericalPosition;
+  readonly appearance?: CanonicalOverlayAppearance;
+  readonly content?: CanonicalHotspotContent;
+  readonly action: CanonicalHotspotAction;
+  readonly visibilityRules?: CanonicalVisibilityRules;
+  readonly sortOrder?: number;
+  readonly createdAt?: Date | string;
+  readonly updatedAt?: Date | string;
+}
+
 export interface CanonicalScene {
   readonly id: string;
   readonly projectId: string;
@@ -216,9 +354,9 @@ export interface CanonicalScene {
   readonly initialView?: CanonicalInitialView;
   readonly viewLimits?: CanonicalViewLimits;
   readonly hotspots: readonly CanonicalHotspot[];
-  readonly overlays?: readonly JsonObject[];
+  readonly overlays?: readonly CanonicalOverlay[];
   readonly connections?: readonly CanonicalSceneConnection[];
-  readonly spatialData?: JsonObject;
+  readonly spatialData?: CanonicalSpatialData;
   readonly runtimeHints?: CanonicalSceneRuntimeHints;
 }
 
@@ -299,6 +437,8 @@ export interface CanonicalProject {
   readonly settings: CanonicalProjectSettings;
   readonly branding: CanonicalBranding;
   readonly scenes: readonly CanonicalScene[];
+  /** Floor/site plans available to this experience's scenes. */
+  readonly plans?: readonly CanonicalPlan[];
   /** Present for `video360` projects; the primary logical 360 video asset. */
   readonly videoAssetId?: string | null;
   /** Present for `video360` projects; ordered by time then deterministic key. */
@@ -313,6 +453,7 @@ export const ASSET_MEDIA_TYPES = [
   'video',
   'audio',
   'logo',
+  'plan_image',
   'other',
 ] as const;
 export type CanonicalAssetMediaType = (typeof ASSET_MEDIA_TYPES)[number];
@@ -324,6 +465,18 @@ export const ASSET_PROJECTIONS = [
   'dual_fisheye',
   'unknown',
 ] as const;
+
+/**
+ * Panorama delivery families the quality policy can choose between. These are
+ * media descriptions, not renderer adapter names.
+ */
+export const PANORAMA_DERIVATIVE_FAMILIES = [
+  'standardEquirectangular',
+  'tiledEquirectangular',
+  'cubemap',
+  'tiledCubemap',
+] as const;
+export type PanoramaDerivativeFamily = (typeof PANORAMA_DERIVATIVE_FAMILIES)[number];
 export type CanonicalAssetProjection = (typeof ASSET_PROJECTIONS)[number];
 
 export const ASSET_DERIVATIVE_KINDS = [
@@ -332,6 +485,10 @@ export const ASSET_DERIVATIVE_KINDS = [
   'standardWeb',
   'tiledLevels',
   'cubemap',
+  'tiledCubemap',
+  /** A supported-projection panorama normalized from a raw camera source. */
+  'normalizedPanorama',
+  'planImage',
   'videoPoster',
   'desktopVideoProfile',
   'mobileVideoProfile',

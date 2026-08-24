@@ -23,6 +23,7 @@ import type { User } from './user.model';
 export class Project extends Model<InferAttributes<Project>, InferCreationAttributes<Project>> {
   declare id: CreationOptional<string>;
   declare ownerId: ForeignKey<User['id']>;
+  declare workspaceId: CreationOptional<string | null>;
   declare type: CreationOptional<ProjectType>;
   declare name: string;
   declare schemaVersion: CreationOptional<number>;
@@ -61,6 +62,11 @@ export class Project extends Model<InferAttributes<Project>, InferCreationAttrib
           type: DataTypes.UUID,
           allowNull: false,
           field: 'owner_id',
+        },
+        workspaceId: {
+          type: DataTypes.UUID,
+          allowNull: true,
+          field: 'workspace_id',
         },
         type: {
           type: DataTypes.STRING(32),
@@ -125,6 +131,7 @@ export class Project extends Model<InferAttributes<Project>, InferCreationAttrib
           { name: 'projects_owner_updated_idx', fields: ['owner_id', 'updated_at'] },
           { name: 'projects_id_revision_unique', unique: true, fields: ['id', 'revision'] },
           { name: 'projects_video_asset_idx', fields: ['video_asset_id'] },
+          { name: 'projects_workspace_updated_idx', fields: ['workspace_id', 'updated_at'] },
         ],
       },
     );

@@ -249,7 +249,6 @@ export const createSceneSchema = z
     panoramaAssetId: id.nullable().optional(),
     initialView: initialViewSchema.optional(),
     viewLimits: viewLimitsSchema.optional(),
-    overlays: z.array(canonicalJsonRecord).max(100).optional(),
     connections: sceneConnectionsSchema.optional(),
     spatialData: canonicalJsonRecord.optional(),
     runtimeHints: sceneRuntimeHintsSchema.optional()
@@ -263,7 +262,6 @@ export const updateSceneSchema = z
     panoramaAssetId: id.nullable().optional(),
     initialView: initialViewSchema.optional(),
     viewLimits: viewLimitsSchema.optional(),
-    overlays: z.array(canonicalJsonRecord).max(100).optional(),
     connections: sceneConnectionsSchema.optional(),
     spatialData: canonicalJsonRecord.optional(),
     runtimeHints: sceneRuntimeHintsSchema.optional()

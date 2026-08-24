@@ -1,16 +1,21 @@
 import { validateSafeUrl } from '../security/url-validator';
+import { validateExtensionPayload } from '../extensions/payload-validator';
+import type { ExtensionRegistrySnapshot } from '../extensions/types';
 import { ASSET_PROCESSING_STATUSES } from './asset-processing';
 import {
   ASSET_DERIVATIVE_KINDS,
   ASSET_MEDIA_TYPES,
   ASSET_PROJECTIONS,
   CURRENT_EXPERIENCE_SCHEMA_VERSION,
+  INTERACTION_GEOMETRY_KINDS,
   PROJECT_TYPES,
+  SPATIAL_COORDINATE_SYSTEMS,
 } from './types';
 import type {
   CanonicalAsset,
   CanonicalAssetMediaType,
   CanonicalProject,
+  CanonicalProjectType,
 } from './types';
 
 export const CANONICAL_VALIDATION_CODES = [
@@ -28,11 +33,27 @@ export const CANONICAL_VALIDATION_CODES = [
   'INVALID_URL',
   'UNSUPPORTED_HOTSPOT_GEOMETRY',
   'UNSUPPORTED_HOTSPOT_ACTION',
+  'UNSUPPORTED_OVERLAY_GEOMETRY',
+  'INVALID_GEOMETRY',
+  'SCENE_SPATIAL_DATA_INCOMPLETE',
+  'MAP_SCENE_MAPPING_INVALID',
+  'MAP_ASSET_NOT_READY',
+  'PLAN_NOT_FOUND',
+  'EXTENSION_NOT_REGISTERED',
+  'EXTENSION_NOT_AVAILABLE',
+  'EXTENSION_PAYLOAD_INVALID',
   'RENDERER_CONFIG_FORBIDDEN',
 ] as const;
 
 export type CanonicalValidationCode = (typeof CANONICAL_VALIDATION_CODES)[number];
-export type ValidationEntityType = 'project' | 'scene' | 'hotspot' | 'asset' | 'branding';
+export type ValidationEntityType =
+  | 'project'
+  | 'scene'
+  | 'hotspot'
+  | 'overlay'
+  | 'plan'
+  | 'asset'
+  | 'branding';
 
 export interface ValidationIssue {
   readonly code: CanonicalValidationCode | string;
@@ -56,6 +77,11 @@ export interface CanonicalValidationOptions {
   readonly requireReadyAssets?: boolean;
   readonly supportedSchemaVersions?: readonly number[];
   readonly supportedProjectTypes?: readonly string[];
+  /**
+   * Supplying the registry enables custom-interaction payload validation.
+   * Without it a custom geometry is rejected rather than trusted.
+   */
+  readonly extensions?: ExtensionRegistrySnapshot;
 }
 
 interface IssueContext {
@@ -169,8 +195,10 @@ export function validateCanonicalProject(
     return result(issues);
   }
 
+  const planIds = validatePlans(project, assets, options, issues);
   const sceneIds = new Set<string>();
   const hotspotIds = new Set<string>();
+  const overlayIds = new Set<string>();
   const connectionIds = new Set<string>();
   for (const [sceneIndex, sceneValue] of scenes.entries()) {
     const scenePath = `scenes[${sceneIndex}]`;
@@ -244,6 +272,17 @@ export function validateCanonicalProject(
       issues,
     );
     validateRuntimeHints(scene.runtimeHints, scenePath, sceneContext, issues);
+    validateSpatialData(scene.spatialData, scenePath, sceneContext, planIds, issues);
+    validateOverlays(
+      scene.overlays,
+      scenePath,
+      sceneId,
+      project,
+      assets,
+      options,
+      overlayIds,
+      issues,
+    );
 
     const hotspots = Array.isArray(scene.hotspots) ? scene.hotspots : undefined;
     if (hotspots === undefined) {
@@ -451,6 +490,9 @@ function validateSettings(
     ));
   }
 
+  validateSpatialSettings(settings, projectContext, issues);
+  validateImmersiveSettings(settings, projectContext, issues);
+
   const information = asRecord(settings.information);
   if (settings.information !== undefined && information === undefined) {
     issues.push(issue(
@@ -479,6 +521,61 @@ function validateSettings(
       }
     }
   }
+}
+
+function validateSpatialSettings(
+  settings: UnknownRecord,
+  projectContext: IssueContext,
+  issues: ValidationIssue[],
+): void {
+  const map = asRecord(settings.map);
+  if (settings.map !== undefined && map === undefined) {
+    issues.push(issue('INVALID_FIELD', 'settings.map must be an object.', withPath(projectContext, 'settings.map')));
+  } else if (map !== undefined) {
+    for (const field of ['enabled', 'showSceneMarkers', 'showHeadingCone'] as const) {
+      if (map[field] !== undefined && typeof map[field] !== 'boolean') {
+        issues.push(issue('INVALID_FIELD', `${field} must be a boolean.`, withPath(projectContext, `settings.map.${field}`)));
+      }
+    }
+    if (map.defaultZoom !== undefined) {
+      validateNumberRange(map.defaultZoom, 0, 22, 'settings.map.defaultZoom', projectContext, issues);
+    }
+  }
+
+  const plan = asRecord(settings.plan);
+  if (settings.plan !== undefined && plan === undefined) {
+    issues.push(issue('INVALID_FIELD', 'settings.plan must be an object.', withPath(projectContext, 'settings.plan')));
+  } else if (plan !== undefined) {
+    for (const field of ['enabled', 'showSceneMarkers', 'showHeadingCone'] as const) {
+      if (plan[field] !== undefined && typeof plan[field] !== 'boolean') {
+        issues.push(issue('INVALID_FIELD', `${field} must be a boolean.`, withPath(projectContext, `settings.plan.${field}`)));
+      }
+    }
+    if (plan.defaultPlanId !== undefined && typeof plan.defaultPlanId !== 'string') {
+      issues.push(issue('INVALID_FIELD', 'defaultPlanId must be a string.', withPath(projectContext, 'settings.plan.defaultPlanId')));
+    }
+  }
+}
+
+function validateImmersiveSettings(
+  settings: UnknownRecord,
+  projectContext: IssueContext,
+  issues: ValidationIssue[],
+): void {
+  validateBooleanObject(
+    settings.motionNavigation,
+    ['enabled', 'requestPermissionOnStart'],
+    'settings.motionNavigation',
+    projectContext,
+    issues,
+  );
+  validateBooleanObject(
+    settings.immersiveViewing,
+    ['stereoEnabled', 'immersiveEnabled'],
+    'settings.immersiveViewing',
+    projectContext,
+    issues,
+  );
 }
 
 function validateBranding(
@@ -692,45 +789,16 @@ function validateHotspot(
     ));
   }
 
-  const geometry = asRecord(hotspot.geometry);
-  if (geometry === undefined || typeof geometry.kind !== 'string') {
-    issues.push(issue(
-      'INVALID_FIELD',
-      'Hotspot geometry must declare a kind.',
-      { ...context, path: `${hotspotPath}.geometry` },
-    ));
-  } else if (!['point', 'polygon', 'polyline', 'layer'].includes(geometry.kind)) {
-    issues.push(issue(
-      'UNSUPPORTED_HOTSPOT_GEOMETRY',
-      'The hotspot geometry kind is not supported.',
-      { ...context, path: `${hotspotPath}.geometry.kind` },
-    ));
-  } else if ((geometry.kind === 'polygon' || geometry.kind === 'polyline')) {
-    if (!Array.isArray(geometry.vertices)) {
-      issues.push(issue(
-        'INVALID_FIELD',
-        'Polygon and polyline geometry requires vertices.',
-        { ...context, path: `${hotspotPath}.geometry.vertices` },
-      ));
-    } else {
-      for (const [index, vertex] of geometry.vertices.entries()) {
-        validateSphericalPosition(
-          vertex,
-          `${hotspotPath}.geometry.vertices[${index}]`,
-          context,
-          issues,
-        );
-      }
-    }
-  } else if (geometry.kind === 'layer') {
-    requireNonEmptyString(
-      geometry.layerAssetId,
-      `${hotspotPath}.geometry.layerAssetId`,
-      context,
-      issues,
-      true,
-    );
-  }
+  validateInteractionGeometry(
+    hotspot.geometry,
+    `${hotspotPath}.geometry`,
+    context,
+    project,
+    assets,
+    options,
+    issues,
+    { allowPoint: true, unsupportedCode: 'UNSUPPORTED_HOTSPOT_GEOMETRY' },
+  );
 
   validateSphericalPosition(hotspot.position, `${hotspotPath}.position`, context, issues);
   validateHotspotAppearance(
@@ -752,6 +820,550 @@ function validateHotspot(
     issues,
   );
   validateHotspotAction(hotspot.action, hotspotPath, context, project, assets, options, issues);
+}
+
+interface GeometryValidationOptions {
+  readonly allowPoint: boolean;
+  readonly unsupportedCode: 'UNSUPPORTED_HOTSPOT_GEOMETRY' | 'UNSUPPORTED_OVERLAY_GEOMETRY';
+}
+
+/**
+ * The one geometry gate for hotspots and overlays. Renderer meshes, marker
+ * plugin options and shader parameters are deliberately absent: only product
+ * shapes, angular sizes and validated references are accepted.
+ */
+function validateInteractionGeometry(
+  value: unknown,
+  geometryPath: string,
+  context: IssueContext,
+  project: UnknownRecord,
+  assets: ReadonlyMap<string, UnknownRecord> | undefined,
+  options: CanonicalValidationOptions,
+  issues: ValidationIssue[],
+  geometryOptions: GeometryValidationOptions,
+): void {
+  const geometry = asRecord(value);
+  if (geometry === undefined || typeof geometry.kind !== 'string') {
+    issues.push(issue(
+      'INVALID_FIELD',
+      'Interaction geometry must declare a kind.',
+      { ...context, path: geometryPath },
+    ));
+    return;
+  }
+  const kind = geometry.kind;
+  if (!INTERACTION_GEOMETRY_KINDS.includes(kind as (typeof INTERACTION_GEOMETRY_KINDS)[number])) {
+    issues.push(issue(
+      geometryOptions.unsupportedCode,
+      'The interaction geometry kind is not supported.',
+      { ...context, path: `${geometryPath}.kind` },
+    ));
+    return;
+  }
+  if (kind === 'point') {
+    if (!geometryOptions.allowPoint) {
+      issues.push(issue(
+        geometryOptions.unsupportedCode,
+        'An overlay requires an area, line or layer geometry.',
+        { ...context, path: `${geometryPath}.kind` },
+      ));
+    }
+    return;
+  }
+
+  if (kind === 'polygon' || kind === 'polyline') {
+    validateGeometryVertices(geometry.vertices, kind, geometryPath, context, issues);
+    return;
+  }
+
+  if (kind === 'imageLayer' || kind === 'videoLayer') {
+    requireNonEmptyString(geometry.assetId, `${geometryPath}.assetId`, context, issues, true);
+    if (typeof geometry.assetId === 'string') {
+      validateAssetReference(
+        geometry.assetId,
+        kind === 'imageLayer'
+          ? ['panorama_image', 'image', 'logo']
+          : ['video', 'video360'],
+        `${geometryPath}.assetId`,
+        context,
+        project,
+        assets,
+        options,
+        issues,
+      );
+    }
+    validateLayerAnchor(geometry.anchor, `${geometryPath}.anchor`, context, issues);
+    return;
+  }
+
+  validateCustomGeometry(geometry, geometryPath, context, project, options, issues);
+}
+
+function validateGeometryVertices(
+  value: unknown,
+  kind: 'polygon' | 'polyline',
+  geometryPath: string,
+  context: IssueContext,
+  issues: ValidationIssue[],
+): void {
+  const minimumVertices = kind === 'polygon' ? 3 : 2;
+  if (!Array.isArray(value)) {
+    issues.push(issue(
+      'INVALID_FIELD',
+      'Area and line geometry requires vertices.',
+      { ...context, path: `${geometryPath}.vertices` },
+    ));
+    return;
+  }
+  if (value.length < minimumVertices) {
+    issues.push(issue(
+      'INVALID_GEOMETRY',
+      kind === 'polygon'
+        ? 'An area needs at least three points.'
+        : 'A line needs at least two points.',
+      { ...context, path: `${geometryPath}.vertices` },
+    ));
+  }
+  if (value.length > 512) {
+    issues.push(issue(
+      'INVALID_GEOMETRY',
+      'This shape has too many points.',
+      { ...context, path: `${geometryPath}.vertices` },
+    ));
+  }
+  for (const [index, vertex] of value.entries()) {
+    validateSphericalPosition(vertex, `${geometryPath}.vertices[${index}]`, context, issues);
+  }
+}
+
+function validateLayerAnchor(
+  value: unknown,
+  anchorPath: string,
+  context: IssueContext,
+  issues: ValidationIssue[],
+): void {
+  const anchor = asRecord(value);
+  if (anchor === undefined) {
+    issues.push(issue(
+      'REQUIRED_FIELD',
+      'A media layer requires placement information.',
+      { ...context, path: anchorPath },
+    ));
+    return;
+  }
+  validateNumberRange(anchor.widthDegrees, 0.1, 360, `${anchorPath}.widthDegrees`, context, issues);
+  validateNumberRange(anchor.heightDegrees, 0.1, 180, `${anchorPath}.heightDegrees`, context, issues);
+  if (anchor.rotationDegrees !== undefined) {
+    validateNumberRange(anchor.rotationDegrees, -180, 180, `${anchorPath}.rotationDegrees`, context, issues);
+  }
+  if (anchor.opacity !== undefined) {
+    validateNumberRange(anchor.opacity, 0, 1, `${anchorPath}.opacity`, context, issues);
+  }
+  validateOptionalColor(anchor.chromaKeyColor, `${anchorPath}.chromaKeyColor`, context, issues);
+}
+
+/**
+ * A custom interaction is only accepted when its extension is registered,
+ * enabled, and its payload passes the registered schema. Unvalidated JSON is
+ * never persisted as executable custom behaviour.
+ */
+function validateCustomGeometry(
+  geometry: UnknownRecord,
+  geometryPath: string,
+  context: IssueContext,
+  project: UnknownRecord,
+  options: CanonicalValidationOptions,
+  issues: ValidationIssue[],
+): void {
+  requireNonEmptyString(geometry.extensionId, `${geometryPath}.extensionId`, context, issues, true);
+  requireNonEmptyString(
+    geometry.extensionVersion,
+    `${geometryPath}.extensionVersion`,
+    context,
+    issues,
+    true,
+  );
+  if (typeof geometry.extensionId !== 'string' || typeof geometry.extensionVersion !== 'string') {
+    return;
+  }
+  if (options.extensions === undefined) {
+    issues.push(issue(
+      'EXTENSION_NOT_REGISTERED',
+      'Custom interactions cannot be validated in this context.',
+      { ...context, path: `${geometryPath}.extensionId` },
+    ));
+    return;
+  }
+  const extension = options.extensions.get(geometry.extensionId, geometry.extensionVersion);
+  if (extension === undefined) {
+    issues.push(issue(
+      'EXTENSION_NOT_REGISTERED',
+      'This custom interaction is not registered on the platform.',
+      { ...context, path: `${geometryPath}.extensionId` },
+    ));
+    return;
+  }
+  if (extension.status === 'disabled' || extension.status === 'draft') {
+    issues.push(issue(
+      'EXTENSION_NOT_AVAILABLE',
+      'This custom interaction is not available.',
+      { ...context, path: `${geometryPath}.extensionId` },
+    ));
+    return;
+  }
+  const projectType = typeof project.type === 'string'
+    ? project.type as CanonicalProjectType
+    : undefined;
+  if (projectType !== undefined
+    && !extension.supportedExperienceTypes.includes(projectType)) {
+    issues.push(issue(
+      'EXTENSION_NOT_AVAILABLE',
+      'This custom interaction is not available for this experience type.',
+      { ...context, path: `${geometryPath}.extensionId` },
+    ));
+    return;
+  }
+  const payload = validateExtensionPayload(extension, geometry.payload ?? {});
+  for (const payloadIssue of payload.issues) {
+    issues.push(issue(
+      'EXTENSION_PAYLOAD_INVALID',
+      payloadIssue.message,
+      {
+        ...context,
+        path: payloadIssue.field.length === 0
+          ? `${geometryPath}.payload`
+          : `${geometryPath}.payload.${payloadIssue.field}`,
+      },
+    ));
+  }
+}
+
+function validatePlans(
+  project: UnknownRecord,
+  assets: ReadonlyMap<string, UnknownRecord> | undefined,
+  options: CanonicalValidationOptions,
+  issues: ValidationIssue[],
+): ReadonlySet<string> {
+  const planIds = new Set<string>();
+  const plans = project.plans;
+  if (plans === undefined) return planIds;
+  if (!Array.isArray(plans)) {
+    issues.push(issue('INVALID_FIELD', 'plans must be an array.', {
+      entityType: 'plan',
+      path: 'plans',
+    }));
+    return planIds;
+  }
+
+  for (const [index, planValue] of plans.entries()) {
+    const planPath = `plans[${index}]`;
+    const plan = asRecord(planValue);
+    if (plan === undefined) {
+      issues.push(issue('INVALID_FIELD', 'A plan must be an object.', {
+        entityType: 'plan',
+        path: planPath,
+      }));
+      continue;
+    }
+    const planId = optionalEntityId(plan.id);
+    const context: IssueContext = {
+      entityType: 'plan',
+      ...(planId === undefined ? {} : { entityId: planId }),
+      path: planPath,
+    };
+    requireNonEmptyString(plan.id, `${planPath}.id`, context, issues, true);
+    requireNonEmptyString(plan.name, `${planPath}.name`, context, issues, true);
+    if (planId !== undefined) {
+      if (planIds.has(planId)) {
+        issues.push(issue('DUPLICATE_ENTITY_ID', 'Plan IDs must be unique within a project.', {
+          ...context,
+          path: `${planPath}.id`,
+        }));
+      }
+      planIds.add(planId);
+    }
+    if (typeof project.id === 'string'
+      && (typeof plan.projectId !== 'string' || plan.projectId !== project.id)) {
+      issues.push(issue('REFERENCE_FORBIDDEN', 'The plan projectId must match its project.', {
+        ...context,
+        path: `${planPath}.projectId`,
+      }));
+    }
+    if (typeof plan.coordinateSystem !== 'string'
+      || !['plan_normalized', 'plan_pixels'].includes(plan.coordinateSystem)) {
+      issues.push(issue(
+        'INVALID_FIELD',
+        'A plan coordinate system must be plan_normalized or plan_pixels.',
+        { ...context, path: `${planPath}.coordinateSystem` },
+      ));
+    }
+    if (typeof plan.assetId === 'string') {
+      validateAssetReference(
+        plan.assetId,
+        ['plan_image', 'image'],
+        `${planPath}.assetId`,
+        context,
+        project,
+        assets,
+        options,
+        issues,
+      );
+    } else if (plan.assetId !== null && plan.assetId !== undefined) {
+      issues.push(issue('INVALID_FIELD', 'assetId must be a string.', {
+        ...context,
+        path: `${planPath}.assetId`,
+      }));
+    }
+  }
+  return planIds;
+}
+
+/**
+ * GPS and plan coordinates are independent families. A scene may carry either,
+ * both, or neither; what it may not do is carry half of one.
+ */
+function validateSpatialData(
+  value: unknown,
+  scenePath: string,
+  context: IssueContext,
+  planIds: ReadonlySet<string>,
+  issues: ValidationIssue[],
+): void {
+  if (value === undefined) return;
+  const path = `${scenePath}.spatialData`;
+  const spatial = asRecord(value);
+  if (spatial === undefined) {
+    issues.push(issue('INVALID_FIELD', 'spatialData must be an object.', { ...context, path }));
+    return;
+  }
+  if (Object.keys(spatial).length === 0) return;
+
+  const coordinateSystem = spatial.coordinateSystem;
+  if (coordinateSystem !== undefined
+    && (typeof coordinateSystem !== 'string'
+      || !SPATIAL_COORDINATE_SYSTEMS.includes(
+        coordinateSystem as (typeof SPATIAL_COORDINATE_SYSTEMS)[number],
+      ))) {
+    issues.push(issue(
+      'INVALID_FIELD',
+      `coordinateSystem must be one of: ${SPATIAL_COORDINATE_SYSTEMS.join(', ')}.`,
+      { ...context, path: `${path}.coordinateSystem` },
+    ));
+    return;
+  }
+
+  const hasLatitude = spatial.latitude !== undefined;
+  const hasLongitude = spatial.longitude !== undefined;
+  if (hasLatitude !== hasLongitude) {
+    issues.push(issue(
+      'SCENE_SPATIAL_DATA_INCOMPLETE',
+      'A scene location needs both a latitude and a longitude.',
+      { ...context, path },
+    ));
+  }
+  if (hasLatitude) {
+    validateNumberRange(spatial.latitude, -90, 90, `${path}.latitude`, context, issues);
+  }
+  if (hasLongitude) {
+    validateNumberRange(spatial.longitude, -180, 180, `${path}.longitude`, context, issues);
+  }
+  if (spatial.altitudeMeters !== undefined) {
+    validateNumberRange(spatial.altitudeMeters, -12_000, 12_000, `${path}.altitudeMeters`, context, issues);
+  }
+  if (spatial.headingDegrees !== undefined) {
+    validateNumberRange(spatial.headingDegrees, 0, 360, `${path}.headingDegrees`, context, issues);
+  }
+
+  const planFields = ['planId', 'mapX', 'mapY'] as const;
+  const providedPlanFields = planFields.filter((field) => spatial[field] !== undefined);
+  if (providedPlanFields.length > 0 && providedPlanFields.length < planFields.length) {
+    issues.push(issue(
+      'SCENE_SPATIAL_DATA_INCOMPLETE',
+      'Placing a scene on a plan needs the plan and both plan coordinates.',
+      { ...context, path },
+    ));
+    return;
+  }
+  if (providedPlanFields.length === 0) {
+    if (coordinateSystem === 'plan_normalized' || coordinateSystem === 'plan_pixels') {
+      issues.push(issue(
+        'SCENE_SPATIAL_DATA_INCOMPLETE',
+        'Plan coordinates are declared but the scene is not placed on a plan.',
+        { ...context, path },
+      ));
+    }
+    return;
+  }
+
+  if (typeof spatial.planId !== 'string' || spatial.planId.length === 0) {
+    issues.push(issue('INVALID_FIELD', 'planId must be a string.', {
+      ...context,
+      path: `${path}.planId`,
+    }));
+    return;
+  }
+  if (!planIds.has(spatial.planId)) {
+    issues.push(issue('PLAN_NOT_FOUND', 'The scene references a plan that does not exist.', {
+      ...context,
+      path: `${path}.planId`,
+    }));
+    return;
+  }
+  if (coordinateSystem === 'wgs84') {
+    issues.push(issue(
+      'MAP_SCENE_MAPPING_INVALID',
+      'Plan coordinates cannot use the world coordinate system.',
+      { ...context, path: `${path}.coordinateSystem` },
+    ));
+    return;
+  }
+  const normalized = coordinateSystem !== 'plan_pixels';
+  for (const field of ['mapX', 'mapY'] as const) {
+    validateNumberRange(
+      spatial[field],
+      0,
+      normalized ? 1 : 1_000_000,
+      `${path}.${field}`,
+      context,
+      issues,
+    );
+  }
+}
+
+function validateOverlays(
+  value: unknown,
+  scenePath: string,
+  sceneId: string | undefined,
+  project: UnknownRecord,
+  assets: ReadonlyMap<string, UnknownRecord> | undefined,
+  options: CanonicalValidationOptions,
+  overlayIds: Set<string>,
+  issues: ValidationIssue[],
+): void {
+  if (value === undefined) return;
+  if (!Array.isArray(value)) {
+    issues.push(issue('INVALID_FIELD', 'overlays must be an array.', {
+      entityType: 'overlay',
+      path: `${scenePath}.overlays`,
+    }));
+    return;
+  }
+  for (const [index, overlayValue] of value.entries()) {
+    validateOverlay(
+      overlayValue,
+      `${scenePath}.overlays[${index}]`,
+      sceneId,
+      project,
+      assets,
+      options,
+      overlayIds,
+      issues,
+    );
+  }
+}
+
+function validateOverlay(
+  value: unknown,
+  overlayPath: string,
+  sceneId: string | undefined,
+  project: UnknownRecord,
+  assets: ReadonlyMap<string, UnknownRecord> | undefined,
+  options: CanonicalValidationOptions,
+  overlayIds: Set<string>,
+  issues: ValidationIssue[],
+): void {
+  const overlay = asRecord(value);
+  if (overlay === undefined) {
+    issues.push(issue('INVALID_FIELD', 'An overlay must be an object.', {
+      entityType: 'overlay',
+      path: overlayPath,
+    }));
+    return;
+  }
+  const overlayId = optionalEntityId(overlay.id);
+  const context: IssueContext = {
+    entityType: 'overlay',
+    ...(overlayId === undefined ? {} : { entityId: overlayId }),
+    path: overlayPath,
+  };
+  requireNonEmptyString(overlay.id, `${overlayPath}.id`, context, issues, true);
+  if (overlayId !== undefined) {
+    if (overlayIds.has(overlayId)) {
+      issues.push(issue('DUPLICATE_ENTITY_ID', 'Overlay IDs must be unique within a project.', {
+        ...context,
+        path: `${overlayPath}.id`,
+      }));
+    }
+    overlayIds.add(overlayId);
+  }
+  if (sceneId !== undefined && overlay.sceneId !== sceneId) {
+    issues.push(issue('REFERENCE_FORBIDDEN', 'The overlay sceneId must match its scene.', {
+      ...context,
+      path: `${overlayPath}.sceneId`,
+    }));
+  }
+  if (overlay.name !== undefined && typeof overlay.name !== 'string') {
+    issues.push(issue('INVALID_FIELD', 'name must be a string.', {
+      ...context,
+      path: `${overlayPath}.name`,
+    }));
+  }
+
+  validateInteractionGeometry(
+    overlay.geometry,
+    `${overlayPath}.geometry`,
+    context,
+    project,
+    assets,
+    options,
+    issues,
+    { allowPoint: false, unsupportedCode: 'UNSUPPORTED_OVERLAY_GEOMETRY' },
+  );
+  if (overlay.position !== undefined) {
+    validateSphericalPosition(overlay.position, `${overlayPath}.position`, context, issues);
+  }
+  validateOverlayAppearance(overlay.appearance, overlayPath, context, issues);
+  validateHotspotContent(overlay.content, overlayPath, context, project, assets, options, issues);
+  validateHotspotAction(overlay.action, overlayPath, context, project, assets, options, issues);
+}
+
+function validateOverlayAppearance(
+  value: unknown,
+  overlayPath: string,
+  context: IssueContext,
+  issues: ValidationIssue[],
+): void {
+  if (value === undefined) return;
+  const appearance = asRecord(value);
+  const path = `${overlayPath}.appearance`;
+  if (appearance === undefined) {
+    issues.push(issue('INVALID_FIELD', 'Overlay appearance must be an object.', {
+      ...context,
+      path,
+    }));
+    return;
+  }
+  if (appearance.label !== undefined && typeof appearance.label !== 'string') {
+    issues.push(issue('INVALID_FIELD', 'Overlay label must be a string.', {
+      ...context,
+      path: `${path}.label`,
+    }));
+  }
+  validateOptionalColor(appearance.color, `${path}.color`, context, issues);
+  if (appearance.fillOpacity !== undefined) {
+    validateNumberRange(appearance.fillOpacity, 0, 1, `${path}.fillOpacity`, context, issues);
+  }
+  if (appearance.strokeWidth !== undefined) {
+    validateNumberRange(appearance.strokeWidth, 0, 24, `${path}.strokeWidth`, context, issues);
+  }
+  if (appearance.emphasis !== undefined
+    && !['normal', 'prominent', 'subtle'].includes(String(appearance.emphasis))) {
+    issues.push(issue(
+      'INVALID_FIELD',
+      'Overlay emphasis must be normal, prominent, or subtle.',
+      { ...context, path: `${path}.emphasis` },
+    ));
+  }
 }
 
 function validateHotspotAppearance(

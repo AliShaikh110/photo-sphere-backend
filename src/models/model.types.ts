@@ -19,6 +19,7 @@ export const ASSET_MEDIA_TYPES = [
   'video',
   'audio',
   'logo',
+  'plan_image',
   'other',
 ] as const;
 export type AssetMediaType = (typeof ASSET_MEDIA_TYPES)[number];
@@ -47,6 +48,9 @@ export const ASSET_DERIVATIVE_KINDS = [
   'standardWeb',
   'tiledLevels',
   'cubemap',
+  'tiledCubemap',
+  'normalizedPanorama',
+  'planImage',
   'videoPoster',
   'desktopVideoProfile',
   'mobileVideoProfile',
@@ -136,8 +140,22 @@ export const RUNTIME_EVENT_NAMES = [
   'video_playback_failed',
   'timeline_interaction_shown',
   'timeline_interaction_clicked',
+  'capability_fallback',
+  'overlay_clicked',
+  'map_interaction',
 ] as const;
 export type RuntimeEventName = (typeof RUNTIME_EVENT_NAMES)[number];
+
+/** Why an optional capability was not delivered to a visitor. */
+export const CAPABILITY_FALLBACK_REASONS = [
+  'device_unsupported',
+  'permission_denied',
+  'module_load_failed',
+  'media_unavailable',
+  'runtime_error',
+  'unknown',
+] as const;
+export type CapabilityFallbackReason = (typeof CAPABILITY_FALLBACK_REASONS)[number];
 
 /** Stable, product-level categories accepted by video playback telemetry. */
 export const VIDEO_PLAYBACK_FAILURE_CATEGORIES = [
@@ -151,6 +169,59 @@ export const VIDEO_PLAYBACK_FAILURE_CATEGORIES = [
   'unknown',
 ] as const;
 export type VideoPlaybackFailureCategory = (typeof VIDEO_PLAYBACK_FAILURE_CATEGORIES)[number];
+
+export const INTERACTION_GEOMETRY_KINDS = [
+  'point',
+  'polygon',
+  'polyline',
+  'imageLayer',
+  'videoLayer',
+  'custom',
+] as const;
+export type InteractionGeometryKind = (typeof INTERACTION_GEOMETRY_KINDS)[number];
+
+export const PLAN_COORDINATE_SYSTEMS = ['plan_normalized', 'plan_pixels'] as const;
+export type PlanCoordinateSystem = (typeof PLAN_COORDINATE_SYSTEMS)[number];
+
+/** Workspace and project roles, ordered from least to most privileged. */
+export const ACCESS_ROLES = ['viewer', 'editor', 'admin', 'owner'] as const;
+export type AccessRole = (typeof ACCESS_ROLES)[number];
+
+export const MEMBERSHIP_STATUSES = ['invited', 'active', 'revoked'] as const;
+export type MembershipStatus = (typeof MEMBERSHIP_STATUSES)[number];
+
+export const TEMPLATE_VISIBILITIES = ['platform', 'workspace', 'private'] as const;
+export type TemplateVisibility = (typeof TEMPLATE_VISIBILITIES)[number];
+
+export const TEMPLATE_STATUSES = ['draft', 'published', 'retired'] as const;
+export type TemplateStatus = (typeof TEMPLATE_STATUSES)[number];
+
+/** How a template's referenced assets reach the instantiated project. */
+export const TEMPLATE_ASSET_POLICIES = ['reference', 'copy', 'omit'] as const;
+export type TemplateAssetPolicy = (typeof TEMPLATE_ASSET_POLICIES)[number];
+
+export const EXTENSION_STATUSES = ['draft', 'active', 'deprecated', 'disabled'] as const;
+export type ExtensionStatus = (typeof EXTENSION_STATUSES)[number];
+
+export const AUDIT_ACTIONS = [
+  'project.created',
+  'project.deleted',
+  'project.published',
+  'project.unpublished',
+  'project.access_granted',
+  'project.access_revoked',
+  'workspace.member_invited',
+  'workspace.member_role_changed',
+  'workspace.member_removed',
+  'asset.deleted',
+  'template.instantiated',
+  'publication.share_token_created',
+  'publication.share_token_revoked',
+  'publication.embed_policy_changed',
+  'extension.status_changed',
+  'viewer_integration.rollout_changed',
+] as const;
+export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
 export const emptyJsonObject = (): JsonObject => ({});
 export const emptyJsonArray = (): JsonValue[] => [];

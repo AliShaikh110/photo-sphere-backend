@@ -124,3 +124,42 @@ function timestamp(value: Date | string | undefined): number {
   const result = value instanceof Date ? value.getTime() : Date.parse(value);
   return Number.isFinite(result) ? result : 0;
 }
+
+export interface PanoramaFamilyDerivatives {
+  readonly standardEquirectangular?: AssetDerivative;
+  readonly tiledEquirectangular?: AssetDerivative;
+  readonly cubemap?: AssetDerivative;
+  readonly tiledCubemap?: AssetDerivative;
+}
+
+/**
+ * The delivery families available for one logical panorama. Only the newest
+ * ready derivative version participates, so a partially reprocessed asset
+ * never mixes generations inside a single published scene.
+ */
+export function selectPanoramaFamilyDerivatives(
+  asset: Pick<CanonicalAsset, 'id' | 'derivatives'>,
+): PanoramaFamilyDerivatives {
+  const baseline = selectPanoramaDerivatives(asset);
+  if (baseline === undefined) {
+    return Object.freeze({});
+  }
+  const version = baseline.standardWeb.version;
+  const ofKind = (kind: AssetDerivativeKind): AssetDerivative | undefined => asset.derivatives
+    .filter((candidate) => candidate.kind === kind
+      && candidate.version === version
+      && isDerivativeReady(candidate))
+    .sort(compareByRecency)[0];
+
+  return Object.freeze({
+    standardEquirectangular: baseline.standardWeb,
+    ...(baseline.tiledLevels === undefined ? {} : { tiledEquirectangular: baseline.tiledLevels }),
+    ...(ofKind('cubemap') === undefined ? {} : { cubemap: ofKind('cubemap')! }),
+    ...(ofKind('tiledCubemap') === undefined ? {} : { tiledCubemap: ofKind('tiledCubemap')! }),
+  });
+}
+
+function compareByRecency(left: AssetDerivative, right: AssetDerivative): number {
+  const byId = left.id.localeCompare(right.id);
+  return byId === 0 ? left.storageKey.localeCompare(right.storageKey) : byId;
+}

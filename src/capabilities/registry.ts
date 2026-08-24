@@ -32,6 +32,7 @@ export const CAPABILITY_REGISTRY = Object.freeze({
     dependencies: [],
     incompatibilities: [],
     deviceRequirements: [],
+    deviceRequirementResolution: 'compile-time',
     mediaRequirements: ['ready-panorama'],
     lazyLoadModule: null,
     fallback: null,
@@ -44,6 +45,7 @@ export const CAPABILITY_REGISTRY = Object.freeze({
     dependencies: ['basicPanorama'],
     incompatibilities: [],
     deviceRequirements: [],
+    deviceRequirementResolution: 'compile-time',
     mediaRequirements: [],
     lazyLoadModule: null,
     fallback: null,
@@ -56,6 +58,7 @@ export const CAPABILITY_REGISTRY = Object.freeze({
     dependencies: ['basicPanorama'],
     incompatibilities: [],
     deviceRequirements: [],
+    deviceRequirementResolution: 'compile-time',
     mediaRequirements: [],
     lazyLoadModule: null,
     fallback: null,
@@ -68,6 +71,7 @@ export const CAPABILITY_REGISTRY = Object.freeze({
     dependencies: ['sceneNavigation'],
     incompatibilities: ['highResolution'],
     deviceRequirements: [],
+    deviceRequirementResolution: 'compile-time',
     mediaRequirements: [],
     lazyLoadModule: 'gallery',
     fallback: null,
@@ -80,6 +84,7 @@ export const CAPABILITY_REGISTRY = Object.freeze({
     dependencies: ['basicPanorama'],
     incompatibilities: [],
     deviceRequirements: [],
+    deviceRequirementResolution: 'compile-time',
     mediaRequirements: [],
     lazyLoadModule: null,
     fallback: null,
@@ -92,6 +97,7 @@ export const CAPABILITY_REGISTRY = Object.freeze({
     dependencies: ['basicPanorama'],
     incompatibilities: [],
     deviceRequirements: [],
+    deviceRequirementResolution: 'compile-time',
     mediaRequirements: [],
     lazyLoadModule: 'compass',
     fallback: null,
@@ -104,6 +110,7 @@ export const CAPABILITY_REGISTRY = Object.freeze({
     dependencies: ['basicPanorama'],
     incompatibilities: [],
     deviceRequirements: [],
+    deviceRequirementResolution: 'compile-time',
     mediaRequirements: [],
     lazyLoadModule: null,
     fallback: null,
@@ -116,6 +123,7 @@ export const CAPABILITY_REGISTRY = Object.freeze({
     dependencies: ['basicPanorama'],
     incompatibilities: [],
     deviceRequirements: [],
+    deviceRequirementResolution: 'compile-time',
     mediaRequirements: ['tiled-panorama-derivatives'],
     lazyLoadModule: 'equirectangular-tiles',
     fallback: {
@@ -132,6 +140,7 @@ export const CAPABILITY_REGISTRY = Object.freeze({
     dependencies: ['basicPanorama'],
     incompatibilities: ['gallery'],
     deviceRequirements: [],
+    deviceRequirementResolution: 'compile-time',
     mediaRequirements: ['high-resolution-derivative'],
     lazyLoadModule: 'resolution-selection',
     fallback: {
@@ -148,6 +157,7 @@ export const CAPABILITY_REGISTRY = Object.freeze({
     dependencies: [],
     incompatibilities: [],
     deviceRequirements: [],
+    deviceRequirementResolution: 'compile-time',
     mediaRequirements: ['ready-image-content'],
     lazyLoadModule: 'image-content',
     fallback: null,
@@ -160,6 +170,7 @@ export const CAPABILITY_REGISTRY = Object.freeze({
     dependencies: [],
     incompatibilities: [],
     deviceRequirements: ['video-playback'],
+    deviceRequirementResolution: 'compile-time',
     mediaRequirements: ['ready-video-content'],
     lazyLoadModule: 'video-content',
     fallback: null,
@@ -172,6 +183,7 @@ export const CAPABILITY_REGISTRY = Object.freeze({
     dependencies: [],
     incompatibilities: [],
     deviceRequirements: [],
+    deviceRequirementResolution: 'compile-time',
     mediaRequirements: [],
     lazyLoadModule: null,
     fallback: null,
@@ -184,6 +196,7 @@ export const CAPABILITY_REGISTRY = Object.freeze({
     dependencies: [],
     incompatibilities: [],
     deviceRequirements: ['video-playback'],
+    deviceRequirementResolution: 'compile-time',
     mediaRequirements: ['ready-video360-source', 'ready-video360-playback-profile'],
     lazyLoadModule: 'video-panorama',
     // 360 video is the whole experience for a video360 project, so there is no
@@ -198,6 +211,7 @@ export const CAPABILITY_REGISTRY = Object.freeze({
     dependencies: ['video360'],
     incompatibilities: [],
     deviceRequirements: [],
+    deviceRequirementResolution: 'compile-time',
     mediaRequirements: ['known-video-duration'],
     lazyLoadModule: 'video-timeline',
     fallback: {
@@ -214,6 +228,7 @@ export const CAPABILITY_REGISTRY = Object.freeze({
     dependencies: ['videoTimeline'],
     incompatibilities: [],
     deviceRequirements: [],
+    deviceRequirementResolution: 'compile-time',
     mediaRequirements: [],
     lazyLoadModule: null,
     fallback: {
@@ -230,6 +245,7 @@ export const CAPABILITY_REGISTRY = Object.freeze({
     dependencies: ['videoTimeline'],
     incompatibilities: [],
     deviceRequirements: [],
+    deviceRequirementResolution: 'compile-time',
     mediaRequirements: [],
     lazyLoadModule: 'video-timeline',
     fallback: {
@@ -246,6 +262,7 @@ export const CAPABILITY_REGISTRY = Object.freeze({
     dependencies: [],
     incompatibilities: [],
     deviceRequirements: [],
+    deviceRequirementResolution: 'compile-time',
     mediaRequirements: [],
     lazyLoadModule: null,
     fallback: {
@@ -257,43 +274,48 @@ export const CAPABILITY_REGISTRY = Object.freeze({
   map: definition({
     id: 'map',
     productFeature: 'Map navigation',
-    availability: 'reserved',
+    availability: 'available',
     rendererModule: 'map',
     dependencies: ['sceneNavigation'],
     incompatibilities: [],
     deviceRequirements: [],
+    deviceRequirementResolution: 'compile-time',
     mediaRequirements: ['map-spatial-data'],
     lazyLoadModule: 'map',
     fallback: {
       behavior: 'disable-capability',
       message: 'Scene navigation will remain available without a map.',
-      alternatives: ['Use scene navigation'],
+      alternatives: ['Add location data to your scenes', 'Use scene navigation'],
     },
   }),
   plan: definition({
     id: 'plan',
     productFeature: 'Plan navigation',
-    availability: 'reserved',
+    availability: 'available',
     rendererModule: 'plan',
     dependencies: ['sceneNavigation'],
     incompatibilities: [],
     deviceRequirements: [],
-    mediaRequirements: ['plan-spatial-data'],
+    deviceRequirementResolution: 'compile-time',
+    mediaRequirements: ['plan-spatial-data', 'ready-plan-asset'],
     lazyLoadModule: 'plan',
     fallback: {
       behavior: 'disable-capability',
       message: 'Scene navigation will remain available without a plan.',
-      alternatives: ['Use scene navigation'],
+      alternatives: ['Place your scenes on a plan', 'Use scene navigation'],
     },
   }),
   gyroscope: definition({
     id: 'gyroscope',
     productFeature: 'Motion navigation',
-    availability: 'reserved',
+    availability: 'available',
     rendererModule: 'gyroscope',
     dependencies: ['basicPanorama'],
     incompatibilities: [],
     deviceRequirements: ['device-orientation'],
+    // Sensor availability and permission are browser decisions. Declaring the
+    // requirement keeps a publication valid while the player degrades safely.
+    deviceRequirementResolution: 'runtime',
     mediaRequirements: [],
     lazyLoadModule: 'gyroscope',
     fallback: {
@@ -305,11 +327,12 @@ export const CAPABILITY_REGISTRY = Object.freeze({
   stereo: definition({
     id: 'stereo',
     productFeature: 'Stereo viewing',
-    availability: 'reserved',
+    availability: 'available',
     rendererModule: 'stereo',
     dependencies: ['basicPanorama'],
     incompatibilities: [],
     deviceRequirements: ['stereo-rendering'],
+    deviceRequirementResolution: 'runtime',
     mediaRequirements: [],
     lazyLoadModule: 'stereo',
     fallback: {
@@ -321,11 +344,12 @@ export const CAPABILITY_REGISTRY = Object.freeze({
   vr: definition({
     id: 'vr',
     productFeature: 'Immersive viewing',
-    availability: 'reserved',
+    availability: 'available',
     rendererModule: 'immersive-viewing',
     dependencies: ['gyroscope', 'stereo'],
     incompatibilities: [],
     deviceRequirements: ['immersive-runtime'],
+    deviceRequirementResolution: 'runtime',
     mediaRequirements: [],
     lazyLoadModule: 'immersive-viewing',
     fallback: {
@@ -337,11 +361,12 @@ export const CAPABILITY_REGISTRY = Object.freeze({
   advancedOverlay: definition({
     id: 'advancedOverlay',
     productFeature: 'Advanced overlays',
-    availability: 'reserved',
+    availability: 'available',
     rendererModule: 'advanced-overlays',
     dependencies: ['basicPanorama'],
     incompatibilities: [],
     deviceRequirements: [],
+    deviceRequirementResolution: 'compile-time',
     mediaRequirements: [],
     lazyLoadModule: 'advanced-overlays',
     fallback: {
@@ -353,17 +378,52 @@ export const CAPABILITY_REGISTRY = Object.freeze({
   advancedGeometry: definition({
     id: 'advancedGeometry',
     productFeature: 'Advanced hotspot geometry',
-    availability: 'reserved',
+    availability: 'available',
     rendererModule: 'advanced-geometry',
     dependencies: ['hotspots'],
     incompatibilities: [],
     deviceRequirements: [],
+    deviceRequirementResolution: 'compile-time',
     mediaRequirements: [],
     lazyLoadModule: 'advanced-geometry',
     fallback: {
       behavior: 'disable-capability',
       message: 'Point hotspots will remain available.',
       alternatives: ['Use point hotspots'],
+    },
+  }),
+  cubemapPanorama: definition({
+    id: 'cubemapPanorama',
+    productFeature: 'Advanced panorama format',
+    availability: 'available',
+    rendererModule: 'cubemap',
+    dependencies: ['basicPanorama'],
+    incompatibilities: [],
+    deviceRequirements: [],
+    deviceRequirementResolution: 'compile-time',
+    mediaRequirements: ['cubemap-derivatives'],
+    lazyLoadModule: 'cubemap',
+    fallback: {
+      behavior: 'disable-capability',
+      message: 'The experience will use the standard panorama format.',
+      alternatives: ['Use the standard panorama format'],
+    },
+  }),
+  customInteraction: definition({
+    id: 'customInteraction',
+    productFeature: 'Custom interactions',
+    availability: 'available',
+    rendererModule: 'extensions',
+    dependencies: ['hotspots'],
+    incompatibilities: [],
+    deviceRequirements: [],
+    deviceRequirementResolution: 'compile-time',
+    mediaRequirements: ['registered-extension'],
+    lazyLoadModule: 'extensions',
+    fallback: {
+      behavior: 'disable-capability',
+      message: 'The experience will continue without the custom interaction.',
+      alternatives: ['Use a standard hotspot or overlay'],
     },
   }),
 } satisfies CapabilityRegistry);
@@ -391,6 +451,9 @@ export function validateCapabilityRegistry(
     if (capability.lazyLoadModule !== null
       && capability.lazyLoadModule !== capability.rendererModule) {
       errors.push(`Capability ${id} declares inconsistent runtime module metadata.`);
+    }
+    if (capability.deviceRequirementResolution === 'runtime' && capability.fallback === null) {
+      errors.push(`Capability ${id} defers device support without declaring a fallback.`);
     }
     for (const dependency of capability.dependencies) {
       if (dependency === id) {

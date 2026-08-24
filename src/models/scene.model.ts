@@ -12,8 +12,9 @@ import {
 
 import type { Asset } from './asset.model';
 import type { Hotspot } from './hotspot.model';
-import { emptyJsonArray, emptyJsonObject } from './model.types';
-import type { JsonObject, JsonValue } from './model.types';
+import type { Overlay } from './overlay.model';
+import { emptyJsonObject } from './model.types';
+import type { JsonObject } from './model.types';
 import type { Project } from './project.model';
 import type { SceneConnection } from './scene-connection.model';
 
@@ -26,7 +27,6 @@ export class Scene extends Model<InferAttributes<Scene>, InferCreationAttributes
   declare isPrimary: CreationOptional<boolean>;
   declare initialView: CreationOptional<JsonObject>;
   declare viewLimits: CreationOptional<JsonObject>;
-  declare overlays: CreationOptional<JsonValue[]>;
   declare spatialData: CreationOptional<JsonObject>;
   declare runtimeHints: CreationOptional<JsonObject>;
   declare createdAt: CreationOptional<Date>;
@@ -35,6 +35,7 @@ export class Scene extends Model<InferAttributes<Scene>, InferCreationAttributes
   declare project?: NonAttribute<Project>;
   declare panoramaAsset?: NonAttribute<Asset>;
   declare hotspots?: NonAttribute<Hotspot[]>;
+  declare overlays?: NonAttribute<Overlay[]>;
   declare connections?: NonAttribute<SceneConnection[]>;
   declare inboundConnections?: NonAttribute<SceneConnection[]>;
 
@@ -90,11 +91,6 @@ export class Scene extends Model<InferAttributes<Scene>, InferCreationAttributes
           allowNull: false,
           defaultValue: emptyJsonObject,
           field: 'view_limits',
-        },
-        overlays: {
-          type: DataTypes.JSONB,
-          allowNull: false,
-          defaultValue: emptyJsonArray,
         },
         spatialData: {
           type: DataTypes.JSONB,

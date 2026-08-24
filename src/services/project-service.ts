@@ -1,9 +1,22 @@
 import { Op, type Transaction } from 'sequelize';
 import { sequelize } from '../database';
 import { AppError, conflict, notFound } from '../errors/app-error';
-import { Asset, Hotspot, Project, Scene, SceneConnection, TimelineInteraction, User } from '../models';
-import type { JsonObject, JsonValue } from '../models/model.types';
+import {
+  Asset,
+  Hotspot,
+  Overlay,
+  Plan,
+  Project,
+  Scene,
+  SceneConnection,
+  TimelineInteraction,
+  User
+} from '../models';
+import type { AccessRole, JsonObject, JsonValue } from '../models/model.types';
 import { sanitizePlainText } from '../security';
+import { accessibleProjectFilter, requireProjectRole } from './access-service';
+import { overlayPayload } from './overlay-service';
+import { planPayload } from './plan-service';
 import { timelineInteractionPayload } from './timeline-service';
 import {
   sanitizeBranding,
@@ -31,20 +44,42 @@ type ProjectUpdateInput = {
   videoSettings?: Record<string, unknown>;
 };
 
-export async function getOwnedProject(projectId: string, ownerId: string, transaction?: Transaction): Promise<Project> {
+/**
+ * Loads a project the caller may act on at the given role. Ownership,
+ * workspace membership and per-project grants are all resolved by the access
+ * service, so every mutation path here is server-enforced.
+ */
+export async function getAccessibleProject(
+  projectId: string,
+  userId: string,
+  required: AccessRole,
+  transaction?: Transaction
+): Promise<Project> {
+  const decision = await requireProjectRole(projectId, userId, required, transaction);
   if (transaction) {
-    await User.findByPk(ownerId, { transaction, lock: transaction.LOCK.UPDATE });
+    // The owner row is the serialization anchor for a project's writes, so it
+    // is locked before the project itself regardless of who is editing.
+    await User.findByPk(decision.ownerId, { transaction, lock: transaction.LOCK.UPDATE });
   }
   const project = await Project.findOne({
-    where: { id: projectId, ownerId },
+    where: { id: projectId },
     ...(transaction === undefined ? {} : { transaction, lock: transaction.LOCK.UPDATE })
   });
   if (!project) throw notFound('project', projectId);
   return project;
 }
 
-async function revisionFailure(projectId: string, ownerId: string, expectedRevision: number): Promise<never> {
-  const project = await Project.findOne({ where: { id: projectId, ownerId }, attributes: ['id', 'revision'] });
+/** Retained for callers that still express intent as "the project I own". */
+export async function getOwnedProject(
+  projectId: string,
+  userId: string,
+  transaction?: Transaction
+): Promise<Project> {
+  return getAccessibleProject(projectId, userId, 'editor', transaction);
+}
+
+async function revisionFailure(projectId: string, expectedRevision: number): Promise<never> {
+  const project = await Project.findOne({ where: { id: projectId }, attributes: ['id', 'revision'] });
   if (!project) throw notFound('project', projectId);
   throw conflict('REVISION_CONFLICT', 'The project was changed by another editor.', {
     expectedRevision,
@@ -52,9 +87,8 @@ async function revisionFailure(projectId: string, ownerId: string, expectedRevis
   });
 }
 
-async function bumpProjectRevision(options: {
+export async function bumpProjectRevision(options: {
   projectId: string;
-  ownerId: string;
   expectedRevision: number;
   transaction: Transaction;
 }): Promise<number> {
@@ -64,14 +98,13 @@ async function bumpProjectRevision(options: {
     {
       where: {
         id: options.projectId,
-        ownerId: options.ownerId,
         revision: options.expectedRevision
       },
       transaction: options.transaction
     }
   );
   if (affected !== 1) {
-    await revisionFailure(options.projectId, options.ownerId, options.expectedRevision);
+    await revisionFailure(options.projectId, options.expectedRevision);
   }
   return nextRevision;
 }
@@ -147,19 +180,19 @@ function scenePayload(scene: Scene): Record<string, unknown> {
     isPrimary: scene.isPrimary,
     initialView: scene.initialView,
     viewLimits: scene.viewLimits,
-    overlays: scene.overlays,
     connections: scene.connections?.map(connectionPayload) ?? [],
     spatialData: scene.spatialData,
     runtimeHints: scene.runtimeHints,
     hotspots: scene.hotspots?.map(hotspotPayload) ?? [],
+    overlays: scene.overlays?.map(overlayPayload) ?? [],
     createdAt: scene.createdAt,
     updatedAt: scene.updatedAt
   };
 }
 
-export async function listProjects(ownerId: string): Promise<Record<string, unknown>[]> {
+export async function listProjects(userId: string): Promise<Record<string, unknown>[]> {
   const projects = await Project.findAll({
-    where: { ownerId },
+    where: await accessibleProjectFilter(userId),
     order: [['updatedAt', 'DESC']],
     attributes: [
       'id',
@@ -211,15 +244,17 @@ export async function createProject(ownerId: string, input: ProjectCreateInput):
   };
 }
 
-export async function readProject(projectId: string, ownerId: string): Promise<Record<string, unknown>> {
+export async function readProject(projectId: string, userId: string): Promise<Record<string, unknown>> {
+  await requireProjectRole(projectId, userId, 'viewer');
   const project = await Project.findOne({
-    where: { id: projectId, ownerId },
+    where: { id: projectId },
     include: [
       {
         model: Scene,
         as: 'scenes',
         include: [
           { model: Hotspot, as: 'hotspots' },
+          { model: Overlay, as: 'overlays' },
           { model: SceneConnection, as: 'connections' }
         ]
       },
@@ -229,6 +264,7 @@ export async function readProject(projectId: string, ownerId: string): Promise<R
       [{ model: Scene, as: 'scenes' }, 'sortOrder', 'ASC'],
       [{ model: Scene, as: 'scenes' }, 'id', 'ASC'],
       [{ model: Scene, as: 'scenes' }, { model: Hotspot, as: 'hotspots' }, 'sortOrder', 'ASC'],
+      [{ model: Scene, as: 'scenes' }, { model: Overlay, as: 'overlays' }, 'sortOrder', 'ASC'],
       [{ model: Scene, as: 'scenes' }, { model: SceneConnection, as: 'connections' }, 'id', 'ASC']
     ]
   });
@@ -239,11 +275,16 @@ export async function readProject(projectId: string, ownerId: string): Promise<R
       order: [['timeMs', 'ASC'], ['sortOrder', 'ASC'], ['id', 'ASC']]
     })
     : [];
+  const plans = await Plan.findAll({
+    where: { projectId },
+    order: [['sortOrder', 'ASC'], ['id', 'ASC']]
+  });
   return {
     ...projectSummary(project),
     settings: project.settings,
     branding: project.branding,
     scenes: project.scenes?.map(scenePayload) ?? [],
+    plans: plans.map(planPayload),
     ...(project.type === 'video360'
       ? { timeline: timeline.map(timelineInteractionPayload) }
       : {}),
@@ -257,7 +298,7 @@ export async function updateProject(
   input: ProjectUpdateInput
 ): Promise<Record<string, unknown>> {
   await sequelize.transaction(async (transaction) => {
-    const project = await getOwnedProject(projectId, ownerId, transaction);
+    const project = await getAccessibleProject(projectId, ownerId, 'editor', transaction);
     const values: Partial<{
       name: string;
       settings: JsonObject;
@@ -272,7 +313,7 @@ export async function updateProject(
     if (input.settings !== undefined) values.settings = sanitizeProjectSettings(input.settings);
     if (input.branding !== undefined) {
       values.branding = sanitizeBranding(input.branding);
-      await assertBrandingAssets(values.branding, projectId, ownerId, transaction);
+      await assertBrandingAssets(values.branding, projectId, project.ownerId, transaction);
     }
     if (input.videoSettings !== undefined || input.videoAssetId !== undefined) {
       if (project.type !== 'video360') {
@@ -286,15 +327,15 @@ export async function updateProject(
         values.videoSettings = input.videoSettings as JsonObject;
       }
       if (input.videoAssetId !== undefined) {
-        await assertPrimaryVideoAsset(input.videoAssetId, projectId, ownerId, transaction);
+        await assertPrimaryVideoAsset(input.videoAssetId, projectId, project.ownerId, transaction);
         values.videoAssetId = input.videoAssetId;
       }
     }
     const [affected] = await Project.update(values, {
-      where: { id: projectId, ownerId, revision: input.revision },
+      where: { id: projectId, revision: input.revision },
       transaction
     });
-    if (affected !== 1) await revisionFailure(projectId, ownerId, input.revision);
+    if (affected !== 1) await revisionFailure(projectId, input.revision);
   });
   return readProject(projectId, ownerId);
 }
@@ -450,34 +491,38 @@ async function validateHotspotAssetReferences(
   }
 }
 
-export async function listScenes(projectId: string, ownerId: string): Promise<Record<string, unknown>[]> {
-  await getOwnedProject(projectId, ownerId);
+export async function listScenes(projectId: string, userId: string): Promise<Record<string, unknown>[]> {
+  await requireProjectRole(projectId, userId, 'viewer');
   const scenes = await Scene.findAll({
     where: { projectId },
     include: [
       { model: Hotspot, as: 'hotspots' },
+      { model: Overlay, as: 'overlays' },
       { model: SceneConnection, as: 'connections' }
     ],
     order: [
       ['sortOrder', 'ASC'],
       ['id', 'ASC'],
       [{ model: Hotspot, as: 'hotspots' }, 'sortOrder', 'ASC'],
+      [{ model: Overlay, as: 'overlays' }, 'sortOrder', 'ASC'],
       [{ model: SceneConnection, as: 'connections' }, 'id', 'ASC']
     ]
   });
   return scenes.map(scenePayload);
 }
 
-export async function getScene(projectId: string, sceneId: string, ownerId: string): Promise<Record<string, unknown>> {
-  await getOwnedProject(projectId, ownerId);
+export async function getScene(projectId: string, sceneId: string, userId: string): Promise<Record<string, unknown>> {
+  await requireProjectRole(projectId, userId, 'viewer');
   const scene = await Scene.findOne({
     where: { id: sceneId, projectId },
     include: [
       { model: Hotspot, as: 'hotspots' },
+      { model: Overlay, as: 'overlays' },
       { model: SceneConnection, as: 'connections' }
     ],
     order: [
       [{ model: Hotspot, as: 'hotspots' }, 'sortOrder', 'ASC'],
+      [{ model: Overlay, as: 'overlays' }, 'sortOrder', 'ASC'],
       [{ model: SceneConnection, as: 'connections' }, 'id', 'ASC']
     ]
   });
@@ -502,7 +547,6 @@ type SceneInput = {
   panoramaAssetId?: string | null;
   initialView?: Record<string, unknown>;
   viewLimits?: Record<string, unknown>;
-  overlays?: Record<string, unknown>[];
   connections?: SceneConnectionInput[];
   spatialData?: Record<string, unknown>;
   runtimeHints?: Record<string, unknown>;
@@ -686,10 +730,12 @@ async function loadSceneGraph(
     where: { id: sceneId, projectId },
     include: [
       { model: Hotspot, as: 'hotspots' },
+      { model: Overlay, as: 'overlays' },
       { model: SceneConnection, as: 'connections' }
     ],
     order: [
       [{ model: Hotspot, as: 'hotspots' }, 'sortOrder', 'ASC'],
+      [{ model: Overlay, as: 'overlays' }, 'sortOrder', 'ASC'],
       [{ model: SceneConnection, as: 'connections' }, 'id', 'ASC']
     ],
     transaction
@@ -714,8 +760,9 @@ export async function createScene(
   input: SceneInput & { name: string }
 ): Promise<Record<string, unknown>> {
   return sequelize.transaction(async (transaction) => {
-    assertSceneCapableProject(await getOwnedProject(projectId, ownerId, transaction));
-    await assertPanoramaAsset(input.panoramaAssetId, projectId, ownerId, transaction);
+    const project = await getAccessibleProject(projectId, ownerId, 'editor', transaction);
+    assertSceneCapableProject(project);
+    await assertPanoramaAsset(input.panoramaAssetId, projectId, project.ownerId, transaction);
     const existingScenes = await Scene.findAll({
       where: { projectId },
       order: [['sortOrder', 'ASC'], ['createdAt', 'ASC'], ['id', 'ASC']],
@@ -724,7 +771,6 @@ export async function createScene(
     await normalizeSceneRows(existingScenes, transaction);
     const revision = await bumpProjectRevision({
       projectId,
-      ownerId,
       expectedRevision: input.projectRevision,
       transaction
     });
@@ -737,7 +783,6 @@ export async function createScene(
         isPrimary: existingScenes.length === 0,
         initialView: (input.initialView ?? {}) as JsonObject,
         viewLimits: (input.viewLimits ?? {}) as JsonObject,
-        overlays: (input.overlays ?? []) as JsonValue[],
         spatialData: (input.spatialData ?? {}) as JsonObject,
         runtimeHints: (input.runtimeHints ?? {}) as JsonObject
       },
@@ -756,15 +801,14 @@ export async function updateScene(
   input: SceneInput
 ): Promise<Record<string, unknown>> {
   return sequelize.transaction(async (transaction) => {
-    await getOwnedProject(projectId, ownerId, transaction);
+    const project = await getAccessibleProject(projectId, ownerId, 'editor', transaction);
     const scene = await Scene.findOne({ where: { id: sceneId, projectId }, transaction });
     if (!scene) {
       throw notFound('scene', sceneId);
     }
-    await assertPanoramaAsset(input.panoramaAssetId, projectId, ownerId, transaction);
+    await assertPanoramaAsset(input.panoramaAssetId, projectId, project.ownerId, transaction);
     const revision = await bumpProjectRevision({
       projectId,
-      ownerId,
       expectedRevision: input.projectRevision,
       transaction
     });
@@ -776,7 +820,6 @@ export async function updateScene(
         ...(input.panoramaAssetId === undefined ? {} : { panoramaAssetId: input.panoramaAssetId }),
         ...(input.initialView === undefined ? {} : { initialView: input.initialView as JsonObject }),
         ...(input.viewLimits === undefined ? {} : { viewLimits: input.viewLimits as JsonObject }),
-        ...(input.overlays === undefined ? {} : { overlays: input.overlays as JsonValue[] }),
         ...(input.spatialData === undefined ? {} : { spatialData: input.spatialData as JsonObject }),
         ...(input.runtimeHints === undefined ? {} : { runtimeHints: input.runtimeHints as JsonObject })
       },
@@ -796,7 +839,7 @@ export async function reorderScenes(
   input: { projectRevision: number; sceneIds: string[] }
 ): Promise<Record<string, unknown>> {
   return sequelize.transaction(async (transaction) => {
-    await getOwnedProject(projectId, ownerId, transaction);
+    await getAccessibleProject(projectId, ownerId, 'editor', transaction);
     const scenes = await Scene.findAll({
       where: { projectId },
       order: [['sortOrder', 'ASC'], ['createdAt', 'ASC'], ['id', 'ASC']],
@@ -829,7 +872,6 @@ export async function reorderScenes(
     }
     const revision = await bumpProjectRevision({
       projectId,
-      ownerId,
       expectedRevision: input.projectRevision,
       transaction
     });
@@ -838,12 +880,14 @@ export async function reorderScenes(
       where: { projectId },
       include: [
         { model: Hotspot, as: 'hotspots' },
+        { model: Overlay, as: 'overlays' },
         { model: SceneConnection, as: 'connections' }
       ],
       order: [
         ['sortOrder', 'ASC'],
         ['id', 'ASC'],
         [{ model: Hotspot, as: 'hotspots' }, 'sortOrder', 'ASC'],
+        [{ model: Overlay, as: 'overlays' }, 'sortOrder', 'ASC'],
         [{ model: SceneConnection, as: 'connections' }, 'id', 'ASC']
       ],
       transaction
@@ -859,7 +903,7 @@ export async function deleteScene(
   projectRevision: number
 ): Promise<Record<string, unknown>> {
   return sequelize.transaction(async (transaction) => {
-    await getOwnedProject(projectId, ownerId, transaction);
+    await getAccessibleProject(projectId, ownerId, 'editor', transaction);
     const scene = await Scene.findOne({ where: { id: sceneId, projectId }, transaction });
     if (!scene) {
       throw notFound('scene', sceneId);
@@ -936,7 +980,6 @@ export async function deleteScene(
     }
     const revision = await bumpProjectRevision({
       projectId,
-      ownerId,
       expectedRevision: projectRevision,
       transaction
     });
@@ -987,16 +1030,15 @@ export async function createHotspot(
   input: HotspotInput & { geometry: Record<string, unknown>; position: Record<string, unknown> }
 ): Promise<Record<string, unknown>> {
   return sequelize.transaction(async (transaction) => {
-    await getOwnedProject(projectId, ownerId, transaction);
+    const project = await getAccessibleProject(projectId, ownerId, 'editor', transaction);
     const scene = await Scene.findOne({ where: { id: sceneId, projectId }, transaction });
     if (!scene) {
       throw notFound('scene', sceneId);
     }
-    const action = await validateHotspotAction(input.action, projectId, ownerId, transaction);
-    await validateHotspotAssetReferences(input, projectId, ownerId, transaction);
+    const action = await validateHotspotAction(input.action, projectId, project.ownerId, transaction);
+    await validateHotspotAssetReferences(input, projectId, project.ownerId, transaction);
     const revision = await bumpProjectRevision({
       projectId,
-      ownerId,
       expectedRevision: input.projectRevision,
       transaction
     });
@@ -1026,7 +1068,7 @@ export async function updateHotspot(
   input: HotspotInput
 ): Promise<Record<string, unknown>> {
   return sequelize.transaction(async (transaction) => {
-    await getOwnedProject(projectId, ownerId, transaction);
+    const project = await getAccessibleProject(projectId, ownerId, 'editor', transaction);
     const hotspot = await Hotspot.findOne({
       where: { id: hotspotId, sceneId },
       include: [{ model: Scene, as: 'scene', required: true, where: { projectId } }],
@@ -1035,11 +1077,10 @@ export async function updateHotspot(
     if (!hotspot) {
       throw notFound('hotspot', hotspotId);
     }
-    const action = await validateHotspotAction(input.action, projectId, ownerId, transaction);
-    await validateHotspotAssetReferences(input, projectId, ownerId, transaction);
+    const action = await validateHotspotAction(input.action, projectId, project.ownerId, transaction);
+    await validateHotspotAssetReferences(input, projectId, project.ownerId, transaction);
     const revision = await bumpProjectRevision({
       projectId,
-      ownerId,
       expectedRevision: input.projectRevision,
       transaction
     });
@@ -1069,7 +1110,7 @@ export async function deleteHotspot(
   projectRevision: number
 ): Promise<Record<string, unknown>> {
   return sequelize.transaction(async (transaction) => {
-    await getOwnedProject(projectId, ownerId, transaction);
+    await getAccessibleProject(projectId, ownerId, 'editor', transaction);
     const hotspot = await Hotspot.findOne({
       where: { id: hotspotId, sceneId },
       include: [{ model: Scene, as: 'scene', required: true, where: { projectId } }],
@@ -1101,7 +1142,6 @@ export async function deleteHotspot(
     }
     const revision = await bumpProjectRevision({
       projectId,
-      ownerId,
       expectedRevision: projectRevision,
       transaction
     });

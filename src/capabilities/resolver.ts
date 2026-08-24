@@ -10,6 +10,7 @@ import {
   type CapabilityResolutionInput,
   type CapabilityResolutionResult,
   type CapabilityViewLimits,
+  type DeferredDeviceCapability,
   type RuntimeModuleDeclaration,
 } from './types';
 import {
@@ -42,6 +43,8 @@ const CAPABILITY_PATHS: Readonly<Record<CapabilityId, string>> = Object.freeze({
   vr: 'settings.immersiveViewing',
   advancedOverlay: 'scenes.overlays',
   advancedGeometry: 'scenes.hotspots.geometry',
+  cubemapPanorama: 'scenes.panoramaAssetId',
+  customInteraction: 'scenes.hotspots.geometry.extensionId',
 });
 
 interface CapabilityFailure {
@@ -112,6 +115,7 @@ export function resolveCapabilities(
     moduleDeclarations,
     issues,
     fallbacks,
+    deferredDeviceCapabilities: buildDeferredDeviceCapabilities(capabilities, registry),
   });
 }
 
@@ -161,6 +165,10 @@ function resolveAvailability(state: ResolutionState): void {
 }
 
 function resolveSemanticConfiguration(state: ResolutionState): void {
+  resolveSpatialConfiguration(state);
+  resolveImmersiveConfiguration(state);
+  resolveAdvancedInteractionConfiguration(state);
+
   if (isUsable(state, 'videoTimeline')
     && (state.input.configuration?.timelineInteractionCount ?? 0) === 0) {
     failCapability(state, {
@@ -206,10 +214,98 @@ function resolveSemanticConfiguration(state: ResolutionState): void {
   }
 }
 
+/**
+ * Map and plan navigation only make sense when the experience actually carries
+ * meaningful spatial data. A project without it never sees the feature rather
+ * than seeing an empty map.
+ */
+function resolveSpatialConfiguration(state: ResolutionState): void {
+  if (isUsable(state, 'map') && (state.input.configuration?.mappedSceneCount ?? 0) === 0) {
+    failCapability(state, {
+      capabilityId: 'map',
+      code: 'FEATURE_NOT_CONFIGURED',
+      message: 'Map navigation is enabled but no scene has a location yet.',
+      alternatives: ['Add a location to at least one scene', 'Use scene navigation'],
+    });
+  }
+  if (isUsable(state, 'plan')
+    && (state.input.configuration?.planPositionedSceneCount ?? 0) === 0) {
+    failCapability(state, {
+      capabilityId: 'plan',
+      code: 'FEATURE_NOT_CONFIGURED',
+      message: 'Plan navigation is enabled but no scene is placed on a plan yet.',
+      alternatives: ['Place at least one scene on a plan', 'Use scene navigation'],
+    });
+  }
+}
+
+function resolveImmersiveConfiguration(state: ResolutionState): void {
+  if (isUsable(state, 'gyroscope')
+    && state.input.configuration?.motionNavigationRequested === false) {
+    failCapability(state, {
+      capabilityId: 'gyroscope',
+      code: 'FEATURE_NOT_CONFIGURED',
+      message: 'Motion navigation is not enabled for this experience.',
+      alternatives: ['Enable motion navigation', 'Use standard navigation'],
+    });
+  }
+  if (isUsable(state, 'stereo') && state.input.configuration?.stereoRequested === false) {
+    failCapability(state, {
+      capabilityId: 'stereo',
+      code: 'FEATURE_NOT_CONFIGURED',
+      message: 'Stereo viewing is not enabled for this experience.',
+      alternatives: ['Enable stereo viewing', 'Use normal panorama viewing'],
+    });
+  }
+  if (isUsable(state, 'vr') && state.input.configuration?.immersiveRequested === false) {
+    failCapability(state, {
+      capabilityId: 'vr',
+      code: 'FEATURE_NOT_CONFIGURED',
+      message: 'Immersive viewing is not enabled for this experience.',
+      alternatives: ['Enable immersive viewing', 'Use normal panorama viewing'],
+    });
+  }
+}
+
+function resolveAdvancedInteractionConfiguration(state: ResolutionState): void {
+  const configuration = state.input.configuration;
+  if (configuration === undefined) return;
+  if (isUsable(state, 'advancedOverlay') && (configuration.overlayCount ?? 0) === 0) {
+    failCapability(state, {
+      capabilityId: 'advancedOverlay',
+      code: 'FEATURE_NOT_CONFIGURED',
+      message: 'Advanced overlays are enabled but no overlay is configured.',
+      alternatives: ['Add an overlay', 'Use standard hotspot content'],
+    });
+  }
+  if (isUsable(state, 'advancedGeometry') && (configuration.advancedGeometryCount ?? 0) === 0) {
+    failCapability(state, {
+      capabilityId: 'advancedGeometry',
+      code: 'FEATURE_NOT_CONFIGURED',
+      message: 'Advanced hotspot geometry is enabled but every hotspot is a point.',
+      alternatives: ['Use point hotspots'],
+    });
+  }
+  if (isUsable(state, 'customInteraction') && (configuration.customInteractionCount ?? 0) === 0) {
+    failCapability(state, {
+      capabilityId: 'customInteraction',
+      code: 'FEATURE_NOT_CONFIGURED',
+      message: 'Custom interactions are enabled but none are configured.',
+      alternatives: ['Use a standard hotspot or overlay'],
+    });
+  }
+}
+
+/**
+ * Only requirements the platform can decide now are enforced here. Sensor,
+ * stereo and immersive support is decided by the player, so those capabilities
+ * compile through and are declared to the runtime with their fallback.
+ */
 function resolveDeviceRequirements(state: ResolutionState): void {
   const available = new Set(state.input.availableDeviceRequirements ?? []);
   for (const id of orderedUsableCapabilities(state)) {
     const definition = state.registry[id];
+    if (definition.deviceRequirementResolution === 'runtime') continue;
     if (definition.deviceRequirements.some((requirement) => !available.has(requirement))) {
       failCapability(state, {
         capabilityId: id,
@@ -219,6 +315,24 @@ function resolveDeviceRequirements(state: ResolutionState): void {
       });
     }
   }
+}
+
+function buildDeferredDeviceCapabilities(
+  capabilities: readonly CapabilityId[],
+  registry: CapabilityRegistry,
+): readonly DeferredDeviceCapability[] {
+  return Object.freeze(capabilities.flatMap((id) => {
+    const definition = registry[id];
+    if (definition.deviceRequirementResolution !== 'runtime') return [];
+    if (definition.deviceRequirements.length === 0) return [];
+    return [Object.freeze({
+      capabilityId: id,
+      deviceRequirements: Object.freeze([...definition.deviceRequirements]),
+      fallbackMessage: definition.fallback?.message
+        ?? 'The experience continues without this feature.',
+      alternatives: Object.freeze([...(definition.fallback?.alternatives ?? [])]),
+    })];
+  }));
 }
 
 function resolveMediaRequirements(state: ResolutionState): void {
@@ -479,5 +593,6 @@ function invalidRegistryResult(
     moduleDeclarations: Object.freeze([]),
     issues,
     fallbacks: Object.freeze([]),
+    deferredDeviceCapabilities: Object.freeze([]),
   });
 }

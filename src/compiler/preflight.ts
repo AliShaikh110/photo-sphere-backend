@@ -2,7 +2,11 @@ import { resolveCapabilities, type CapabilityResolutionResult } from '../capabil
 import { validateCanonicalProject } from '../domain/validation';
 import { validateSafeUrl } from '../security/url-validator';
 import type { ValidationIssue } from '../domain/validation';
-import type { CanonicalAsset, CanonicalProject } from '../domain/types';
+import type {
+  CanonicalAsset,
+  CanonicalInteractionGeometry,
+  CanonicalProject,
+} from '../domain/types';
 import {
   selectPanoramaDerivatives,
   selectPreferredReadyDerivative,
@@ -30,6 +34,7 @@ function preflightImageExperience(input: CompileExperienceInput): CompilerPrefli
     assets: input.assets,
     requireReadyAssets: true,
     supportedProjectTypes: ['image360'],
+    ...(input.extensions === undefined ? {} : { extensions: input.extensions }),
   });
   const optionalBrandingFailures = new Set([
     'REFERENCE_NOT_FOUND',
@@ -62,31 +67,34 @@ function preflightImageExperience(input: CompileExperienceInput): CompilerPrefli
     ));
   }
 
-  for (const [sceneIndex, scene] of input.project.scenes.entries()) {
-    for (const [field, value] of [
-      ['overlays', scene.overlays ?? []],
-      ['spatialData', scene.spatialData ?? {}],
-    ] as const) {
-      if (Array.isArray(value) ? value.length > 0 : Object.keys(value).length > 0) {
-        issues.push({
-          code: 'CAPABILITY_UNSUPPORTED',
-          message: `${field} is reserved for a later experience capability.`,
-          entityType: 'scene',
-          entityId: scene.id,
-          path: `scenes[${sceneIndex}].${field}`,
-          retryable: false,
-        });
-      }
+  for (const plan of input.project.plans ?? []) {
+    if (plan.assetId === null || plan.assetId === undefined) continue;
+    const planAsset = assetsById.get(plan.assetId);
+    if (planAsset === undefined) continue;
+    if (planAsset.processingStatus !== 'ready'
+      || selectPreferredReadyDerivative(planAsset) === undefined) {
+      issues.push({
+        code: 'MAP_ASSET_NOT_READY',
+        message: 'The plan image is still being prepared.',
+        entityType: 'plan',
+        entityId: plan.id,
+        path: `plans.${plan.id}.assetId`,
+        retryable: planAsset.processingStatus !== 'failed',
+      });
     }
+  }
+
+  for (const [sceneIndex, scene] of input.project.scenes.entries()) {
     const panorama = scene.panoramaAssetId === null
       ? undefined
       : assetsById.get(scene.panoramaAssetId);
     if (panorama !== undefined && panorama.processingStatus === 'ready') {
       if (panorama.projection !== 'equirectangular'
-        && panorama.projection !== 'cropped_equirectangular') {
+        && panorama.projection !== 'cropped_equirectangular'
+        && panorama.projection !== 'cubemap') {
         issues.push({
           code: 'UNSUPPORTED_PANORAMA_PROJECTION',
-          message: 'This release supports equirectangular panoramas only.',
+          message: 'This panorama format is not supported yet.',
           entityType: 'scene',
           entityId: scene.id,
           path: `scenes[${sceneIndex}].panoramaAssetId`,
@@ -128,16 +136,14 @@ function preflightImageExperience(input: CompileExperienceInput): CompilerPrefli
 
     for (const [hotspotIndex, hotspot] of scene.hotspots.entries()) {
       const path = `scenes[${sceneIndex}].hotspots[${hotspotIndex}]`;
-      if (hotspot.geometry.kind !== 'point') {
-        issues.push({
-          code: 'CAPABILITY_UNSUPPORTED',
-          message: 'Sprint 01 compilation supports point hotspots only.',
-          entityType: 'hotspot',
-          entityId: hotspot.id,
-          path: `${path}.geometry.kind`,
-          retryable: false,
-        });
-      }
+      requireGeometryMedia(
+        hotspot.geometry,
+        `${path}.geometry`,
+        hotspot.id,
+        assetsById,
+        issues,
+        'hotspot',
+      );
       const referencedImages = [
         hotspot.appearance?.iconAssetId,
         hotspot.content?.imageAssetId,
@@ -156,6 +162,26 @@ function preflightImageExperience(input: CompileExperienceInput): CompilerPrefli
           assetsById,
           issues,
         );
+      }
+    }
+
+    for (const [overlayIndex, overlay] of (scene.overlays ?? []).entries()) {
+      const path = `scenes[${sceneIndex}].overlays[${overlayIndex}]`;
+      requireGeometryMedia(
+        overlay.geometry,
+        `${path}.geometry`,
+        overlay.id,
+        assetsById,
+        issues,
+        'overlay',
+      );
+      for (const [field, assetId] of [
+        ['content.imageAssetId', overlay.content?.imageAssetId],
+        ['content.videoAssetId', overlay.content?.videoAssetId],
+        ['action.assetId', overlay.action.kind === 'openAsset' ? overlay.action.assetId : undefined],
+      ] as const) {
+        if (assetId === undefined) continue;
+        requireDisplayDerivative(assetId, `${path}.${field}`, overlay.id, assetsById, issues, 'overlay');
       }
     }
   }
@@ -473,8 +499,27 @@ function scanVideoProjectForRendererConfiguration(
   visit({ settings: project.settings, branding: project.branding, timeline: project.timeline ?? [] }, '');
 }
 
+/**
+ * A media layer can only publish when its referenced asset has a ready
+ * delivery derivative; a custom geometry needs its extension module resolved
+ * by the registry snapshot the compile was given.
+ */
+function requireGeometryMedia(
+  geometry: CanonicalInteractionGeometry,
+  path: string,
+  entityId: string,
+  assetsById: ReadonlyMap<string, CanonicalAsset>,
+  issues: ValidationIssue[],
+  entityType: ValidationIssue['entityType'],
+): void {
+  if (geometry.kind !== 'imageLayer' && geometry.kind !== 'videoLayer') return;
+  requireDisplayDerivative(geometry.assetId, `${path}.assetId`, entityId, assetsById, issues, entityType);
+}
+
 function validationEntityType(path: string): ValidationIssue['entityType'] {
   if (path.includes('.hotspots') || path.startsWith('hotspots')) return 'hotspot';
+  if (path.includes('.overlays') || path.startsWith('overlays')) return 'overlay';
+  if (path.startsWith('plans')) return 'plan';
   if (path.startsWith('scenes')) return 'scene';
   if (path.startsWith('assets')) return 'asset';
   if (path.startsWith('branding')) return 'branding';

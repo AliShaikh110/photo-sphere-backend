@@ -4,8 +4,14 @@ import type {
   CapabilityResolutionInput,
   MediaRequirement,
 } from '../capabilities/types';
-import type { CanonicalAsset, CanonicalProject } from '../domain/types';
-import { selectPanoramaDerivatives } from './derivative-selector';
+import type {
+  CanonicalAsset,
+  CanonicalInteractionGeometry,
+  CanonicalOverlay,
+  CanonicalProject,
+  CanonicalScene,
+} from '../domain/types';
+import { selectPanoramaDerivatives, selectPanoramaFamilyDerivatives } from './derivative-selector';
 import { hasPublishableVideoProfile } from './video-derivative-selector';
 
 export function analyzeProjectCapabilities(
@@ -132,12 +138,44 @@ function readNumber(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
+interface SpatialAnalysis {
+  readonly mappedSceneCount: number;
+  readonly planPositionedSceneCount: number;
+  readonly usedPlanIds: ReadonlySet<string>;
+}
+
+function analyzeSpatialData(project: CanonicalProject): SpatialAnalysis {
+  const usedPlanIds = new Set<string>();
+  let mappedSceneCount = 0;
+  let planPositionedSceneCount = 0;
+  for (const scene of project.scenes) {
+    const spatial = scene.spatialData;
+    if (spatial === undefined) continue;
+    if (typeof spatial.latitude === 'number' && typeof spatial.longitude === 'number') {
+      mappedSceneCount += 1;
+    }
+    if (typeof spatial.planId === 'string'
+      && typeof spatial.mapX === 'number'
+      && typeof spatial.mapY === 'number') {
+      planPositionedSceneCount += 1;
+      usedPlanIds.add(spatial.planId);
+    }
+  }
+  return { mappedSceneCount, planPositionedSceneCount, usedPlanIds };
+}
+
+interface GeometryAnalysis {
+  readonly advancedGeometryCount: number;
+  readonly customInteractionCount: number;
+}
+
 function analyzeImageProjectCapabilities(
   project: CanonicalProject,
   assets: readonly CanonicalAsset[],
 ): CapabilityResolutionInput {
   const requested = new Set<CapabilityId>(['basicPanorama']);
   const references: CapabilityAssetReference[] = [];
+  const extraRequirements = new Set<MediaRequirement>();
   const assetsById = new Map(assets.map((asset) => [asset.id, asset]));
   const globalQuality = project.settings.quality?.preference ?? 'automatic';
 
@@ -145,6 +183,9 @@ function analyzeImageProjectCapabilities(
     || (project.settings.navigation?.sceneNavigation ?? false);
   let hasViewLimits = false;
   let firstViewLimits: NonNullable<CapabilityResolutionInput['configuration']>['viewLimits'];
+  let overlayCount = 0;
+  let advancedGeometryCount = 0;
+  let customInteractionCount = 0;
 
   for (const [sceneIndex, scene] of project.scenes.entries()) {
     const panorama = scene.panoramaAssetId === null
@@ -160,6 +201,9 @@ function analyzeImageProjectCapabilities(
     }));
 
     const sceneQuality = scene.runtimeHints?.qualityPreference ?? globalQuality;
+    const families = panorama === undefined
+      ? undefined
+      : selectPanoramaFamilyDerivatives(panorama);
     const tiled = panorama === undefined
       ? undefined
       : selectPanoramaDerivatives(panorama)?.tiledLevels;
@@ -187,6 +231,20 @@ function analyzeImageProjectCapabilities(
         path: `scenes[${sceneIndex}].runtimeHints.qualityPreference`,
       }));
     }
+    // A cubemap family is only requested when the pipeline actually produced
+    // one; equirectangular delivery stays the default everywhere else.
+    if (families?.cubemap !== undefined || families?.tiledCubemap !== undefined) {
+      requested.add('cubemapPanorama');
+      references.push(assetReference({
+        assetId: scene.panoramaAssetId ?? `missing-panorama:${scene.id}`,
+        capabilityId: 'cubemapPanorama',
+        requirement: 'cubemap-derivatives',
+        asset: panorama,
+        derivativeReady: true,
+        entityId: scene.id,
+        path: `scenes[${sceneIndex}].panoramaAssetId`,
+      }));
+    }
 
     if (scene.hotspots.length > 0) requested.add('hotspots');
     if ((scene.connections?.length ?? 0) > 0) hasSceneNavigation = true;
@@ -201,6 +259,17 @@ function analyzeImageProjectCapabilities(
       if (hotspot.action.kind === 'goToScene') hasSceneNavigation = true;
       if (hotspot.action.kind === 'openUrl'
         || hotspot.content?.externalUrl !== undefined) requested.add('externalLink');
+
+      const geometry = analyzeGeometry(
+        hotspot.geometry,
+        `${path}.geometry`,
+        hotspot.id,
+        assetsById,
+        requested,
+        references,
+      );
+      advancedGeometryCount += geometry.advancedGeometryCount;
+      customInteractionCount += geometry.customInteractionCount;
 
       const imageAssetIds = [
         hotspot.content?.imageAssetId,
@@ -237,6 +306,27 @@ function analyzeImageProjectCapabilities(
         }));
       }
     }
+
+    const overlays = scene.overlays ?? [];
+    overlayCount += overlays.length;
+    for (const [overlayIndex, overlay] of overlays.entries()) {
+      const path = `scenes[${sceneIndex}].overlays[${overlayIndex}]`;
+      requested.add('advancedOverlay');
+      if (overlay.action.kind === 'goToScene') hasSceneNavigation = true;
+      if (overlay.action.kind === 'openUrl'
+        || overlay.content?.externalUrl !== undefined) requested.add('externalLink');
+      const geometry = analyzeGeometry(
+        overlay.geometry,
+        `${path}.geometry`,
+        overlay.id,
+        assetsById,
+        requested,
+        references,
+      );
+      advancedGeometryCount += geometry.advancedGeometryCount;
+      customInteractionCount += geometry.customInteractionCount;
+      analyzeOverlayContent(overlay, path, assetsById, requested, references);
+    }
   }
 
   if (hasSceneNavigation) requested.add('sceneNavigation');
@@ -245,7 +335,40 @@ function analyzeImageProjectCapabilities(
   if (project.settings.compass?.enabled ?? false) requested.add('compass');
   if (project.settings.information?.externalUrl !== undefined) requested.add('externalLink');
 
-  const availableMediaRequirements = mediaRequirementsSatisfied(references);
+  const spatial = analyzeSpatialData(project);
+  const plans = project.plans ?? [];
+  if (project.settings.map?.enabled ?? false) {
+    requested.add('map');
+    if (spatial.mappedSceneCount > 0) extraRequirements.add('map-spatial-data');
+  }
+  if (project.settings.plan?.enabled ?? false) {
+    requested.add('plan');
+    if (spatial.planPositionedSceneCount > 0) extraRequirements.add('plan-spatial-data');
+    for (const plan of plans) {
+      if (!spatial.usedPlanIds.has(plan.id)) continue;
+      references.push(assetReference({
+        assetId: plan.assetId ?? `missing-plan-image:${plan.id}`,
+        capabilityId: 'plan',
+        requirement: 'ready-plan-asset',
+        asset: plan.assetId === null ? undefined : assetsById.get(plan.assetId),
+        entityId: plan.id,
+        path: `plans.${plan.id}.assetId`,
+      }));
+    }
+  }
+
+  // Motion, stereo and immersive viewing are creator intent. Device support is
+  // declared to the player and resolved there, never at publish time.
+  if (project.settings.motionNavigation?.enabled ?? false) requested.add('gyroscope');
+  if (project.settings.immersiveViewing?.stereoEnabled ?? false) requested.add('stereo');
+  if (project.settings.immersiveViewing?.immersiveEnabled ?? false) requested.add('vr');
+
+  if (customInteractionCount > 0) extraRequirements.add('registered-extension');
+
+  const availableMediaRequirements = [
+    ...mediaRequirementsSatisfied(references),
+    ...extraRequirements,
+  ];
   return {
     projectId: project.id,
     requestedCapabilities: [...requested],
@@ -257,9 +380,108 @@ function analyzeImageProjectCapabilities(
     configuration: {
       compassEnabled: project.settings.compass?.enabled ?? false,
       ...(hasViewLimits && firstViewLimits !== undefined ? { viewLimits: firstViewLimits } : {}),
+      mappedSceneCount: spatial.mappedSceneCount,
+      planPositionedSceneCount: spatial.planPositionedSceneCount,
+      overlayCount,
+      advancedGeometryCount,
+      customInteractionCount,
+      motionNavigationRequested: project.settings.motionNavigation?.enabled ?? false,
+      stereoRequested: project.settings.immersiveViewing?.stereoEnabled ?? false,
+      immersiveRequested: project.settings.immersiveViewing?.immersiveEnabled ?? false,
     },
     fallbackMode: 'apply',
   };
+}
+
+/**
+ * Advanced geometry brings its own capability and, for media layers, its own
+ * asset readiness requirement.
+ */
+function analyzeGeometry(
+  geometry: CanonicalInteractionGeometry,
+  path: string,
+  entityId: string,
+  assetsById: ReadonlyMap<string, CanonicalAsset>,
+  requested: Set<CapabilityId>,
+  references: CapabilityAssetReference[],
+): GeometryAnalysis {
+  switch (geometry.kind) {
+    case 'point':
+      return { advancedGeometryCount: 0, customInteractionCount: 0 };
+    case 'polygon':
+    case 'polyline':
+      requested.add('advancedGeometry');
+      return { advancedGeometryCount: 1, customInteractionCount: 0 };
+    case 'imageLayer':
+    case 'videoLayer': {
+      requested.add('advancedGeometry');
+      const capabilityId: CapabilityId = geometry.kind === 'videoLayer'
+        ? 'videoContent'
+        : 'imageContent';
+      requested.add(capabilityId);
+      references.push(assetReference({
+        assetId: geometry.assetId,
+        capabilityId,
+        requirement: geometry.kind === 'videoLayer' ? 'ready-video-content' : 'ready-image-content',
+        asset: assetsById.get(geometry.assetId),
+        entityId,
+        path: `${path}.assetId`,
+      }));
+      return { advancedGeometryCount: 1, customInteractionCount: 0 };
+    }
+    case 'custom':
+      requested.add('customInteraction');
+      return { advancedGeometryCount: 0, customInteractionCount: 1 };
+  }
+}
+
+function analyzeOverlayContent(
+  overlay: CanonicalOverlay,
+  path: string,
+  assetsById: ReadonlyMap<string, CanonicalAsset>,
+  requested: Set<CapabilityId>,
+  references: CapabilityAssetReference[],
+): void {
+  const imageAssetIds = [
+    overlay.content?.imageAssetId,
+    overlay.action.kind === 'openAsset' ? overlay.action.assetId : undefined,
+  ].filter((assetId): assetId is string => assetId !== undefined);
+  for (const assetId of imageAssetIds) {
+    const asset = assetsById.get(assetId);
+    const capabilityId: CapabilityId = asset?.mediaType === 'video' ? 'videoContent' : 'imageContent';
+    requested.add(capabilityId);
+    references.push(assetReference({
+      assetId,
+      capabilityId,
+      requirement: capabilityId === 'videoContent' ? 'ready-video-content' : 'ready-image-content',
+      asset,
+      entityId: overlay.id,
+      path: `${path}.content.imageAssetId`,
+    }));
+  }
+  if (overlay.content?.videoAssetId !== undefined) {
+    requested.add('videoContent');
+    references.push(assetReference({
+      assetId: overlay.content.videoAssetId,
+      capabilityId: 'videoContent',
+      requirement: 'ready-video-content',
+      asset: assetsById.get(overlay.content.videoAssetId),
+      entityId: overlay.id,
+      path: `${path}.content.videoAssetId`,
+    }));
+  }
+}
+
+/** Exported so the compiler and diagnostics can describe scene placement. */
+export function sceneHasWorldCoordinates(scene: CanonicalScene): boolean {
+  return typeof scene.spatialData?.latitude === 'number'
+    && typeof scene.spatialData?.longitude === 'number';
+}
+
+export function sceneHasPlanCoordinates(scene: CanonicalScene): boolean {
+  return typeof scene.spatialData?.planId === 'string'
+    && typeof scene.spatialData?.mapX === 'number'
+    && typeof scene.spatialData?.mapY === 'number';
 }
 
 function assetReference(options: {

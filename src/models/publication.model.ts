@@ -27,6 +27,8 @@ const IMMUTABLE_PUBLICATION_FIELDS = [
   'visibility',
   'compiledManifestVersion',
   'compiledManifest',
+  'viewerIntegrationVersion',
+  'pinnedExtensions',
 ] as const;
 
 export class Publication extends Model<
@@ -41,6 +43,11 @@ export class Publication extends Model<
   declare visibility: PublicationVisibility;
   declare compiledManifestVersion: string;
   declare compiledManifest: JsonObject | null;
+  /** The adapter version that produced this revision, for rollback and telemetry. */
+  declare viewerIntegrationVersion: CreationOptional<string>;
+  declare embedPolicy: CreationOptional<JsonObject>;
+  /** Extension id/version pairs pinned by this revision. */
+  declare pinnedExtensions: CreationOptional<JsonObject>;
   declare status: CreationOptional<PublicationStatus>;
   declare isCurrent: CreationOptional<boolean>;
   declare shareMetadata: CreationOptional<JsonObject>;
@@ -105,6 +112,24 @@ export class Publication extends Model<
           allowNull: true,
           field: 'compiled_manifest',
         },
+        viewerIntegrationVersion: {
+          type: DataTypes.STRING(64),
+          allowNull: false,
+          defaultValue: 'unknown',
+          field: 'viewer_integration_version',
+        },
+        embedPolicy: {
+          type: DataTypes.JSONB,
+          allowNull: false,
+          defaultValue: emptyJsonObject,
+          field: 'embed_policy',
+        },
+        pinnedExtensions: {
+          type: DataTypes.JSONB,
+          allowNull: false,
+          defaultValue: emptyJsonObject,
+          field: 'pinned_extensions',
+        },
         status: {
           type: DataTypes.STRING(32),
           allowNull: false,
@@ -148,6 +173,10 @@ export class Publication extends Model<
             fields: ['project_id', 'publication_revision'],
           },
           { name: 'publications_slug_current_status_idx', fields: ['slug', 'is_current', 'status'] },
+          {
+            name: 'publications_viewer_integration_idx',
+            fields: ['viewer_integration_version', 'status'],
+          },
           {
             name: 'publications_one_current_per_project_unique',
             unique: true,

@@ -2,7 +2,11 @@ import { sanitizeRichHtml } from '../security/html-sanitizer';
 import type { JsonObject, JsonValue } from '../domain/types';
 import type {
   CompiledHotspot,
+  CompiledInteractionGeometry,
+  CompiledOverlay,
+  CompiledPlan,
   CompiledScene,
+  CompiledSpatialIndex,
   CompiledTimelineInteraction,
   ViewerIntegrationAdapter,
   ViewerIntegrationInput,
@@ -11,7 +15,7 @@ import type {
   ViewerVideoIntegrationInput,
 } from './types';
 
-export const PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION = 'psv-5.14.3-adapter-1' as const;
+export const PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION = 'psv-5.14.3-adapter-2' as const;
 
 /**
  * The sole renderer translation boundary. No canonical entity imports or
@@ -34,12 +38,11 @@ export class PhotoSphereViewerIntegrationAdapter implements ViewerIntegrationAda
     }
 
     const sceneCount = input.sceneIndex?.length ?? input.scenes.length;
+    const capabilities = new Set(input.capabilities ?? []);
     const config: JsonObject = {
-      adapter: initialScene.panorama.tiles === undefined
-        ? 'equirectangular'
-        : 'equirectangular-tiles',
+      adapter: selectAdapter(initialScene),
       initialSceneId: input.initialSceneId,
-      navbar: buildNavbar(input),
+      navbar: buildNavbar(input, capabilities),
       mousewheel: input.settings.navigation?.zoom ?? true,
       mousemove: input.settings.navigation?.mouse ?? true,
       touchControlsEnabled: input.settings.navigation?.touch ?? true,
@@ -53,6 +56,31 @@ export class PhotoSphereViewerIntegrationAdapter implements ViewerIntegrationAda
         : {}),
       ...(input.settings.autorotation?.enabled === true
         ? { autorotation: buildAutorotationConfiguration(input) }
+        : {}),
+      ...(capabilities.has('map') && input.spatialIndex !== undefined
+        ? { map: buildMapConfiguration(input, input.spatialIndex) }
+        : {}),
+      ...(capabilities.has('plan') && input.plans !== undefined && input.plans.length > 0
+        ? { plan: buildPlanConfiguration(input, input.plans) }
+        : {}),
+      ...(capabilities.has('gyroscope')
+        ? {
+          gyroscope: {
+            enabled: true,
+            touchmove: true,
+            absolutePosition: false,
+            requestPermissionOnStart:
+              input.settings.motionNavigation?.requestPermissionOnStart ?? true,
+          },
+        }
+        : {}),
+      ...(capabilities.has('stereo') || capabilities.has('vr')
+        ? {
+          stereo: {
+            enabled: true,
+            immersive: capabilities.has('vr'),
+          },
+        }
         : {}),
       startup: buildSceneConfiguration(initialScene),
       scenes: input.scenes.map(buildSceneConfiguration),
@@ -194,7 +222,10 @@ function buildTimedMarkerConfiguration(interaction: CompiledTimelineInteraction)
   };
 }
 
-function buildNavbar(input: ViewerIntegrationInput): JsonValue[] {
+function buildNavbar(
+  input: ViewerIntegrationInput,
+  capabilities: ReadonlySet<string>,
+): JsonValue[] {
   const controls = input.settings.navigation;
   const navbar: JsonValue[] = [];
   if (controls?.navigationButtons ?? true) {
@@ -202,6 +233,12 @@ function buildNavbar(input: ViewerIntegrationInput): JsonValue[] {
   }
   if (controls?.zoom ?? true) {
     navbar.push('zoom');
+  }
+  if (capabilities.has('gyroscope')) {
+    navbar.push('gyroscope');
+  }
+  if (capabilities.has('stereo') || capabilities.has('vr')) {
+    navbar.push('stereo');
   }
   if (controls?.fullscreen ?? true) {
     navbar.push('fullscreen');
@@ -213,6 +250,88 @@ function buildNavbar(input: ViewerIntegrationInput): JsonValue[] {
     navbar.push('gallery');
   }
   return navbar;
+}
+
+/**
+ * Map and plan views are driven by the compiled spatial index, so the renderer
+ * never needs to fetch scene definitions to draw them.
+ */
+function buildMapConfiguration(
+  input: ViewerIntegrationInput,
+  spatialIndex: CompiledSpatialIndex,
+): JsonObject {
+  const settings = input.settings.map;
+  return {
+    enabled: true,
+    coordinateSystem: 'wgs84',
+    ...(settings?.defaultZoom === undefined ? {} : { defaultZoom: settings.defaultZoom }),
+    showHeadingCone: settings?.showHeadingCone ?? true,
+    ...(spatialIndex.bounds === undefined ? {} : { bounds: { ...spatialIndex.bounds } }),
+    hotspots: (settings?.showSceneMarkers ?? true)
+      ? spatialIndex.entries.flatMap((entry) => {
+        if (typeof entry.spatial.latitude !== 'number'
+          || typeof entry.spatial.longitude !== 'number') return [];
+        return [{
+          id: entry.sceneId,
+          nodeId: entry.sceneId,
+          tooltip: entry.name,
+          gps: [entry.spatial.longitude, entry.spatial.latitude],
+          ...(entry.spatial.headingDegrees === undefined
+            ? {}
+            : { yaw: degreesToRadians(entry.spatial.headingDegrees) }),
+        }];
+      })
+      : [],
+  };
+}
+
+function buildPlanConfiguration(
+  input: ViewerIntegrationInput,
+  plans: readonly CompiledPlan[],
+): JsonObject {
+  const settings = input.settings.plan;
+  const defaultPlanId = settings?.defaultPlanId ?? plans[0]?.id;
+  return {
+    enabled: true,
+    ...(defaultPlanId === undefined ? {} : { defaultPlanId }),
+    showHeadingCone: settings?.showHeadingCone ?? true,
+    layers: plans.map((plan) => ({
+      id: plan.id,
+      name: plan.name,
+      coordinateSystem: plan.coordinateSystem,
+      ...(plan.image === undefined ? {} : { imageUrl: plan.image.url }),
+      hotspots: (settings?.showSceneMarkers ?? true)
+        ? (input.spatialIndex?.entries ?? []).flatMap((entry) => {
+          if (entry.spatial.planId !== plan.id
+            || typeof entry.spatial.mapX !== 'number'
+            || typeof entry.spatial.mapY !== 'number') return [];
+          return [{
+            id: entry.sceneId,
+            nodeId: entry.sceneId,
+            tooltip: entry.name,
+            x: entry.spatial.mapX,
+            y: entry.spatial.mapY,
+            ...(entry.spatial.headingDegrees === undefined
+              ? {}
+              : { yaw: degreesToRadians(entry.spatial.headingDegrees) }),
+          }];
+        })
+        : [],
+    })),
+  };
+}
+
+function selectAdapter(scene: CompiledScene): string {
+  switch (scene.panorama.family) {
+    case 'tiledEquirectangular':
+      return 'equirectangular-tiles';
+    case 'tiledCubemap':
+      return 'cubemap-tiles';
+    case 'cubemap':
+      return 'cubemap';
+    default:
+      return 'equirectangular';
+  }
 }
 
 function buildGalleryConfiguration(input: ViewerIntegrationInput): JsonObject {
@@ -252,11 +371,14 @@ function buildAutorotationConfiguration(input: ViewerIntegrationInput): JsonObje
 function buildSceneConfiguration(scene: CompiledScene): JsonObject {
   const initialView = scene.initialView;
   const tiles = scene.panorama.tiles;
+  const usesTiles = tiles !== undefined && scene.panorama.family === 'tiledEquirectangular';
   return {
     id: scene.id,
-    adapter: tiles === undefined ? 'equirectangular' : 'equirectangular-tiles',
-    panorama: tiles === undefined
-      ? scene.panorama.primary.url
+    adapter: selectAdapter(scene),
+    panorama: !usesTiles
+      ? scene.panorama.family === 'cubemap' && scene.panorama.cubemap !== undefined
+        ? scene.panorama.cubemap.url
+        : scene.panorama.primary.url
       : {
         baseUrl: scene.panorama.base.url,
         tileUrlTemplate: tiles.tileUrlTemplate,
@@ -271,7 +393,10 @@ function buildSceneConfiguration(scene: CompiledScene): JsonObject {
     defaultPitch: degreesToRadians(initialView.pitchDegrees ?? 0),
     defaultZoomLvl: fieldOfViewToZoomLevel(initialView.horizontalFovDegrees),
     ...(scene.viewLimits === undefined ? {} : { visibleRange: buildVisibleRange(scene) }),
-    markers: scene.hotspots.map(buildMarkerConfiguration),
+    markers: [
+      ...scene.hotspots.map(buildMarkerConfiguration),
+      ...scene.overlays.map(buildOverlayConfiguration),
+    ],
     links: scene.connections.flatMap((connection) => {
       const targetSceneId = connection.targetSceneId;
       if (typeof targetSceneId !== 'string') return [];
@@ -323,7 +448,6 @@ function buildMarkerConfiguration(hotspot: CompiledHotspot): JsonObject {
     ?? content?.title
     ?? hotspot.appearance?.label
     ?? '';
-  const html = sanitizeRichHtml(candidateHtml) || '<span aria-hidden="true">&#9679;</span>';
 
   return {
     id: hotspot.id,
@@ -331,12 +455,125 @@ function buildMarkerConfiguration(hotspot: CompiledHotspot): JsonObject {
       yaw: degreesToRadians(hotspot.position.longitudeDegrees),
       pitch: degreesToRadians(hotspot.position.latitudeDegrees),
     },
-    html,
+    ...buildGeometryConfiguration(hotspot.geometry, candidateHtml),
     visible: hotspot.enabled,
     data: {
       action: toJsonValue(hotspot.action),
     },
   };
+}
+
+function buildOverlayConfiguration(overlay: CompiledOverlay): JsonObject {
+  const content = overlay.content;
+  const candidateHtml = content?.tooltip
+    ?? content?.bodyHtml
+    ?? content?.description
+    ?? content?.title
+    ?? overlay.appearance?.label
+    ?? '';
+  const appearance = overlay.appearance;
+  return {
+    id: overlay.id,
+    ...(overlay.position === undefined
+      ? {}
+      : {
+        position: {
+          yaw: degreesToRadians(overlay.position.longitudeDegrees),
+          pitch: degreesToRadians(overlay.position.latitudeDegrees),
+        },
+      }),
+    ...buildGeometryConfiguration(overlay.geometry, candidateHtml),
+    ...(appearance === undefined
+      ? {}
+      : {
+        style: {
+          ...(appearance.color === undefined
+            ? {}
+            : { fill: appearance.color, stroke: appearance.color }),
+          ...(appearance.fillOpacity === undefined
+            ? {}
+            : { fillOpacity: appearance.fillOpacity }),
+          ...(appearance.strokeWidth === undefined
+            ? {}
+            : { strokeWidth: appearance.strokeWidth }),
+        },
+      }),
+    visible: overlay.enabled,
+    data: {
+      overlayId: overlay.id,
+      action: toJsonValue(overlay.action),
+    },
+  };
+}
+
+/**
+ * The single place where a canonical geometry family becomes renderer marker
+ * configuration. Adding a family here must never require a data migration.
+ */
+function buildGeometryConfiguration(
+  geometry: CompiledInteractionGeometry,
+  candidateHtml: string,
+): JsonObject {
+  switch (geometry.kind) {
+    case 'polygon':
+      return {
+        polygon: geometry.vertices.map((vertex) => [
+          degreesToRadians(vertex.longitudeDegrees),
+          degreesToRadians(vertex.latitudeDegrees),
+        ]),
+        ...(candidateHtml.length === 0
+          ? {}
+          : { tooltip: sanitizeRichHtml(candidateHtml) }),
+      };
+    case 'polyline':
+      return {
+        polyline: geometry.vertices.map((vertex) => [
+          degreesToRadians(vertex.longitudeDegrees),
+          degreesToRadians(vertex.latitudeDegrees),
+        ]),
+        ...(candidateHtml.length === 0
+          ? {}
+          : { tooltip: sanitizeRichHtml(candidateHtml) }),
+      };
+    case 'imageLayer':
+      return {
+        imageLayer: geometry.media.url,
+        size: {
+          width: geometry.anchor.widthDegrees,
+          height: geometry.anchor.heightDegrees,
+        },
+        ...(geometry.anchor.rotationDegrees === undefined
+          ? {}
+          : { rotation: degreesToRadians(geometry.anchor.rotationDegrees) }),
+        ...(geometry.anchor.opacity === undefined ? {} : { opacity: geometry.anchor.opacity }),
+      };
+    case 'videoLayer':
+      return {
+        videoLayer: geometry.media.url,
+        size: {
+          width: geometry.anchor.widthDegrees,
+          height: geometry.anchor.heightDegrees,
+        },
+        ...(geometry.anchor.chromaKeyColor === undefined
+          ? {}
+          : { chromaKey: { enabled: true, color: geometry.anchor.chromaKeyColor } }),
+        ...(geometry.anchor.opacity === undefined ? {} : { opacity: geometry.anchor.opacity }),
+      };
+    case 'custom':
+      return {
+        element: {
+          extensionId: geometry.extensionId,
+          extensionVersion: geometry.extensionVersion,
+          // Allow-listed at registration; the player loads nothing else.
+          module: geometry.runtimeModule,
+          payload: toJsonValue(geometry.payload),
+        },
+      };
+    default:
+      return {
+        html: sanitizeRichHtml(candidateHtml) || '<span aria-hidden="true">&#9679;</span>',
+      };
+  }
 }
 
 function degreesToRadians(value: number): number {
