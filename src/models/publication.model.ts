@@ -10,9 +10,15 @@ import {
   Model
 } from 'sequelize';
 
-import { emptyJsonObject, PUBLICATION_STATUSES, PUBLICATION_VISIBILITIES } from './model.types';
+import {
+  emptyJsonArray,
+  emptyJsonObject,
+  PUBLICATION_STATUSES,
+  PUBLICATION_VISIBILITIES,
+} from './model.types';
 import type {
   JsonObject,
+  JsonValue,
   PublicationStatus,
   PublicationVisibility,
 } from './model.types';
@@ -48,6 +54,11 @@ export class Publication extends Model<
   declare embedPolicy: CreationOptional<JsonObject>;
   /** Extension id/version pairs pinned by this revision. */
   declare pinnedExtensions: CreationOptional<JsonObject>;
+  /**
+   * The complete compiled scene index. A large tour's manifest ships only the
+   * first segment, and the paged scene-index route reads the rest from here.
+   */
+  declare sceneIndex: CreationOptional<JsonValue[]>;
   declare status: CreationOptional<PublicationStatus>;
   declare isCurrent: CreationOptional<boolean>;
   declare shareMetadata: CreationOptional<JsonObject>;
@@ -129,6 +140,12 @@ export class Publication extends Model<
           allowNull: false,
           defaultValue: emptyJsonObject,
           field: 'pinned_extensions',
+        },
+        sceneIndex: {
+          type: DataTypes.JSONB,
+          allowNull: false,
+          defaultValue: emptyJsonArray,
+          field: 'scene_index',
         },
         status: {
           type: DataTypes.STRING(32),

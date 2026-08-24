@@ -12,10 +12,14 @@ import {
   TimelineInteraction,
   User
 } from '../models';
-import type { AccessRole, JsonObject, JsonValue } from '../models/model.types';
+import type { AccessRole, JsonObject } from '../models/model.types';
 import { sanitizePlainText } from '../security';
 import { accessibleProjectFilter, requireProjectRole } from './access-service';
-import { overlayPayload } from './overlay-service';
+import {
+  overlayPayload,
+  sanitizeInteractionGeometry,
+  type GeometryInput
+} from './overlay-service';
 import { planPayload } from './plan-service';
 import { timelineInteractionPayload } from './timeline-service';
 import {
@@ -1037,6 +1041,15 @@ export async function createHotspot(
     }
     const action = await validateHotspotAction(input.action, projectId, project.ownerId, transaction);
     await validateHotspotAssetReferences(input, projectId, project.ownerId, transaction);
+    // Hotspots share the interaction geometry union with overlays, so a layer
+    // or custom hotspot is validated by exactly the same rules.
+    const geometry = await sanitizeInteractionGeometry(input.geometry as GeometryInput, {
+      projectId,
+      ownerId: project.ownerId,
+      experienceType: project.type,
+      transaction,
+      allowPoint: true
+    });
     const revision = await bumpProjectRevision({
       projectId,
       expectedRevision: input.projectRevision,
@@ -1046,7 +1059,10 @@ export async function createHotspot(
     const hotspot = await Hotspot.create(
       {
         sceneId,
-        geometry: input.geometry as JsonObject,
+        geometryKind: geometry.kind,
+        geometry: geometry.geometry,
+        extensionId: geometry.extensionId,
+        extensionVersion: geometry.extensionVersion,
         position: input.position as JsonObject,
         appearance: sanitizeHotspotAppearance(input.appearance ?? {}),
         content: sanitizeHotspotContent(input.content ?? {}),
@@ -1079,6 +1095,15 @@ export async function updateHotspot(
     }
     const action = await validateHotspotAction(input.action, projectId, project.ownerId, transaction);
     await validateHotspotAssetReferences(input, projectId, project.ownerId, transaction);
+    const geometry = input.geometry === undefined
+      ? undefined
+      : await sanitizeInteractionGeometry(input.geometry as GeometryInput, {
+        projectId,
+        ownerId: project.ownerId,
+        experienceType: project.type,
+        transaction,
+        allowPoint: true
+      });
     const revision = await bumpProjectRevision({
       projectId,
       expectedRevision: input.projectRevision,
@@ -1086,6 +1111,14 @@ export async function updateHotspot(
     });
     await hotspot.update(
       {
+        ...(geometry === undefined
+          ? {}
+          : {
+            geometryKind: geometry.kind,
+            geometry: geometry.geometry,
+            extensionId: geometry.extensionId,
+            extensionVersion: geometry.extensionVersion
+          }),
         ...(input.position === undefined ? {} : { position: input.position as JsonObject }),
         ...(input.appearance === undefined
           ? {}

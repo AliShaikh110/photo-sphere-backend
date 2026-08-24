@@ -10,6 +10,7 @@ import type {
   MediaUrlResolutionRequest,
 } from '../../../src/compiler/types';
 import { isImageExperienceManifest } from '../../../src/compiler/types';
+import type { CanonicalOverlay } from '../../../src/domain/types';
 import { derivative, canonicalProject, panoramaAsset } from './fixtures';
 
 function compilerInput(
@@ -216,7 +217,9 @@ describe('Experience compiler', () => {
     const unsafeProject = canonicalProject({
       scenes: [{
         ...scene,
-        overlays: [{ html: '<img src=x onerror=steal()>' }],
+        // Deliberately not a canonical overlay: the compiler must reject an
+        // unrecognized bag rather than pass it through to the renderer.
+        overlays: [{ html: '<img src=x onerror=steal()>' } as unknown as CanonicalOverlay],
       }],
     });
 

@@ -2,6 +2,7 @@ import { Op } from 'sequelize';
 import { AppError } from '../errors/app-error';
 import { Publication, RuntimeEvent } from '../models';
 import type { JsonObject, RuntimeEventName } from '../models/model.types';
+import { incrementMetric } from '../observability';
 
 export type RuntimeEventInput = {
   eventId: string;
@@ -35,6 +36,7 @@ export async function ingestRuntimeEvents(events: RuntimeEventInput[]): Promise<
       attributes: ['id', 'compiledManifest']
     });
     if (!publication) {
+      incrementMetric('runtime.event.rejected', { errorCode: 'PUBLICATION_NOT_FOUND' });
       throw new AppError('PUBLICATION_NOT_FOUND', 'The telemetry event references an unknown publication.', {
         status: 422,
         entityId: key.experienceId,
@@ -50,6 +52,9 @@ export async function ingestRuntimeEvents(events: RuntimeEventInput[]): Promise<
         && event.viewerIntegrationVersion !== expectedViewerIntegrationVersion
       ))
     ) {
+      incrementMetric('runtime.event.rejected', {
+        errorCode: 'VIEWER_INTEGRATION_VERSION_MISMATCH'
+      });
       throw new AppError(
         'VIEWER_INTEGRATION_VERSION_MISMATCH',
         'The telemetry event does not match the published viewer integration.',
@@ -88,6 +93,17 @@ export async function ingestRuntimeEvents(events: RuntimeEventInput[]): Promise<
       { ignoreDuplicates: true, returning: ['eventId'] }
     );
     accepted = inserted.length;
+    for (const event of newEvents) {
+      incrementMetric('runtime.event.ingested', { eventName: event.eventName });
+      // A capability that fell back is an operational signal, not engagement:
+      // it means a visitor did not get the experience that was published.
+      if (event.eventName === 'capability_fallback') {
+        incrementMetric('runtime.capability_fallback', {
+          capabilityId: String(event.payload.capabilityId ?? 'unknown'),
+          reason: String(event.payload.reason ?? 'unknown')
+        });
+      }
+    }
   }
   return { accepted, duplicates: events.length - accepted };
 }

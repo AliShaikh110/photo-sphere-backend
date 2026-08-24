@@ -2,6 +2,7 @@ import type { ErrorRequestHandler, RequestHandler } from 'express';
 import { UniqueConstraintError, ValidationError as SequelizeValidationError } from 'sequelize';
 import { ZodError } from 'zod';
 import { AppError } from '../errors/app-error';
+import { incrementMetric } from '../observability';
 
 export const routeNotFound: RequestHandler = (request, _response, next) => {
   next(new AppError('ROUTE_NOT_FOUND', 'The requested route was not found.', {
@@ -58,6 +59,23 @@ export const errorHandler: ErrorRequestHandler = (error: unknown, request, respo
     request.log.error({ err: error }, 'request failed');
   } else {
     request.log.warn({ errorCode: mapped.code, statusCode: mapped.status }, 'request rejected');
+  }
+
+  // Failure classes that need their own operational signal rather than being
+  // buried in an overall error rate.
+  incrementMetric('api.request.failed', {
+    method: request.method,
+    status: mapped.status,
+    errorCode: mapped.code
+  });
+  if (mapped.status === 401 || mapped.status === 403) {
+    incrementMetric('api.auth.failed', { reason: mapped.code });
+  }
+  if (mapped.code === 'REVISION_CONFLICT') {
+    incrementMetric('api.concurrency_conflict', { entityType: 'project' });
+  }
+  if (mapped.status === 429) {
+    incrementMetric('api.rate_limited', { scope: mapped.code });
   }
 
   if (request.header('idempotency-key')) {

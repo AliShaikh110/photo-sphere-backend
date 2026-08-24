@@ -11,8 +11,8 @@ import {
 
 import type { Asset } from './asset.model';
 import type { IdempotencyRecord } from './idempotency-record.model';
-import { USER_STATUSES } from './model.types';
-import type { UserStatus } from './model.types';
+import { PLATFORM_ROLES, USER_STATUSES } from './model.types';
+import type { PlatformRole, UserStatus } from './model.types';
 import type { Project } from './project.model';
 import type { UploadSession } from './upload-session.model';
 
@@ -22,6 +22,7 @@ export class User extends Model<InferAttributes<User>, InferCreationAttributes<U
   declare passwordHash: string | null;
   declare displayName: string;
   declare status: CreationOptional<UserStatus>;
+  declare platformRole: CreationOptional<PlatformRole>;
   declare createdAt: CreationOptional<Date>;
   declare updatedAt: CreationOptional<Date>;
 
@@ -63,6 +64,13 @@ export class User extends Model<InferAttributes<User>, InferCreationAttributes<U
           allowNull: false,
           defaultValue: 'active',
           validate: { isIn: [USER_STATUSES] },
+        },
+        platformRole: {
+          type: DataTypes.STRING(32),
+          allowNull: false,
+          defaultValue: 'member',
+          field: 'platform_role',
+          validate: { isIn: [PLATFORM_ROLES] },
         },
         createdAt: DataTypes.DATE,
         updatedAt: DataTypes.DATE,

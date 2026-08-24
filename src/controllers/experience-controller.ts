@@ -10,15 +10,37 @@ import {
   resolveManifest,
   resolvePlaybackProfile,
   resolvePublishedScene,
-  validateExperience
+  resolvePublishedSceneIndex,
+  unpublishExperience,
+  updateEmbedPolicy,
+  validateExperience,
+  type PublishedAccessRequest
 } from '../services/experience-service';
 import { requireIdempotencyKey, withIdempotency } from '../services/idempotency-service';
 import { sendData } from '../utils/http-response';
 import { routeParam } from '../utils/route-param';
-import { playbackProfileRequestSchema } from '../validators/request-schemas';
+import {
+  playbackProfileRequestSchema,
+  sceneIndexQuerySchema
+} from '../validators/request-schemas';
 
 function ownerId(request: Request): string {
   return request.auth!.userId;
+}
+
+/**
+ * How a visitor is presenting themselves to a published experience: as a signed
+ * in user, as the holder of a share link, and from some embedding origin.
+ */
+function publishedAccess(request: Request): PublishedAccessRequest {
+  const headerToken = request.header('x-share-token');
+  const queryToken = typeof request.query.share === 'string' ? request.query.share : undefined;
+  const origin = request.header('origin');
+  return {
+    ...(request.auth?.userId === undefined ? {} : { authenticatedUserId: request.auth.userId }),
+    ...(headerToken ?? queryToken ? { shareToken: headerToken ?? queryToken! } : {}),
+    ...(origin === undefined ? {} : { origin })
+  };
 }
 
 export async function validateDraft(request: Request, response: Response): Promise<void> {
@@ -56,11 +78,28 @@ export async function publish(request: Request, response: Response): Promise<voi
       expectedRevision: request.body.revision as number,
       slug: request.body.slug as string,
       visibility: request.body.visibility as 'public' | 'private',
+      ...(request.body.embedPolicy === undefined
+        ? {}
+        : { embedPolicy: request.body.embedPolicy as unknown }),
       idempotencyRecord
     })
   });
   response.setHeader('idempotency-replayed', String(operation.replayed));
   sendData(response, operation.result, { status: 201, message: 'Experience published.' });
+}
+
+export async function unpublish(request: Request, response: Response): Promise<void> {
+  const result = await unpublishExperience(routeParam(request, 'projectId'), ownerId(request));
+  sendData(response, result, { message: 'Experience unpublished.' });
+}
+
+export async function patchEmbedPolicy(request: Request, response: Response): Promise<void> {
+  const result = await updateEmbedPolicy(
+    routeParam(request, 'projectId'),
+    ownerId(request),
+    request.body.embedPolicy
+  );
+  sendData(response, result, { message: 'Embed settings updated.' });
 }
 
 export async function publicationHistory(request: Request, response: Response): Promise<void> {
@@ -69,14 +108,17 @@ export async function publicationHistory(request: Request, response: Response): 
 }
 
 export async function manifest(request: Request, response: Response): Promise<void> {
-  const result = await resolveManifest(routeParam(request, 'slug'), request.auth?.userId);
+  const result = await resolveManifest(routeParam(request, 'slug'), publishedAccess(request));
   response.setHeader(
     'cache-control',
-    result.publication.visibility === 'public'
+    result.publication.visibility === 'public' && result.access.grantedBy === 'public'
       ? 'public, max-age=0, must-revalidate'
       : 'private, no-store'
   );
-  sendData(response, result);
+  // The player shell is framed by the embedding site, so the origin advertises
+  // the experience's own embed policy rather than the API default.
+  response.setHeader('content-security-policy', result.access.contentSecurityPolicy);
+  sendData(response, { manifest: result.manifest, publication: result.publication });
 }
 
 export async function playbackProfile(request: Request, response: Response): Promise<void> {
@@ -94,7 +136,7 @@ export async function playbackProfile(request: Request, response: Response): Pro
         : { supportedMimeTypes: device.supportedMimeTypes }),
       ...(device.dataSaver === undefined ? {} : { dataSaver: device.dataSaver })
     },
-    ...(request.auth?.userId === undefined ? {} : { authenticatedUserId: request.auth.userId })
+    access: publishedAccess(request)
   });
   // Selection depends on the caller's device, so it must never be cached.
   response.setHeader('cache-control', 'private, no-store');
@@ -110,9 +152,7 @@ async function sendPublishedScene(
     slug: routeParam(request, 'slug'),
     sceneId: routeParam(request, 'sceneId'),
     ...(publicationRevision === undefined ? {} : { publicationRevision }),
-    ...(request.auth?.userId === undefined
-      ? {}
-      : { authenticatedUserId: request.auth.userId })
+    access: publishedAccess(request)
   });
   response.setHeader(
     'cache-control',
@@ -122,10 +162,35 @@ async function sendPublishedScene(
         : 'public, max-age=0, must-revalidate'
       : 'private, no-store'
   );
+  response.setHeader('content-security-policy', result.access.contentSecurityPolicy);
   if (result.visibility === 'public') {
     response.setHeader('etag', `"${result.checksum}"`);
   }
   sendData(response, { sceneDefinition: result.sceneDefinition });
+}
+
+export async function publishedSceneIndex(request: Request, response: Response): Promise<void> {
+  const query = sceneIndexQuerySchema.parse(request.query ?? {});
+  const publicationRevision = Number(routeParam(request, 'publicationRevision'));
+  const result = await resolvePublishedSceneIndex({
+    slug: routeParam(request, 'slug'),
+    publicationRevision,
+    ...(query.offset === undefined ? {} : { offset: query.offset }),
+    ...(query.limit === undefined ? {} : { limit: query.limit }),
+    access: publishedAccess(request)
+  });
+  response.setHeader(
+    'cache-control',
+    result.visibility === 'public'
+      ? 'public, max-age=31536000, immutable'
+      : 'private, no-store'
+  );
+  response.setHeader('content-security-policy', result.access.contentSecurityPolicy);
+  sendData(response, {
+    sceneIndexVersion: result.sceneIndexVersion,
+    entries: result.entries,
+    page: { offset: result.offset, limit: result.limit, total: result.total }
+  });
 }
 
 export async function publishedScene(request: Request, response: Response): Promise<void> {
@@ -190,7 +255,8 @@ export async function publicationMedia(request: Request, response: Response): Pr
   const derivative = await authorizePublishedDerivative({
     projectId: routeParam(request, 'projectId'),
     publicationRevision: Number(routeParam(request, 'publicationRevision')),
-    derivativeId: routeParam(request, 'derivativeId')
+    derivativeId: routeParam(request, 'derivativeId'),
+    ...(request.header('origin') === undefined ? {} : { origin: request.header('origin')! })
   });
   const object = await storage.get(derivative.storageKey);
   response.setHeader('content-type', object.contentType ?? derivative.mimeType);
@@ -205,7 +271,8 @@ export async function publicationMediaTile(request: Request, response: Response)
   const derivative = await authorizePublishedDerivative({
     projectId: routeParam(request, 'projectId'),
     publicationRevision: Number(routeParam(request, 'publicationRevision')),
-    derivativeId: routeParam(request, 'derivativeId')
+    derivativeId: routeParam(request, 'derivativeId'),
+    ...(request.header('origin') === undefined ? {} : { origin: request.header('origin')! })
   });
   await sendTile(
     response,

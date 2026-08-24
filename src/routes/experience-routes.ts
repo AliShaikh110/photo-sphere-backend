@@ -7,6 +7,7 @@ import {
   publicationMedia,
   publicationMediaTile,
   publishedScene,
+  publishedSceneIndex,
   revisionedPublishedScene
 } from '../controllers/experience-controller';
 import { optionalAuth } from '../middlewares/auth';
@@ -17,6 +18,7 @@ import {
   mediaTileParams,
   publicationMediaParams,
   publicationMediaTileParams,
+  publishedSceneIndexParams,
   publishedSceneParams,
   revisionedPublishedSceneParams,
   slugParams
@@ -32,6 +34,12 @@ viewRouter.post(
   optionalAuth,
   validate('params', slugParams),
   asyncHandler(playbackProfile)
+);
+viewRouter.get(
+  '/:slug/revisions/:publicationRevision/scene-index',
+  optionalAuth,
+  validate('params', publishedSceneIndexParams),
+  asyncHandler(publishedSceneIndex)
 );
 viewRouter.get(
   '/:slug/revisions/:publicationRevision/scenes/:sceneId',

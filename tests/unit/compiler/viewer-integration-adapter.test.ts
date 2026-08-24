@@ -19,6 +19,8 @@ function adapterInput(): ViewerIntegrationInput {
       panorama: {
         assetId: 'asset-1',
         projection: 'equirectangular',
+        family: 'standardEquirectangular',
+        fallbackFamilies: [],
         base: {
           assetId: 'asset-1',
           derivativeId: 'low',

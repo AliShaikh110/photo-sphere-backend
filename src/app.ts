@@ -13,9 +13,13 @@ import { errorHandler, routeNotFound } from './middlewares/error-handler';
 import { requestContext } from './middlewares/request-context';
 import { assetRouter } from './routes/asset-routes';
 import { authRouter } from './routes/auth-routes';
+import { extensionRouter, platformRouter } from './routes/platform-routes';
 import { projectRouter } from './routes/project-routes';
 import { telemetryRouter } from './routes/telemetry-routes';
+import { templateRouter } from './routes/template-routes';
+import { workspaceRouter } from './routes/workspace-routes';
 import { mediaRouter, publicationMediaRouter, viewRouter } from './routes/experience-routes';
+import { apiVersion, API_VERSION, SUPPORTED_API_VERSIONS } from './middlewares/api-version';
 import { asyncHandler } from './utils/async-handler';
 import { sendData } from './utils/http-response';
 
@@ -90,16 +94,22 @@ export function createApp(): Express {
   app.get('/', (_request, response) => {
     sendData(response, {
       service: 'sphere-backend',
-      apiVersion: 'v1',
+      apiVersion: API_VERSION,
+      supportedApiVersions: SUPPORTED_API_VERSIONS,
       schemaVersion: 1,
       viewerIntegrationVersion: config.viewerIntegrationVersion
     });
   });
 
   app.use(express.json({ limit: '1mb', strict: true }));
+  app.use('/api/v1', apiVersion('v1'));
   app.use('/api/v1/auth', authRouter);
   app.use('/api/v1/projects', projectRouter);
   app.use('/api/v1/assets', assetRouter);
+  app.use('/api/v1/templates', templateRouter);
+  app.use('/api/v1/workspaces', workspaceRouter);
+  app.use('/api/v1/extensions', extensionRouter);
+  app.use('/api/v1/platform', platformRouter);
   app.use('/api/v1/media', mediaRouter);
   app.use('/api/v1/publications', publicationMediaRouter);
   app.use('/api/v1/runtime', telemetryRouter);

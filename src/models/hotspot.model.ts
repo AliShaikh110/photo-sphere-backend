@@ -10,15 +10,20 @@ import {
   Model
 } from 'sequelize';
 
-import { emptyJsonObject } from './model.types';
-import type { JsonObject } from './model.types';
+import { emptyJsonObject, INTERACTION_GEOMETRY_KINDS } from './model.types';
+import type { InteractionGeometryKind, JsonObject } from './model.types';
 import type { Scene } from './scene.model';
 import type { SceneConnection } from './scene-connection.model';
 
 export class Hotspot extends Model<InferAttributes<Hotspot>, InferCreationAttributes<Hotspot>> {
   declare id: CreationOptional<string>;
   declare sceneId: ForeignKey<Scene['id']>;
+  /** Denormalized from `geometry.kind` so the database can index and check it. */
+  declare geometryKind: CreationOptional<InteractionGeometryKind>;
   declare geometry: JsonObject;
+  /** Set only for `custom` geometry; pins the registered extension version. */
+  declare extensionId: CreationOptional<string | null>;
+  declare extensionVersion: CreationOptional<string | null>;
   declare position: JsonObject;
   declare appearance: CreationOptional<JsonObject>;
   declare content: CreationOptional<JsonObject>;
@@ -49,6 +54,13 @@ export class Hotspot extends Model<InferAttributes<Hotspot>, InferCreationAttrib
           allowNull: false,
           field: 'scene_id',
         },
+        geometryKind: {
+          type: DataTypes.STRING(32),
+          allowNull: false,
+          defaultValue: 'point',
+          field: 'geometry_kind',
+          validate: { isIn: [INTERACTION_GEOMETRY_KINDS] },
+        },
         geometry: {
           type: DataTypes.JSONB,
           allowNull: false,
@@ -59,6 +71,16 @@ export class Hotspot extends Model<InferAttributes<Hotspot>, InferCreationAttrib
               }
             },
           },
+        },
+        extensionId: {
+          type: DataTypes.STRING(128),
+          allowNull: true,
+          field: 'extension_id',
+        },
+        extensionVersion: {
+          type: DataTypes.STRING(32),
+          allowNull: true,
+          field: 'extension_version',
         },
         position: {
           type: DataTypes.JSONB,
@@ -100,7 +122,10 @@ export class Hotspot extends Model<InferAttributes<Hotspot>, InferCreationAttrib
         modelName: 'Hotspot',
         tableName: 'hotspots',
         underscored: true,
-        indexes: [{ name: 'hotspots_scene_sort_idx', fields: ['scene_id', 'sort_order'] }],
+        indexes: [
+          { name: 'hotspots_scene_sort_idx', fields: ['scene_id', 'sort_order'] },
+          { name: 'hotspots_extension_idx', fields: ['extension_id', 'extension_version'] },
+        ],
       },
     );
 

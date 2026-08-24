@@ -37,6 +37,7 @@ import type {
   MediaJobStageName,
   MediaJobStageStatus
 } from '../models/model.types';
+import { incrementMetric, observeMetric } from '../observability';
 import { sha256 } from '../utils/hash';
 import { drainStorageDeletionJobs } from './storage-deletion-service';
 
@@ -354,6 +355,10 @@ async function persistDerivative(
 async function processClaimedJob(job: MediaJob, storage: StorageProvider): Promise<void> {
   const asset = await Asset.findByPk(job.assetId);
   if (!asset) {
+    incrementMetric('media.job.failed', {
+      jobType: job.type,
+      errorCode: 'ASSET_MISSING'
+    });
     await updateLeasedJob(job, {
       status: 'failed',
       error: { category: 'UNKNOWN_PROCESSING_ERROR', message: 'Asset no longer exists.' },
@@ -363,14 +368,39 @@ async function processClaimedJob(job: MediaJob, storage: StorageProvider): Promi
     });
     return;
   }
+  // How long the job waited for a worker, and how long the work then took, are
+  // the two numbers that separate a backlog from a slow pipeline.
+  observeMetric('media.job.queue_delay', Math.max(0, Date.now() - job.availableAt.getTime()), {
+    jobType: job.type,
+    mediaType: asset.mediaType
+  });
+  if (job.attempt > 1) {
+    incrementMetric('media.job.retry', { jobType: job.type, mediaType: asset.mediaType });
+  }
+  const startedAt = Date.now();
   try {
     if (isVideoAsset(asset)) {
       await processVideoAsset(asset, job, storage);
     } else {
       await processImageAsset(asset, job, storage);
     }
+    observeMetric('media.job.duration', Date.now() - startedAt, {
+      jobType: job.type,
+      mediaType: asset.mediaType,
+      status: 'succeeded'
+    });
     logger.info({ assetId: asset.id, jobId: job.id, derivativeVersion: job.derivativeVersion }, 'media job completed');
   } catch (error) {
+    observeMetric('media.job.duration', Date.now() - startedAt, {
+      jobType: job.type,
+      mediaType: asset.mediaType,
+      status: 'failed'
+    });
+    incrementMetric('media.job.failed', {
+      jobType: job.type,
+      mediaType: asset.mediaType,
+      errorCode: error instanceof AppError ? error.code : 'UNKNOWN_PROCESSING_ERROR'
+    });
     logger.error({ err: error, assetId: asset.id, jobId: job.id }, 'media job failed');
     await persistFailure(asset, job, error);
   }

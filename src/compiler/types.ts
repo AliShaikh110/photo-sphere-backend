@@ -291,10 +291,12 @@ export type TourDeliveryStrategy = 'embedded' | 'progressive';
 export interface CompiledTourDelivery {
   readonly strategy: TourDeliveryStrategy;
   readonly sceneIndexVersion: string;
+  /** The whole index, or only its first segment when `sceneIndexSegmented`. */
   readonly sceneIndex: readonly CompiledSceneIndexEntry[];
   readonly sceneDefinitionUrlTemplate?: string;
   /** Present when the index is too large to ship whole; see `sceneIndexUrl`. */
   readonly sceneIndexSegmented?: boolean;
+  readonly sceneIndexSegmentSize?: number;
   readonly sceneIndexUrl?: string;
   readonly sceneCount: number;
 }
@@ -530,6 +532,11 @@ export interface CompiledPublishedSceneDefinition {
 export interface CompiledExperienceBundle {
   readonly manifest: CompiledExperienceManifest;
   readonly sceneDefinitions: readonly CompiledPublishedSceneDefinition[];
+  /**
+   * Every scene index entry, including those the manifest omits when the index
+   * is segmented. Empty for video experiences, which have no scene index.
+   */
+  readonly sceneIndex?: readonly CompiledSceneIndexEntry[];
 }
 
 export interface CompiledExperienceManifestBase {

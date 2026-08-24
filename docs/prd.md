@@ -6,12 +6,13 @@
 
 | **Document**       | **Value**                                                                                          |
 |--------------------|----------------------------------------------------------------------------------------------------|
-| Version            | 1.0                                                                                                |
+| Version            | 1.1                                                                                                |
 | Status             | Draft for product / design / engineering alignment                                                 |
-| Date               | 24 August 2026                                                                                     |
+| Date               | 25 August 2026                                                                                     |
 | Architecture basis | No-Code 360° Experience Platform — Product, Architecture, UX & Runtime Specification, Revision 2.0 |
 | Rendering basis    | Photo Sphere Viewer 5.14.3 (as specified by source architecture)                                   |
-| Primary audience   | Product, UX/UI, frontend, backend, media/platform, QA, DevOps/SRE                                  |
+| Primary audience   | Product, UX/UI, frontend, backend, media/platform, DevOps/SRE                                      |
+| Change from v1.0   | Testing & Quality Strategy section removed; sections renumbered; test-suite references cleared     |
 
 | **Product rule:** The user configures the experience. The platform configures the technology. |
 |-----------------------------------------------------------------------------------------------|
@@ -22,6 +23,9 @@ This PRD converts the supplied product/architecture specification into an implem
 
 | **Scope of interpretation:** Items explicitly defined by the supplied architecture are treated as source requirements. API path names, exact service boundaries, and numeric performance targets in this PRD are proposed implementation conventions and may be adjusted without changing the product behavior. |
 |-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+
+| **Testing scope note (v1.1):** Test strategy, test tooling, reference test suites, and release gating are intentionally out of scope for this document and are expected to be maintained separately. Acceptance criteria, Definition of Done, and performance targets remain in this PRD as product requirements, not as test instructions. |
+|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 
 # Contents
 
@@ -55,13 +59,11 @@ This PRD converts the supplied product/architecture specification into an implem
 
 - 15\. Error Handling & Recovery
 
-- 16\. Testing & Quality Strategy
+- 16\. Definition of Done by Phase
 
-- 17\. Definition of Done by Phase
+- 17\. Risks, Dependencies & Open Decisions
 
-- 18\. Risks, Dependencies & Open Decisions
-
-- 19\. Requirement Traceability
+- 18\. Requirement Traceability
 
 # 1. Product Summary & Context
 
@@ -130,7 +132,7 @@ Ingest → Inspect → Normalize → Optimize → Derive → Store
 | Runtime performance  | First useful visual and scene transitions  | Measured per device/network class; use progressive derivatives and adjacent preloading.                        |
 | Reliability          | Publish/player/media failures              | Failures are observable, recoverable, and do not corrupt project data.                                         |
 | Compatibility        | Optional capability fallback               | Unsupported gyro/VR/video profile/etc. degrades to a supported normal 360° experience.                         |
-| Maintainability      | Renderer upgrades                          | Viewer upgrade can be handled in integration adapter/reference tests without migrating all saved project data. |
+| Maintainability      | Renderer upgrades                          | Viewer upgrade can be handled in the integration adapter without migrating all saved project data.             |
 
 # 3. Users, Jobs & Key Journeys
 
@@ -722,7 +724,7 @@ Publication states above are proposed implementation conventions. The key produc
 | Scene                      | id, name, panoramaAssetId, initialView, viewLimits, hotspots, overlays, connections, spatialData, runtimeHints.                                  |
 | Hotspot / Interaction      | id, geometry, position/spatial data, appearance, content, action, visibilityRules.                                                               |
 | Video timeline interaction | id, timestamp/start/end as required, action kind, payload, viewpoint/geometry, visibility rules.                                                 |
-| Publication                | id, projectId, revision, slug, visibility, compiledManifestVersion, publishedAt, status.                                                         |
+| Publication                | id, projectId, revision, slug, visibility, compiledManifestVersion, publishedAt, status.                                                          |
 | Published scene definition | Immutable/derived runtime representation of a scene for progressive fetch when large-tour strategy is used.                                      |
 
 ## 7.2 Proposed canonical project shape
@@ -993,7 +995,7 @@ All authored rich content and uploaded files are untrusted input. Security contr
 | First panorama visible            | p75 ≤ 2.5 s on defined test profile using optimized derivative; establish separate budgets by device/network class. |
 | Scene transition with preload hit | p75 ≤ 1.5 s on defined test profile.                                                                                |
 | Media job execution               | Asynchronous; user-facing status updates and retries are required rather than a fixed request timeout.              |
-| Runtime error rate                | Track by publication/viewer version; launch gate must define an acceptable threshold from beta telemetry.           |
+| Runtime error rate                | Track by publication/viewer version; define an acceptable operating threshold from beta telemetry.                 |
 
 These numeric values are recommendations added for implementation measurability. They are not present in the supplied architecture and should be calibrated using representative panorama sizes, target markets, device classes, and hosting/CDN region.
 
@@ -1009,77 +1011,11 @@ These numeric values are recommendations added for implementation measurability.
 | Runtime asset fails                    | Show graceful fallback/error state; report telemetry; experience shell remains functional when possible.                               |
 | Optional immersive feature unsupported | Continue in normal 360° mode.                                                                                                          |
 | Broken scene/asset reference           | Block publish or automatically repair only if behavior is explicit and deterministic.                                                  |
-| Viewer integration regression          | Versioned adapter + reference suite prevents uncontrolled rollout; rollback to previous integration version is operationally possible. |
+| Viewer integration regression          | Versioned adapter isolation prevents uncontrolled rollout; rollback to previous integration version is operationally possible.         |
 
-# 16. Testing & Quality Strategy
+# 16. Definition of Done by Phase
 
-## 16.1 Reference experience suite
-
-- Basic panorama
-
-- Cropped panorama/XMP
-
-- High-resolution panorama
-
-- Multi-scene tour
-
-- Gallery
-
-- Hotspots and rich content
-
-- Map/plan
-
-- Gyroscope/stereo fallback
-
-- 360° video
-
-- Timed interactions
-
-- Advanced overlay when phase enables it
-
-## 16.2 Frontend tests
-
-- Component tests for tool panels, contextual properties, forms, timeline and states.
-
-- Integration tests against mocked/contract API for project save, upload status, preview and publish.
-
-- End-to-end flows: create image experience → upload → hotspot → preview → publish; later video equivalent.
-
-- Responsive/touch accessibility tests; keyboard navigation where supported.
-
-- Visual regression for editor shell and player UI, not for arbitrary panorama pixel content.
-
-## 16.3 Backend/platform tests
-
-- Schema validation and migration compatibility tests.
-
-- Contract tests for idempotency, concurrency/version checks and authorization.
-
-- Media fixtures for full/cropped panoramas, invalid files, large images, video codecs/dimensions, failure recovery.
-
-- Compiler/resolver tests for valid/invalid capability combinations and fallbacks.
-
-- Publish atomicity and previous-revision preservation tests.
-
-- Progressive large-tour fetch/caching/preload tests.
-
-- Security tests for XSS/rich HTML, URL scheme abuse, private manifest/asset access and embed policy.
-
-## 16.4 Release gates
-
-- No P0/P1 security defects in upload, authored content, private access or publication path.
-
-- Reference experience suite passes against pinned viewer integration version.
-
-- No project corruption after failed media job, failed publish, page reload or retry.
-
-- Performance baselines measured on representative devices and asset sizes.
-
-- Runtime telemetry identifies publication revision, viewer version and actionable error category.
-
-# 17. Definition of Done by Phase
-
-## 17.1 Phase 1 DoD
+## 16.1 Phase 1 DoD
 
 - An authenticated creator can create a 360° image project, upload a supported panorama, see processing status, and enter the editor after a ready derivative exists.
 
@@ -1099,7 +1035,7 @@ These numeric values are recommendations added for implementation measurability.
 
 - Failed processing or publishing is recoverable without project corruption.
 
-## 17.2 Phase 2 DoD
+## 16.2 Phase 2 DoD
 
 - Multi-scene tours can be authored and connected visually.
 
@@ -1109,7 +1045,7 @@ These numeric values are recommendations added for implementation measurability.
 
 - Large-tour mode progressively fetches scene definitions and avoids loading unrelated full-resolution media at startup.
 
-## 17.3 Phase 3 DoD
+## 16.3 Phase 3 DoD
 
 - 360° video upload produces poster + device-compatible playback profiles.
 
@@ -1117,11 +1053,11 @@ These numeric values are recommendations added for implementation measurability.
 
 - Player selects compatible profile and records playback/stall telemetry.
 
-- Mobile fallback is validated on representative handheld devices.
+- Mobile fallback behaves correctly on representative handheld devices.
 
-# 18. Risks, Dependencies & Open Decisions
+# 17. Risks, Dependencies & Open Decisions
 
-## 18.1 Key risks
+## 17.1 Key risks
 
 | **Risk**                                              | **Mitigation / product requirement**                                                    |
 |-------------------------------------------------------|-----------------------------------------------------------------------------------------|
@@ -1131,10 +1067,10 @@ These numeric values are recommendations added for implementation measurability.
 | Mobile video incompatibility                          | Transcode/select mobile-compatible profiles; runtime capability detection.              |
 | Plugin/adaptor incompatibilities surface to customers | Capability resolver and product-level fallback/alternative behavior.                    |
 | Untrusted rich content causes XSS                     | Central sanitization and URL validation, CSP strategy.                                  |
-| Viewer upgrades break existing experiences            | Pinned version, adapter isolation, reference suite, manifest/revision observability.    |
+| Viewer upgrades break existing experiences            | Pinned version, adapter isolation, manifest/revision observability.                     |
 | Editor complexity grows with features                 | Configurable tools, search, contextual UI, progressive disclosure, canvas-first layout. |
 
-## 18.2 Open product/engineering decisions
+## 17.2 Open product/engineering decisions
 
 - Maximum upload sizes and accepted containers/codecs by plan.
 
@@ -1156,7 +1092,7 @@ These numeric values are recommendations added for implementation measurability.
 
 - Accessibility behavior for reduced motion, keyboard controls, captions/transcripts for embedded video content.
 
-# 19. Requirement Traceability
+# 18. Requirement Traceability
 
 | **Architecture theme**                             | **PRD sections / requirement families** |
 |----------------------------------------------------|-----------------------------------------|
@@ -1171,8 +1107,8 @@ These numeric values are recommendations added for implementation measurability.
 | Capability resolver / incompatibilities / fallback | §11                                     |
 | Security / trust boundary                          | §12, SEC-001–SEC-006                    |
 | Lifecycle / telemetry / observability              | §11.3, §13                              |
-| Efficiency / quality bar                           | §14–17                                  |
-| Versioned viewer integration                       | §9, §16, §18                            |
+| Efficiency / quality bar                           | §14–16                                  |
+| Versioned viewer integration                       | §9, §17                                 |
 
 # Appendix A — Frontend ↔ Backend Handoff Checklist
 
@@ -1231,3 +1167,49 @@ Product behavior, acceptance criteria, security requirements, canonical schema i
 
 | **Final product principle:** The user interacts with the experience. The Experience Engine, media pipeline, capability resolver, and viewer integration handle the technology. |
 |--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+
+---
+
+# Appendix E — v1.0 → v1.1 Change Log
+
+## Removed
+
+| **Item** | **Was at** |
+|----------|------------|
+| Section 16 — Testing & Quality Strategy (entire section) | §16 |
+| 16.1 Reference experience suite (11 test experiences) | §16.1 |
+| 16.2 Frontend tests (component, integration, E2E, responsive/accessibility, visual regression) | §16.2 |
+| 16.3 Backend/platform tests (schema, contract, media fixtures, compiler/resolver, publish atomicity, large-tour, security) | §16.3 |
+| 16.4 Release gates | §16.4 |
+| Contents entry "16. Testing & Quality Strategy" | Contents |
+| Phrase "reference suite" from viewer-regression mitigation | §15, §18.1 |
+| Phrase "reference tests" from Maintainability success measure | §2.3 |
+| Phrase "launch gate must define" (rewritten as operating threshold) | §14.2 |
+| Word "QA" from Primary audience | Header table |
+
+## Renumbered
+
+| **Was** | **Now** |
+|---------|---------|
+| §17 Definition of Done by Phase | §16 |
+| §17.1 / §17.2 / §17.3 | §16.1 / §16.2 / §16.3 |
+| §18 Risks, Dependencies & Open Decisions | §17 |
+| §18.1 / §18.2 | §17.1 / §17.2 |
+| §19 Requirement Traceability | §18 |
+
+## Traceability updated
+
+| **Row** | **Was** | **Now** |
+|---------|---------|---------|
+| Efficiency / quality bar | §14–17 | §14–16 |
+| Versioned viewer integration | §9, §16, §18 | §9, §17 |
+
+## Deliberately kept
+
+| **Item** | **Reason** |
+|----------|------------|
+| All "Acceptance criteria" columns (§5, §6.3, §10.3, §11.3, §12) | These are product requirements defining correct behavior, not test procedures. |
+| §16 Definition of Done by Phase | Defines product completeness per phase, not testing. |
+| §14.2 Proposed launch SLOs | Performance targets, not a test plan. |
+| §15 Error Handling & Recovery | Runtime product behavior. |
+| §13 Analytics & Observability | Production telemetry, not test instrumentation. |

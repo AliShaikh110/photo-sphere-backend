@@ -1,4 +1,4 @@
-# Backend API — Sprints 01–03
+# Backend API — Sprints 01–04
 
 This document defines the HTTP contract for the image360 backend MVP. The
 canonical source of data is the Experience model described in

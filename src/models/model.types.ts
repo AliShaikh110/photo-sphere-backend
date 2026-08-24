@@ -9,6 +9,14 @@ export interface JsonObject {
 export const USER_STATUSES = ['active', 'disabled'] as const;
 export type UserStatus = (typeof USER_STATUSES)[number];
 
+/**
+ * Platform-level role. `member` is every ordinary creator; `platform_admin`
+ * gates operator surfaces such as the extension registry and the viewer
+ * integration rollout. Project and workspace permissions are separate.
+ */
+export const PLATFORM_ROLES = ['member', 'platform_admin'] as const;
+export type PlatformRole = (typeof PLATFORM_ROLES)[number];
+
 export const PROJECT_TYPES = ['image360', 'video360'] as const;
 export type ProjectType = (typeof PROJECT_TYPES)[number];
 
@@ -202,6 +210,14 @@ export type TemplateAssetPolicy = (typeof TEMPLATE_ASSET_POLICIES)[number];
 
 export const EXTENSION_STATUSES = ['draft', 'active', 'deprecated', 'disabled'] as const;
 export type ExtensionStatus = (typeof EXTENSION_STATUSES)[number];
+
+/** Outcome of a reference experience suite run against a viewer integration. */
+export const VIEWER_INTEGRATION_CHECK_STATUSES = ['running', 'passed', 'failed'] as const;
+export type ViewerIntegrationCheckStatus = (typeof VIEWER_INTEGRATION_CHECK_STATUSES)[number];
+
+/** Durable operational settings keys. Kept closed so typos cannot create rows. */
+export const PLATFORM_SETTING_KEYS = ['viewerIntegrationRollout'] as const;
+export type PlatformSettingKey = (typeof PLATFORM_SETTING_KEYS)[number];
 
 export const AUDIT_ACTIONS = [
   'project.created',

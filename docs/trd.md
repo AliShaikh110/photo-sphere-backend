@@ -274,29 +274,3 @@ src/
 **Rule:** Business logic stays in `services`; controllers remain thin.
 
 ---
-
-## 11. Deployment
-
-The backend should remain deployable as a standard Node.js/Express application while being compatible with cloud/serverless deployment where required.
-
-Environment-specific configuration:
-
-```text
-DATABASE_URL
-STORAGE credentials
-JWT/Auth secrets
-CORS origins
-API configuration
-```
-
-No environment-specific secrets are committed to Git.
-
----
-
-## 12. Core Backend Principle
-
-> **Backend = Platform/Experience Engine**
-
-The backend is responsible for managing **projects → assets → experiences → scenes → interactions → publishing → analytics**.
-
-The 360° viewer only consumes the published experience configuration and renders it on the frontend.

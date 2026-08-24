@@ -1,4 +1,4 @@
-# Backend Schema — Sprints 01–03
+# Backend Schema — Sprints 01–04
 
 This document describes both the renderer-independent canonical Experience
 model and its PostgreSQL persistence representation. API payload details are in

@@ -16,6 +16,7 @@ import { WorkspaceMembership } from './workspace-membership.model';
 import { IdempotencyRecord } from './idempotency-record.model';
 import { MediaJob } from './media-job.model';
 import { MediaJobStage } from './media-job-stage.model';
+import { PlatformSetting } from './platform-setting.model';
 import { Project } from './project.model';
 import { Publication } from './publication.model';
 import { PublishedSceneDefinition } from './published-scene-definition.model';
@@ -26,6 +27,7 @@ import { StorageDeletionJob } from './storage-deletion-job.model';
 import { TimelineInteraction } from './timeline-interaction.model';
 import { UploadSession } from './upload-session.model';
 import { User } from './user.model';
+import { ViewerIntegrationCheck } from './viewer-integration-check.model';
 
 export { AssetDerivative } from './asset-derivative.model';
 export { Asset } from './asset.model';
@@ -44,6 +46,7 @@ export { IdempotencyRecord } from './idempotency-record.model';
 export { MediaJob } from './media-job.model';
 export { MediaJobStage } from './media-job-stage.model';
 export * from './model.types';
+export { PlatformSetting } from './platform-setting.model';
 export { Project } from './project.model';
 export { Publication } from './publication.model';
 export { PublishedSceneDefinition } from './published-scene-definition.model';
@@ -54,6 +57,7 @@ export { StorageDeletionJob } from './storage-deletion-job.model';
 export { TimelineInteraction } from './timeline-interaction.model';
 export { UploadSession } from './upload-session.model';
 export { User } from './user.model';
+export { ViewerIntegrationCheck } from './viewer-integration-check.model';
 
 export interface ModelRegistry {
   readonly User: typeof User;
@@ -82,6 +86,8 @@ export interface ModelRegistry {
   readonly Extension: typeof Extension;
   readonly PublicationShareToken: typeof PublicationShareToken;
   readonly CustomDomain: typeof CustomDomain;
+  readonly PlatformSetting: typeof PlatformSetting;
+  readonly ViewerIntegrationCheck: typeof ViewerIntegrationCheck;
 }
 
 const associationRegistries = new WeakSet<Sequelize>();
@@ -114,6 +120,8 @@ export function initializeModels(sequelize: Sequelize): ModelRegistry {
     Extension: Extension.initialize(sequelize),
     PublicationShareToken: PublicationShareToken.initialize(sequelize),
     CustomDomain: CustomDomain.initialize(sequelize),
+    PlatformSetting: PlatformSetting.initialize(sequelize),
+    ViewerIntegrationCheck: ViewerIntegrationCheck.initialize(sequelize),
   };
 
   if (!associationRegistries.has(sequelize)) {
@@ -535,6 +543,44 @@ function registerAssociations(models: ModelRegistry): void {
   models.PublicationShareToken.belongsTo(models.Project, {
     as: 'project',
     foreignKey: 'projectId',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+
+  models.Workspace.hasMany(models.Template, {
+    as: 'templates',
+    foreignKey: 'workspaceId',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+  models.Template.belongsTo(models.Workspace, {
+    as: 'workspace',
+    foreignKey: 'workspaceId',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+  models.User.hasMany(models.Template, {
+    as: 'templates',
+    foreignKey: 'ownerId',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+  models.Template.belongsTo(models.User, {
+    as: 'owner',
+    foreignKey: 'ownerId',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+
+  models.Workspace.hasMany(models.CustomDomain, {
+    as: 'customDomains',
+    foreignKey: 'workspaceId',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+  models.CustomDomain.belongsTo(models.Workspace, {
+    as: 'workspace',
+    foreignKey: 'workspaceId',
     onDelete: 'CASCADE',
     onUpdate: 'CASCADE',
   });

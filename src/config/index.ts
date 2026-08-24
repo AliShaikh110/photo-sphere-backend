@@ -72,7 +72,19 @@ const envSchema = z
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
     TRUST_PROXY: booleanFromString,
     AUTO_MIGRATE: booleanFromString,
-    VIEWER_INTEGRATION_VERSION: z.string().default('psv-5.14.3-adapter-1')
+    // Must name a viewer integration this build can emit; see the compiler's
+    // viewer integration registry.
+    VIEWER_INTEGRATION_VERSION: z.string().default('psv-5.14.3-adapter-2'),
+    /** Deterministic share of projects compiled with the rollout candidate. */
+    VIEWER_INTEGRATION_ROLLOUT_PERCENT: z.coerce.number().int().min(0).max(100).default(0),
+    VIEWER_INTEGRATION_CANDIDATE_VERSION: z.string().min(1).optional(),
+    DUAL_FISHEYE_INGEST_ENABLED: booleanFromString,
+    LIVE_SOURCE_ENABLED: booleanFromString,
+    LIVE_SOURCE_ALLOWED_HOSTS: z.string().default(''),
+    ANALYTICS_MAX_RANGE_DAYS: z.coerce.number().int().positive().max(400).default(92),
+    PUBLISH_MAX_SCENES: z.coerce.number().int().positive().default(500),
+    PUBLISH_MAX_MANIFEST_BYTES: z.coerce.number().int().positive().default(8 * 1024 * 1024),
+    PUBLISH_MAX_SCENE_DEFINITION_BYTES: z.coerce.number().int().positive().default(2 * 1024 * 1024)
   })
   .superRefine((value, context) => {
     if (
@@ -122,6 +134,17 @@ export type AppConfig = {
   trustProxy: boolean;
   autoMigrate: boolean;
   viewerIntegrationVersion: string;
+  viewerIntegrationCandidateVersion: string | undefined;
+  viewerIntegrationRolloutPercent: number;
+  dualFisheyeIngestEnabled: boolean;
+  liveSourceEnabled: boolean;
+  liveSourceAllowedHosts: string[];
+  analyticsMaxRangeDays: number;
+  publishLimits: {
+    maxScenes: number;
+    maxManifestBytes: number;
+    maxSceneDefinitionBytes: number;
+  };
 };
 
 export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -183,7 +206,21 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
     logLevel: value.LOG_LEVEL,
     trustProxy: value.TRUST_PROXY,
     autoMigrate: value.AUTO_MIGRATE,
-    viewerIntegrationVersion: value.VIEWER_INTEGRATION_VERSION
+    viewerIntegrationVersion: value.VIEWER_INTEGRATION_VERSION,
+    viewerIntegrationCandidateVersion: value.VIEWER_INTEGRATION_CANDIDATE_VERSION,
+    viewerIntegrationRolloutPercent: value.VIEWER_INTEGRATION_ROLLOUT_PERCENT,
+    dualFisheyeIngestEnabled: value.DUAL_FISHEYE_INGEST_ENABLED,
+    liveSourceEnabled: value.LIVE_SOURCE_ENABLED,
+    liveSourceAllowedHosts: value.LIVE_SOURCE_ALLOWED_HOSTS
+      .split(',')
+      .map((host) => host.trim().toLowerCase())
+      .filter(Boolean),
+    analyticsMaxRangeDays: value.ANALYTICS_MAX_RANGE_DAYS,
+    publishLimits: {
+      maxScenes: value.PUBLISH_MAX_SCENES,
+      maxManifestBytes: value.PUBLISH_MAX_MANIFEST_BYTES,
+      maxSceneDefinitionBytes: value.PUBLISH_MAX_SCENE_DEFINITION_BYTES
+    }
   };
 }
 

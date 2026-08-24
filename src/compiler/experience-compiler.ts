@@ -14,7 +14,6 @@ import type {
   CanonicalViewpoint,
   JsonObject,
   JsonValue,
-  PanoramaDerivativeFamily,
 } from '../domain/types';
 import { resolvePanoramaQuality } from '../media/quality-policy';
 import { CAPABILITY_REGISTRY } from '../capabilities/registry';
@@ -391,6 +390,13 @@ export class ExperienceCompiler {
         typeof connection.targetSceneId === 'string' ? [connection.targetSceneId] : []
       )),
     }));
+    // A very large index is itself a startup cost, so beyond the segment
+    // threshold the manifest carries only the first segment and the player
+    // pages the rest from the published scene-index route.
+    const sceneIndexSegmented = progressive && sceneIndex.length > SCENE_INDEX_SEGMENT_THRESHOLD;
+    const inlineSceneIndex = sceneIndexSegmented
+      ? sceneIndex.slice(0, SCENE_INDEX_SEGMENT_THRESHOLD)
+      : sceneIndex;
     const plans = deepFreeze(await this.compilePlans(
       input.project.plans ?? [],
       input.project.scenes,
@@ -406,7 +412,7 @@ export class ExperienceCompiler {
       settings,
       branding,
       scenes: manifestScenes,
-      sceneIndex,
+      sceneIndex: inlineSceneIndex,
       plans,
       spatialIndex,
       capabilities: capabilityResolution.capabilities,
@@ -445,13 +451,14 @@ export class ExperienceCompiler {
       tour: {
         strategy: progressive ? 'progressive' : 'embedded',
         sceneIndexVersion,
-        sceneIndex,
+        sceneIndex: inlineSceneIndex,
         sceneCount: frozenScenes.length,
         ...(progressive
           ? {
             sceneDefinitionUrlTemplate: publishedSceneUrlTemplate(input),
             sceneIndexUrl: publishedSceneIndexUrl(input),
-            sceneIndexSegmented: frozenScenes.length > SCENE_INDEX_SEGMENT_THRESHOLD,
+            sceneIndexSegmented,
+            ...(sceneIndexSegmented ? { sceneIndexSegmentSize: SCENE_INDEX_SEGMENT_THRESHOLD } : {}),
           }
           : {}),
       },
@@ -514,7 +521,9 @@ export class ExperienceCompiler {
       }))
       : [];
 
-    return deepFreeze({ manifest, sceneDefinitions });
+    // The complete index travels with the bundle even when the manifest ships
+    // only a segment, so the publisher can persist it for the paged route.
+    return deepFreeze({ manifest, sceneDefinitions, sceneIndex });
   }
 
   /**

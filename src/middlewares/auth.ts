@@ -48,6 +48,34 @@ export const requireAuth: RequestHandler = (request, _response, next) => {
   }
 };
 
+/**
+ * Gates operator surfaces such as the extension registry and the viewer
+ * integration rollout. The role is read from the database on every request, so
+ * revoking it takes effect immediately rather than at the next token refresh.
+ */
+export const requirePlatformAdmin: RequestHandler = (request, _response, next) => {
+  const userId = request.auth?.userId;
+  if (userId === undefined) {
+    next(new AppError('AUTHENTICATION_REQUIRED', 'Authentication is required.', { status: 401 }));
+    return;
+  }
+  void (async () => {
+    try {
+      const { User } = await import('../models');
+      const user = await User.findByPk(userId, { attributes: ['id', 'platformRole', 'status'] });
+      if (!user || user.status !== 'active' || user.platformRole !== 'platform_admin') {
+        next(new AppError('PLATFORM_ADMIN_REQUIRED', 'You do not have access to this resource.', {
+          status: 403
+        }));
+        return;
+      }
+      next();
+    } catch (error) {
+      next(error);
+    }
+  })();
+};
+
 export const optionalAuth: RequestHandler = (request, _response, next) => {
   const token = bearerToken(request.header('authorization'));
   if (!token) {

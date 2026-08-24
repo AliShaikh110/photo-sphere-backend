@@ -2,6 +2,7 @@ import { Op, UniqueConstraintError, type Transaction } from 'sequelize';
 import { AppError } from '../errors/app-error';
 import { IdempotencyRecord } from '../models/idempotency-record.model';
 import type { JsonObject } from '../models/model.types';
+import { incrementMetric } from '../observability';
 import { hashRequest } from '../utils/hash';
 
 const keyPattern = /^[A-Za-z0-9._:-]{8,255}$/;
@@ -197,6 +198,7 @@ export async function withIdempotency<T extends Record<string, unknown>>(options
   if (record) {
     record = await claimExistingRecord(record, requestFingerprint);
     if (record.status === 'completed' && record.responseBody) {
+      incrementMetric('api.idempotency_replay', { operation: options.operation });
       return { result: record.responseBody as unknown as T, replayed: true };
     }
     const failure = storedFailure(record);
@@ -226,7 +228,8 @@ export async function withIdempotency<T extends Record<string, unknown>>(options
       }
       record = await claimExistingRecord(raced, requestFingerprint);
       if (record.status === 'completed' && record.responseBody) {
-        return { result: record.responseBody as unknown as T, replayed: true };
+        incrementMetric('api.idempotency_replay', { operation: options.operation });
+      return { result: record.responseBody as unknown as T, replayed: true };
       }
       const failure = storedFailure(record);
       if (failure) throw failure;

@@ -1,7 +1,9 @@
 node_modules/
 dist/
 coverage/
-storage/
+# Anchored so it only ignores the runtime object-storage root, not the
+# src/integrations/storage source module.
+/storage/
 .sphere-pg-*/
 .env
 *.log
