@@ -66,6 +66,23 @@ The following inventory mirrors <code>.env.example</code>.
 | <code>STORAGE_ROOT</code> | <code>./storage</code> | Durable private storage directory. Mount and back up this path in production. |
 | <code>MAX_IMAGE_UPLOAD_BYTES</code> | <code>52428800</code> | Maximum original image bytes; default 50 MiB. |
 | <code>MAX_IMAGE_PIXELS</code> | <code>80000000</code> | Sharp input-pixel ceiling protecting against decompression bombs; default 80 million pixels. |
+| <code>MAX_VIDEO_UPLOAD_BYTES</code> | <code>1073741824</code> | Maximum original 360 video bytes; default 1 GiB. Raise deliberately: uploads are buffered in memory during validation and inspection. |
+| <code>MAX_VIDEO_DURATION_MS</code> | <code>1800000</code> | Rejects over-long sources during inspection; default 30 minutes. |
+| <code>MAX_VIDEO_DERIVATIVE_BYTES</code> | <code>1073741824</code> | Ceiling on a single generated playback derivative. |
+| <code>VIDEO_TRANSCODER</code> | <code>auto</code> | <code>auto</code>, <code>ffmpeg</code>, or <code>compatibility</code>. See "Video transcoding" below. |
+| <code>FFMPEG_PATH</code> | unset | Absolute path to an <code>ffmpeg</code> binary. Required when <code>VIDEO_TRANSCODER=ffmpeg</code>. |
+| <code>VIDEO_TRANSCODE_TIMEOUT_MS</code> | <code>600000</code> | Per-invocation encoder timeout. |
+| <code>VIDEO_POSTER_PLACEHOLDER_ENABLED</code> | <code>true</code> | Allows a clearly labelled placeholder poster when no encoder can extract a frame. Set false to require a real frame. |
+| <code>VIDEO_POSTER_TIME_MS</code> | <code>1000</code> | Timestamp used for poster frame extraction. |
+| <code>VIDEO_DESKTOP_MAX_WIDTH</code> | <code>8192</code> | Desktop playback profile width ceiling. |
+| <code>VIDEO_DESKTOP_MAX_FRAME_RATE</code> | <code>60</code> | Desktop playback profile frame-rate ceiling. |
+| <code>VIDEO_DESKTOP_TARGET_BITRATE</code> | <code>16000000</code> | Desktop playback profile target bitrate. |
+| <code>VIDEO_MOBILE_MAX_WIDTH</code> | <code>4096</code> | Handheld profile width ceiling. The renderer documents 4096 as the handheld limit for 360 video; the platform clamps this value to that ceiling. |
+| <code>VIDEO_MOBILE_MAX_FRAME_RATE</code> | <code>30</code> | Handheld profile frame-rate ceiling. |
+| <code>VIDEO_MOBILE_TARGET_BITRATE</code> | <code>6000000</code> | Handheld profile target bitrate. |
+| <code>VIDEO_AUDIO_BITRATE</code> | <code>128000</code> | Audio bitrate for generated playback profiles. |
+| <code>VIDEO_CODEC</code> | <code>h264</code> | Encoder video codec passed to the transcoder integration. |
+| <code>VIDEO_AUDIO_CODEC</code> | <code>aac</code> | Encoder audio codec passed to the transcoder integration. |
 | <code>UPLOAD_SESSION_TTL_SECONDS</code> | <code>3600</code> | Time allowed to PUT an upload before session expiry. |
 | <code>SIGNED_MEDIA_TTL_SECONDS</code> | <code>900</code> | Lifetime of signed preview/private-publication derivative URLs. |
 | <code>MEDIA_WORKER_MODE</code> | <code>embedded</code> | <code>embedded</code>, <code>external</code>, or <code>disabled</code>. |
@@ -274,6 +291,38 @@ Do not manually mark a job successful or an asset ready. Successful status
 requires a complete, persisted derivative catalog. Prefer normal retry/reprocess
 paths so state-machine and idempotency rules remain intact.
 
+## Video transcoding
+
+Video metadata inspection is built in and needs no external binary: the platform
+reads MP4/WebM container structure directly for dimensions, duration, frame
+rate, codecs, audio presence, rotation and 360 projection markers.
+
+Producing playback derivatives is delegated to a transcoder integration selected
+by <code>VIDEO_TRANSCODER</code>:
+
+| Mode | Behavior |
+| --- | --- |
+| <code>ffmpeg</code> | Uses <code>FFMPEG_PATH</code> to re-encode profiles and extract poster frames. |
+| <code>compatibility</code> | Emits a profile only when the inspected source provably satisfies every constraint of that profile, and generates a labelled placeholder poster. |
+| <code>auto</code> (default) | Uses ffmpeg when <code>FFMPEG_PATH</code> resolves to an existing file, otherwise the compatibility provider. |
+
+The compatibility provider never publishes an oversized original as a handheld
+profile. If a source needs a genuine re-encode, that profile is reported as
+unavailable with an actionable reason rather than being silently substituted.
+A deployment that ingests sources wider than
+<code>VIDEO_MOBILE_MAX_WIDTH</code> should configure ffmpeg; otherwise handheld
+visitors of those experiences will have no compatible profile.
+
+Operational signals to watch:
+
+- <code>media_job_stages</code> rows with <code>status = 'failed'</code> and a
+  <code>derivative_kind</code> of <code>mobileVideoProfile</code> indicate
+  handheld delivery gaps.
+- The <code>video_profile_selected</code> and
+  <code>video_playback_failed</code> runtime events show what visitors actually
+  received and where playback broke, keyed by publication revision and viewer
+  integration version.
+
 ## Private local storage
 
 <code>STORAGE_ROOT</code> contains immutable originals, versioned derivatives,
@@ -340,7 +389,7 @@ Equivalent aggregate command:
 npm run test:all
 ~~~
 
-### Complete Sprint 01 gate
+### Complete release gate
 
 Use a dedicated PostgreSQL database whose name clearly identifies it as test
 data. Never point this sequence at production.
@@ -394,6 +443,25 @@ preservation, private access, and runtime-event deduplication.
    lease has expired; do not manually duplicate it.
 7. Scale external workers cautiously if work is valid and infrastructure is
    healthy.
+
+### A video playback profile is unavailable
+
+1. Read <code>GET /api/v1/assets/:assetId</code> and inspect
+   <code>processingStages</code> and
+   <code>metadata.unavailablePlaybackProfiles</code>.
+2. A failed <code>transcodeMobile</code> stage whose reason mentions resizing
+   means the source exceeds the handheld ceiling and the deployment has no
+   re-encoding transcoder. Configure <code>FFMPEG_PATH</code>.
+3. Regenerate only the affected profile:
+   <code>POST /api/v1/assets/:assetId/reprocess</code> with
+   <code>{ "profiles": ["mobile"] }</code> and an <code>Idempotency-Key</code>.
+   This writes a new derivative version for that profile alone; the logical
+   asset ID and the other profiles are unchanged, so published experiences keep
+   working throughout.
+4. Republish the experience to move published manifests onto the new profile.
+5. If <code>finalize</code> failed with <code>VIDEO_PROFILE_UNAVAILABLE</code>,
+   no publishable profile exists at all and the asset is <code>failed</code>;
+   fix the transcoder configuration, then reprocess the whole asset.
 
 ### Asset is stuck or failed
 

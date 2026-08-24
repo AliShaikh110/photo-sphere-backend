@@ -12,6 +12,7 @@ import {
 
 import type { AssetDerivative } from './asset-derivative.model';
 import type { MediaJob } from './media-job.model';
+import type { MediaJobStage } from './media-job-stage.model';
 import {
   ASSET_MEDIA_TYPES,
   ASSET_PROCESSING_STATUSES,
@@ -51,6 +52,8 @@ export class Asset extends Model<InferAttributes<Asset>, InferCreationAttributes
   declare derivatives?: NonAttribute<AssetDerivative[]>;
   declare uploadSessions?: NonAttribute<UploadSession[]>;
   declare mediaJobs?: NonAttribute<MediaJob[]>;
+  declare mediaJobStages?: NonAttribute<MediaJobStage[]>;
+  declare videoProjects?: NonAttribute<Project[]>;
   declare panoramaScenes?: NonAttribute<Scene[]>;
 
   static initialize(sequelize: Sequelize): typeof Asset {

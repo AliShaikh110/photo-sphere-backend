@@ -3,10 +3,12 @@ import type { JsonObject, JsonValue } from '../domain/types';
 import type {
   CompiledHotspot,
   CompiledScene,
+  CompiledTimelineInteraction,
   ViewerIntegrationAdapter,
   ViewerIntegrationInput,
   ViewerIntegrationOutput,
   ViewerSceneIntegrationOutput,
+  ViewerVideoIntegrationInput,
 } from './types';
 
 export const PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION = 'psv-5.14.3-adapter-1' as const;
@@ -71,6 +73,125 @@ export class PhotoSphereViewerIntegrationAdapter implements ViewerIntegrationAda
       config: deepFreeze(buildSceneConfiguration(scene)),
     });
   }
+
+  /**
+   * The 360 video translation. Playback profile candidates stay ordered so
+   * the runtime can pick, and the timeline is emitted as renderer-neutral
+   * timed markers rather than plugin event wiring.
+   */
+  adaptVideo(input: ViewerVideoIntegrationInput): ViewerIntegrationOutput {
+    const video = input.video;
+    const videoSettings = input.settings.video;
+    const config: JsonObject = {
+      adapter: video.projection === 'cubemap'
+        ? 'cubemap-video'
+        : 'equirectangular-video',
+      panorama: {
+        source: video.profiles[0]!.media.url,
+        sources: video.profiles.map((profile) => ({
+          profileId: profile.profileId,
+          url: profile.media.url,
+          type: profile.constraints.mimeType,
+          width: profile.media.width,
+          height: profile.media.height,
+          handheldSafe: profile.constraints.handheldSafe,
+        })),
+        ...(video.poster === undefined ? {} : { poster: video.poster.url }),
+      },
+      navbar: buildVideoNavbar(input),
+      mousewheel: input.settings.navigation?.zoom ?? true,
+      mousemove: input.settings.navigation?.mouse ?? true,
+      touchControlsEnabled: input.settings.navigation?.touch ?? true,
+      keyboard: input.settings.navigation?.keyboard ?? true,
+      video: {
+        autoplay: videoSettings?.autoplay ?? false,
+        loop: videoSettings?.loop ?? false,
+        muted: videoSettings?.muted ?? (videoSettings?.autoplay ?? false),
+        progressbar: videoSettings?.showControls ?? true,
+        bigbutton: videoSettings?.showControls ?? true,
+        durationMs: video.durationMs,
+        ...(videoSettings?.startAtMs === undefined
+          ? {}
+          : { startAtMs: videoSettings.startAtMs }),
+      },
+      timeline: input.timeline.map(buildTimelineConfiguration),
+      markers: input.timeline
+        .filter((interaction) => interaction.position !== undefined)
+        .map(buildTimedMarkerConfiguration),
+    };
+
+    return Object.freeze({
+      rendererId: 'photo-sphere-viewer',
+      viewerIntegrationVersion: this.viewerIntegrationVersion,
+      config: deepFreeze(config),
+    });
+  }
+}
+
+function buildVideoNavbar(input: ViewerVideoIntegrationInput): JsonValue[] {
+  const controls = input.settings.navigation;
+  const navbar: JsonValue[] = [];
+  if (input.settings.video?.showControls ?? true) {
+    navbar.push('video');
+    navbar.push('videoTime');
+  }
+  if (controls?.zoom ?? true) navbar.push('zoom');
+  if (controls?.fullscreen ?? true) navbar.push('fullscreen');
+  return navbar;
+}
+
+function buildTimelineConfiguration(interaction: CompiledTimelineInteraction): JsonObject {
+  return {
+    id: interaction.id,
+    kind: interaction.kind,
+    startTime: interaction.timeMs / 1000,
+    ...(interaction.endTimeMs === null ? {} : { endTime: interaction.endTimeMs / 1000 }),
+    visible: interaction.enabled,
+    ...(interaction.viewpoint === undefined
+      ? {}
+      : {
+        viewpoint: {
+          yaw: degreesToRadians(interaction.viewpoint.headingDegrees),
+          pitch: degreesToRadians(interaction.viewpoint.pitchDegrees),
+          ...(interaction.viewpoint.horizontalFovDegrees === undefined
+            ? {}
+            : { zoom: fieldOfViewToZoomLevel(interaction.viewpoint.horizontalFovDegrees) }),
+          transition: interaction.viewpoint.transition === 'cut'
+            ? false
+            : interaction.viewpoint.transitionMs ?? true,
+        },
+      }),
+    data: {
+      action: toJsonValue(interaction.action),
+      ...(interaction.content === undefined
+        ? {}
+        : { content: toJsonValue(interaction.content.properties) }),
+    },
+  };
+}
+
+function buildTimedMarkerConfiguration(interaction: CompiledTimelineInteraction): JsonObject {
+  const content = interaction.content;
+  const candidateHtml = content?.tooltip
+    ?? content?.bodyHtml
+    ?? content?.description
+    ?? content?.title
+    ?? interaction.appearance?.label
+    ?? '';
+  const html = sanitizeRichHtml(candidateHtml) || '<span aria-hidden="true">&#9679;</span>';
+  return {
+    id: interaction.id,
+    position: {
+      yaw: degreesToRadians(interaction.position!.longitudeDegrees),
+      pitch: degreesToRadians(interaction.position!.latitudeDegrees),
+    },
+    html,
+    visible: interaction.enabled,
+    data: {
+      timelineInteractionId: interaction.id,
+      action: toJsonValue(interaction.action),
+    },
+  };
 }
 
 function buildNavbar(input: ViewerIntegrationInput): JsonValue[] {

@@ -2,6 +2,7 @@ import 'dotenv/config';
 import path from 'node:path';
 import { z } from 'zod';
 import type { PanoramaTilingPolicy } from '../media/panorama-quality-policy';
+import type { VideoTranscodingPolicy } from '../media/video-profile-policy';
 import type { TourStrategyPolicyConfig } from '../runtime';
 
 const booleanFromString = z
@@ -29,6 +30,26 @@ const envSchema = z
     STORAGE_ROOT: z.string().default('./storage'),
     MAX_IMAGE_UPLOAD_BYTES: z.coerce.number().int().positive().default(50 * 1024 * 1024),
     MAX_IMAGE_PIXELS: z.coerce.number().int().positive().default(80_000_000),
+    MAX_VIDEO_UPLOAD_BYTES: z.coerce.number().int().positive().default(1_024 * 1024 * 1024),
+    MAX_VIDEO_DURATION_MS: z.coerce.number().int().positive().default(30 * 60 * 1000),
+    MAX_VIDEO_DERIVATIVE_BYTES: z.coerce.number().int().positive().default(1_024 * 1024 * 1024),
+    VIDEO_TRANSCODER: z.enum(['auto', 'ffmpeg', 'compatibility']).default('auto'),
+    FFMPEG_PATH: z.string().min(1).optional(),
+    VIDEO_TRANSCODE_TIMEOUT_MS: z.coerce.number().int().positive().default(600_000),
+    VIDEO_POSTER_PLACEHOLDER_ENABLED: z
+      .enum(['true', 'false'])
+      .default('true')
+      .transform((value) => value === 'true'),
+    VIDEO_POSTER_TIME_MS: z.coerce.number().int().nonnegative().default(1_000),
+    VIDEO_DESKTOP_MAX_WIDTH: z.coerce.number().int().positive().default(8_192),
+    VIDEO_DESKTOP_MAX_FRAME_RATE: z.coerce.number().int().positive().default(60),
+    VIDEO_DESKTOP_TARGET_BITRATE: z.coerce.number().int().positive().default(16_000_000),
+    VIDEO_MOBILE_MAX_WIDTH: z.coerce.number().int().positive().default(4_096),
+    VIDEO_MOBILE_MAX_FRAME_RATE: z.coerce.number().int().positive().default(30),
+    VIDEO_MOBILE_TARGET_BITRATE: z.coerce.number().int().positive().default(6_000_000),
+    VIDEO_AUDIO_BITRATE: z.coerce.number().int().positive().default(128_000),
+    VIDEO_CODEC: z.string().min(1).default('h264'),
+    VIDEO_AUDIO_CODEC: z.string().min(1).default('aac'),
     PANORAMA_TILING_ENABLED: z
       .enum(['true', 'false'])
       .default('true')
@@ -80,6 +101,16 @@ export type AppConfig = {
   storageRoot: string;
   maxImageUploadBytes: number;
   maxImagePixels: number;
+  maxVideoUploadBytes: number;
+  maxVideoDurationMs: number;
+  maxVideoDerivativeBytes: number;
+  maxUploadBytes: number;
+  videoTranscoderMode: 'auto' | 'ffmpeg' | 'compatibility';
+  ffmpegPath: string | undefined;
+  videoTranscodeTimeoutMs: number;
+  videoPosterPlaceholderEnabled: boolean;
+  videoPosterTimeMs: number;
+  videoTranscodingPolicy: VideoTranscodingPolicy;
   panoramaTilingPolicy: PanoramaTilingPolicy;
   tourStrategyPolicy: TourStrategyPolicyConfig;
   uploadSessionTtlSeconds: number;
@@ -106,6 +137,28 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
     storageRoot: path.resolve(value.STORAGE_ROOT),
     maxImageUploadBytes: value.MAX_IMAGE_UPLOAD_BYTES,
     maxImagePixels: value.MAX_IMAGE_PIXELS,
+    maxVideoUploadBytes: value.MAX_VIDEO_UPLOAD_BYTES,
+    maxVideoDurationMs: value.MAX_VIDEO_DURATION_MS,
+    maxVideoDerivativeBytes: value.MAX_VIDEO_DERIVATIVE_BYTES,
+    maxUploadBytes: Math.max(value.MAX_IMAGE_UPLOAD_BYTES, value.MAX_VIDEO_UPLOAD_BYTES),
+    videoTranscoderMode: value.VIDEO_TRANSCODER,
+    ffmpegPath: value.FFMPEG_PATH,
+    videoTranscodeTimeoutMs: value.VIDEO_TRANSCODE_TIMEOUT_MS,
+    videoPosterPlaceholderEnabled: value.VIDEO_POSTER_PLACEHOLDER_ENABLED,
+    videoPosterTimeMs: value.VIDEO_POSTER_TIME_MS,
+    videoTranscodingPolicy: {
+      version: 1,
+      desktopMaxWidth: value.VIDEO_DESKTOP_MAX_WIDTH,
+      desktopMaxFrameRate: value.VIDEO_DESKTOP_MAX_FRAME_RATE,
+      desktopTargetBitrate: value.VIDEO_DESKTOP_TARGET_BITRATE,
+      mobileMaxWidth: value.VIDEO_MOBILE_MAX_WIDTH,
+      mobileMaxFrameRate: value.VIDEO_MOBILE_MAX_FRAME_RATE,
+      mobileTargetBitrate: value.VIDEO_MOBILE_TARGET_BITRATE,
+      audioBitrate: value.VIDEO_AUDIO_BITRATE,
+      videoCodec: value.VIDEO_CODEC,
+      audioCodec: value.VIDEO_AUDIO_CODEC,
+      posterEnabled: true
+    },
     panoramaTilingPolicy: {
       enabled: value.PANORAMA_TILING_ENABLED,
       minimumSourceWidth: value.PANORAMA_TILING_MIN_WIDTH,

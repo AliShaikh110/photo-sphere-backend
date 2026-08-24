@@ -134,8 +134,10 @@ async function startRealPostgres(): Promise<IntegrationTestContext | undefined> 
 
     const database = await import('../../src/database');
     await database.sequelize.authenticate();
-    const migration = await import('../../migrations/20260824000000-initial-schema');
-    await migration.up({ context: database.sequelize.getQueryInterface() });
+    // Run the full migration chain: a disposable cluster must reach the same
+    // schema the deployed database does, not just the initial sprint.
+    const { createMigrator } = await import('../../src/database/migrate');
+    await createMigrator(database.sequelize).up();
     const { app } = await import('../../src/app');
 
     return {
@@ -231,10 +233,14 @@ export async function truncateApplicationData(context: IntegrationTestContext): 
   const tableNames = [
     'runtime_events',
     'idempotency_records',
+    'published_scene_definitions',
     'publications',
+    'timeline_interactions',
+    'scene_connections',
     'hotspots',
     'scenes',
     'storage_deletion_jobs',
+    'media_job_stages',
     'media_jobs',
     'upload_sessions',
     'asset_derivatives',

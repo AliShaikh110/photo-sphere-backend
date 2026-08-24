@@ -21,9 +21,22 @@ import {
   type GeneratedStorageObject,
   type PanoramaInspection
 } from '../media/image-processor';
-import { validateImageUpload } from '../media/file-policy';
-import { Asset, AssetDerivative, MediaJob } from '../models';
-import type { AssetProcessingStatus, JsonObject } from '../models/model.types';
+import { validateImageUpload, validateVideoUpload } from '../media/file-policy';
+import {
+  generateVideoDerivatives,
+  VIDEO_STAGE_BY_DERIVATIVE_KIND
+} from '../media/video-derivatives';
+import { inspectVideo, videoInspectionMetadata } from '../media/video-processor';
+import { videoTranscoder as defaultVideoTranscoder } from '../integrations/video';
+import { Asset, AssetDerivative, MediaJob, MediaJobStage } from '../models';
+import { MEDIA_JOB_STAGE_NAMES } from '../models/model.types';
+import type {
+  AssetDerivativeKind,
+  AssetProcessingStatus,
+  JsonObject,
+  MediaJobStageName,
+  MediaJobStageStatus
+} from '../models/model.types';
 import { sha256 } from '../utils/hash';
 import { drainStorageDeletionJobs } from './storage-deletion-service';
 
@@ -140,7 +153,13 @@ function failureCategory(error: unknown): AssetProcessingFailureCategory {
     if (['UPLOAD_MIME_MISMATCH', 'UPLOAD_EXTENSION_MISMATCH'].includes(error.code)) return 'SIGNATURE_MISMATCH';
     if (error.code === 'UPLOAD_TOO_LARGE') return 'FILE_TOO_LARGE';
     if (error.code === 'IMAGE_DECODE_FAILED') return 'IMAGE_DECODE_FAILED';
-    if (['IMAGE_METADATA_MISSING', 'PANORAMA_METADATA_INVALID'].includes(error.code)) {
+    if (['UNSUPPORTED_VIDEO_TYPE', 'VIDEO_360_NOT_DETECTED', 'VIDEO_TOO_LONG'].includes(error.code)) {
+      return 'UNSUPPORTED_MEDIA_TYPE';
+    }
+    if (error.code === 'VIDEO_DECODE_FAILED') return 'VIDEO_DECODE_FAILED';
+    if (error.code === 'VIDEO_DURATION_UNKNOWN') return 'VIDEO_DURATION_UNKNOWN';
+    if (error.code === 'VIDEO_PROFILE_UNAVAILABLE') return 'VIDEO_PROFILE_UNAVAILABLE';
+    if (['IMAGE_METADATA_MISSING', 'PANORAMA_METADATA_INVALID', 'VIDEO_METADATA_MISSING'].includes(error.code)) {
       return 'METADATA_INSPECTION_FAILED';
     }
     if (error.code.includes('DERIVATIVE')) return 'DERIVATIVE_GENERATION_FAILED';
@@ -151,8 +170,14 @@ function failureCategory(error: unknown): AssetProcessingFailureCategory {
 
 function failureStage(error: unknown): AssetProcessingStage {
   if (error instanceof AppError) {
-    if (error.code.startsWith('UPLOAD_') || error.code === 'UNSUPPORTED_IMAGE_TYPE') return 'upload_validation';
-    if (error.code.includes('METADATA') || error.code.includes('DECODE') || error.code === 'PANORAMA_NOT_DETECTED') {
+    if (error.code.startsWith('UPLOAD_')
+      || error.code === 'UNSUPPORTED_IMAGE_TYPE'
+      || error.code === 'UNSUPPORTED_VIDEO_TYPE') return 'upload_validation';
+    if (error.code.includes('METADATA')
+      || error.code.includes('DECODE')
+      || error.code === 'PANORAMA_NOT_DETECTED'
+      || error.code === 'VIDEO_360_NOT_DETECTED'
+      || error.code === 'VIDEO_DURATION_UNKNOWN') {
       return 'inspection';
     }
     if (error.code.includes('STORAGE') || error.code.includes('OBJECT')) return 'storage';
@@ -339,6 +364,28 @@ async function processClaimedJob(job: MediaJob, storage: StorageProvider): Promi
     return;
   }
   try {
+    if (isVideoAsset(asset)) {
+      await processVideoAsset(asset, job, storage);
+    } else {
+      await processImageAsset(asset, job, storage);
+    }
+    logger.info({ assetId: asset.id, jobId: job.id, derivativeVersion: job.derivativeVersion }, 'media job completed');
+  } catch (error) {
+    logger.error({ err: error, assetId: asset.id, jobId: job.id }, 'media job failed');
+    await persistFailure(asset, job, error);
+  }
+}
+
+function isVideoAsset(asset: Asset): boolean {
+  return asset.mediaType === 'video360' || asset.mediaType === 'video';
+}
+
+async function processImageAsset(
+  asset: Asset,
+  job: MediaJob,
+  storage: StorageProvider
+): Promise<void> {
+  {
     if (asset.processingStatus !== 'processing') {
       await setAssetStatus(asset, 'inspecting');
     }
@@ -423,11 +470,275 @@ async function processClaimedJob(job: MediaJob, storage: StorageProvider): Promi
         leaseToken: null
       }, { transaction });
     });
-    logger.info({ assetId: asset.id, jobId: job.id, derivativeVersion: job.derivativeVersion }, 'media job completed');
-  } catch (error) {
-    logger.error({ err: error, assetId: asset.id, jobId: job.id }, 'media job failed');
-    await persistFailure(asset, job, error);
   }
+}
+
+const VIDEO_PLAYBACK_DERIVATIVE_KINDS = ['desktopVideoProfile', 'mobileVideoProfile'] as const;
+
+function requestedVideoStages(job: MediaJob): MediaJobStageName[] {
+  const requested = job.payload.stages;
+  if (!Array.isArray(requested)) {
+    return ['poster', 'transcodeDesktop', 'transcodeMobile'];
+  }
+  const allowed = new Set<string>(MEDIA_JOB_STAGE_NAMES);
+  return requested.filter(
+    (stage): stage is MediaJobStageName => typeof stage === 'string' && allowed.has(stage)
+  );
+}
+
+async function recordStage(
+  job: MediaJob,
+  assetId: string,
+  stage: MediaJobStageName,
+  values: {
+    status: MediaJobStageStatus;
+    derivativeKind?: AssetDerivativeKind;
+    required?: boolean;
+    error?: JsonObject | null;
+    diagnostics?: JsonObject;
+    startedAt?: Date | null;
+    finishedAt?: Date | null;
+  }
+): Promise<void> {
+  const [row] = await MediaJobStage.findOrCreate({
+    where: { mediaJobId: job.id, stage },
+    defaults: {
+      mediaJobId: job.id,
+      assetId,
+      stage,
+      status: values.status,
+      derivativeKind: values.derivativeKind ?? null,
+      derivativeVersion: job.derivativeVersion,
+      attempt: job.attempt,
+      required: values.required ?? true,
+      error: values.error ?? null,
+      diagnostics: values.diagnostics ?? {},
+      startedAt: values.startedAt ?? null,
+      finishedAt: values.finishedAt ?? null
+    }
+  });
+  await row.update({
+    status: values.status,
+    attempt: job.attempt,
+    derivativeVersion: job.derivativeVersion,
+    ...(values.derivativeKind === undefined ? {} : { derivativeKind: values.derivativeKind }),
+    ...(values.required === undefined ? {} : { required: values.required }),
+    ...(values.error === undefined ? {} : { error: values.error }),
+    ...(values.diagnostics === undefined ? {} : { diagnostics: values.diagnostics }),
+    ...(values.startedAt === undefined ? {} : { startedAt: values.startedAt }),
+    ...(values.finishedAt === undefined ? {} : { finishedAt: values.finishedAt })
+  });
+}
+
+async function processVideoAsset(
+  asset: Asset,
+  job: MediaJob,
+  storage: StorageProvider
+): Promise<void> {
+  if (asset.processingStatus !== 'processing') {
+    await setAssetStatus(asset, 'inspecting');
+  }
+  await updateLeasedJob(job, { stage: 'inspection', progress: 10, lockedAt: new Date() });
+  await recordStage(job, asset.id, 'inspect', { status: 'running', startedAt: new Date() });
+
+  const source = await storage.get(asset.sourceStorageKey);
+  const validated = validateVideoUpload({
+    bytes: source.body,
+    filename: asset.sourceFilename,
+    claimedMimeType: asset.sourceMimeType,
+    maxBytes: config.maxVideoUploadBytes
+  });
+  const inspection = inspectVideo({
+    bytes: source.body,
+    mimeType: validated.mimeType,
+    require360: asset.mediaType === 'video360',
+    maxDurationMs: config.maxVideoDurationMs
+  });
+  await recordStage(job, asset.id, 'inspect', {
+    status: 'succeeded',
+    finishedAt: new Date(),
+    diagnostics: {
+      container: inspection.container,
+      width: inspection.width,
+      height: inspection.height,
+      durationMs: inspection.durationMs,
+      projectionSource: inspection.projectionSource
+    }
+  });
+
+  await updateLeasedJob(job, { lockedAt: new Date(), progress: 25 });
+  await asset.update({
+    projection: inspection.projection === 'cubemap'
+      ? 'cubemap'
+      : inspection.is360 ? 'equirectangular' : 'unknown',
+    metadata: videoInspectionMetadata(inspection) as unknown as JsonObject
+  });
+  if (asset.processingStatus !== 'processing') {
+    await setAssetStatus(asset, 'processing');
+  }
+  await updateLeasedJob(job, { stage: 'processing', progress: 35, lockedAt: new Date() });
+
+  // A retried attempt must not re-encode a derivative that is already stored:
+  // re-encoding is not byte-deterministic and would collide with the immutable
+  // catalog entry created by the previous attempt.
+  const existingAtVersion = await AssetDerivative.findAll({
+    where: { assetId: asset.id, version: job.derivativeVersion },
+    attributes: ['kind']
+  });
+  const alreadyStored = new Set<string>(existingAtVersion.map((entry) => entry.kind));
+  const stages = requestedVideoStages(job).filter((stage) => {
+    const kind = Object.entries(VIDEO_STAGE_BY_DERIVATIVE_KIND)
+      .find(([, stageName]) => stageName === stage)?.[0];
+    return kind === undefined || !alreadyStored.has(kind);
+  });
+
+  const outcomes = await generateVideoDerivatives({
+    assetId: asset.id,
+    version: job.derivativeVersion,
+    bytes: source.body,
+    inspection,
+    transcoder: defaultVideoTranscoder,
+    policy: config.videoTranscodingPolicy,
+    posterTimeMs: config.videoPosterTimeMs,
+    stages
+  });
+
+  let retryableStageFailure: AppError | undefined;
+  for (const outcome of outcomes) {
+    await updateLeasedJob(job, { lockedAt: new Date() });
+    if (outcome.status === 'succeeded' && outcome.derivative) {
+      await persistDerivative(asset.id, outcome.derivative, storage);
+      await recordStage(job, asset.id, outcome.stage, {
+        status: 'succeeded',
+        ...(outcome.derivativeKind === undefined ? {} : { derivativeKind: outcome.derivativeKind }),
+        required: outcome.required,
+        error: null,
+        diagnostics: outcome.diagnostics as unknown as JsonObject,
+        finishedAt: new Date()
+      });
+      continue;
+    }
+    if (outcome.status === 'skipped') {
+      await recordStage(job, asset.id, outcome.stage, {
+        status: 'skipped',
+        ...(outcome.derivativeKind === undefined ? {} : { derivativeKind: outcome.derivativeKind }),
+        required: outcome.required,
+        diagnostics: outcome.diagnostics as unknown as JsonObject,
+        finishedAt: new Date()
+      });
+      continue;
+    }
+    await recordStage(job, asset.id, outcome.stage, {
+      status: 'failed',
+      ...(outcome.derivativeKind === undefined ? {} : { derivativeKind: outcome.derivativeKind }),
+      required: outcome.required,
+      error: (outcome.failure ?? null) as unknown as JsonObject | null,
+      diagnostics: outcome.diagnostics as unknown as JsonObject,
+      finishedAt: new Date()
+    });
+    if (outcome.failure?.retryable === true) {
+      retryableStageFailure = new AppError(
+        'VIDEO_DERIVATIVE_GENERATION_FAILED',
+        outcome.failure.message,
+        { status: 500, retryable: true, entityId: asset.id }
+      );
+    }
+  }
+  // Re-encoding infrastructure faults are worth another attempt; already-stored
+  // derivatives are skipped above so the retry stays idempotent.
+  if (retryableStageFailure) throw retryableStageFailure;
+
+  await recordStage(job, asset.id, 'finalize', { status: 'running', startedAt: new Date() });
+  const playbackDerivatives = await AssetDerivative.findAll({
+    where: { assetId: asset.id, kind: { [Op.in]: [...VIDEO_PLAYBACK_DERIVATIVE_KINDS] } },
+    order: [['version', 'DESC']]
+  });
+  if (playbackDerivatives.length === 0) {
+    await recordStage(job, asset.id, 'finalize', {
+      status: 'failed',
+      finishedAt: new Date(),
+      diagnostics: { publishableProfiles: 0 }
+    });
+    throw new AppError(
+      'VIDEO_PROFILE_UNAVAILABLE',
+      'No compatible playback profile could be produced for this video.',
+      { status: 422, entityId: asset.id, retryable: false }
+    );
+  }
+
+  const posterReady = await AssetDerivative.count({
+    where: { assetId: asset.id, kind: 'videoPoster' }
+  }) > 0;
+  const profileSummary = summarizePlaybackProfiles(playbackDerivatives);
+  const stageRows = await MediaJobStage.findAll({ where: { mediaJobId: job.id } });
+  const unavailableProfiles = stageRows
+    .filter((row) => row.status === 'failed' && row.derivativeKind !== null)
+    .map((row) => ({
+      derivativeKind: row.derivativeKind,
+      stage: row.stage,
+      reason: (row.error as JsonObject | null)?.message ?? 'The playback profile is unavailable.'
+    }));
+
+  await sequelize.transaction(async (transaction) => {
+    const lockedJob = await MediaJob.findOne({
+      where: { id: job.id, status: 'running', leaseToken: job.leaseToken },
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    if (!lockedJob) throw new Error('The media job lease was lost.');
+    const lockedAsset = await Asset.findByPk(asset.id, {
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    if (!lockedAsset) throw new Error('The media asset no longer exists.');
+    assertAssetProcessingTransition(lockedAsset.processingStatus, 'ready');
+    await lockedAsset.update(
+      {
+        processingStatus: 'ready',
+        processingError: null,
+        metadata: {
+          ...lockedAsset.metadata,
+          posterAvailable: posterReady,
+          playbackProfiles: profileSummary,
+          ...(unavailableProfiles.length === 0
+            ? {}
+            : { unavailablePlaybackProfiles: unavailableProfiles })
+        } as unknown as JsonObject
+      },
+      { transaction }
+    );
+    await lockedJob.update({
+      status: 'succeeded',
+      stage: 'complete',
+      progress: 100,
+      error: null,
+      finishedAt: new Date(),
+      lockedAt: null,
+      leaseToken: null
+    }, { transaction });
+  });
+  await recordStage(job, asset.id, 'finalize', {
+    status: 'succeeded',
+    finishedAt: new Date(),
+    diagnostics: { publishableProfiles: profileSummary.length, posterAvailable: posterReady }
+  });
+}
+
+function summarizePlaybackProfiles(derivatives: readonly AssetDerivative[]): JsonObject[] {
+  const latestByKind = new Map<string, AssetDerivative>();
+  for (const derivative of derivatives) {
+    const current = latestByKind.get(derivative.kind);
+    if (!current || derivative.version > current.version) latestByKind.set(derivative.kind, derivative);
+  }
+  return [...latestByKind.values()].map((derivative) => ({
+    derivativeKind: derivative.kind,
+    profileId: typeof derivative.metadata.profileId === 'string' ? derivative.metadata.profileId : null,
+    version: derivative.version,
+    width: derivative.width,
+    height: derivative.height,
+    mimeType: derivative.mimeType,
+    handheldSafe: derivative.metadata.handheldSafe === true
+  }));
 }
 
 export async function processNextMediaJob(storage: StorageProvider = defaultStorage): Promise<boolean> {

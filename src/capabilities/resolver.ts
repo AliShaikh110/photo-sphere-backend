@@ -30,7 +30,11 @@ const CAPABILITY_PATHS: Readonly<Record<CapabilityId, string>> = Object.freeze({
   imageContent: 'scenes.hotspots.content.imageAssetId',
   videoContent: 'scenes.hotspots.content.videoAssetId',
   externalLink: 'scenes.hotspots.content.externalUrl',
-  video360: 'media.video360',
+  video360: 'videoAssetId',
+  videoTimeline: 'timeline',
+  timedHotspots: 'timeline',
+  timedViewpoint: 'timeline',
+  cta: 'timeline',
   map: 'settings.map',
   plan: 'settings.plan',
   gyroscope: 'settings.motionNavigation',
@@ -157,6 +161,16 @@ function resolveAvailability(state: ResolutionState): void {
 }
 
 function resolveSemanticConfiguration(state: ResolutionState): void {
+  if (isUsable(state, 'videoTimeline')
+    && (state.input.configuration?.timelineInteractionCount ?? 0) === 0) {
+    failCapability(state, {
+      capabilityId: 'videoTimeline',
+      code: 'FEATURE_NOT_CONFIGURED',
+      message: 'The video timeline is enabled but has no interactions.',
+      alternatives: ['Add a timed interaction', 'Play the video without timed interactions'],
+    });
+  }
+
   if (isUsable(state, 'compass')
     && state.input.configuration?.compassEnabled !== true) {
     failCapability(state, {

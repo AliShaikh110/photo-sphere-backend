@@ -5,6 +5,9 @@ import type {
   CanonicalInitialView,
   CanonicalProject,
   CanonicalProjectSettings,
+  CanonicalTimelineInteraction,
+  CanonicalTimelineInteractionKind,
+  CanonicalViewpoint,
   CanonicalViewLimits,
   JsonObject,
   SphericalPosition,
@@ -17,12 +20,14 @@ import type {
 import type {
   CompiledRuntimeCachePolicy,
   SceneTransitionFailureCategory,
+  VideoPlaybackProfileId,
+  VideoProfileCandidate,
 } from '../runtime';
 import type { CompiledPanoramaCrop } from './panorama-metadata';
 
 export type { CompiledPanoramaCrop } from './panorama-metadata';
 
-export const COMPILED_MANIFEST_VERSION = 2 as const;
+export const COMPILED_MANIFEST_VERSION = 3 as const;
 export const COMPILED_SCENE_VERSION = 1 as const;
 
 export type CompileTarget = 'preview' | 'publication';
@@ -212,20 +217,25 @@ export interface CompiledRuntimeCacheContract {
   };
 }
 
+export interface RuntimePreloadDeclaration {
+  readonly strategy: 'selective-adjacent' | 'video-progressive';
+  readonly maxScenesPerSource: number;
+  readonly content: 'scene-definition-and-base-media' | 'poster-and-first-video-segments';
+}
+
+export interface RuntimeFallbackPolicy {
+  readonly panorama?: 'low-resolution-base-then-standard-or-tiled-detail';
+  readonly video?: 'ordered-playback-profile-candidates';
+  readonly optionalCapabilities: 'continue-without-capability';
+}
+
 export interface RuntimeDeclarations {
   readonly modules: readonly string[];
   readonly moduleDeclarations: readonly RuntimeModuleDeclaration[];
   readonly capabilityFallbacks: readonly AppliedCapabilityFallback[];
-  readonly preload: {
-    readonly strategy: 'selective-adjacent';
-    readonly maxScenesPerSource: 2;
-    readonly content: 'scene-definition-and-base-media';
-  };
+  readonly preload: RuntimePreloadDeclaration;
   readonly cache: CompiledRuntimeCacheContract;
-  readonly fallbackPolicy: {
-    readonly panorama: 'low-resolution-base-then-standard-or-tiled-detail';
-    readonly optionalCapabilities: 'continue-without-capability';
-  };
+  readonly fallbackPolicy: RuntimeFallbackPolicy;
 }
 
 export const BASELINE_TELEMETRY_EVENTS = [
@@ -240,14 +250,33 @@ export const BASELINE_TELEMETRY_EVENTS = [
   'experience_exited',
 ] as const;
 
+/** Added for video360 experiences on top of the baseline event set. */
+export const VIDEO_TELEMETRY_EVENTS = [
+  'video_started',
+  'video_paused',
+  'video_resumed',
+  'video_seeked',
+  'video_stalled',
+  'video_ended',
+  'video_profile_selected',
+  'video_playback_failed',
+  'timeline_interaction_shown',
+  'timeline_interaction_clicked',
+] as const;
+
+export type CompiledTelemetryEvent =
+  | (typeof BASELINE_TELEMETRY_EVENTS)[number]
+  | (typeof VIDEO_TELEMETRY_EVENTS)[number];
+
 export interface CompiledTelemetryMetadata {
   readonly enabled: true;
   readonly experienceId: string;
   readonly projectRevision: number;
   readonly publicationRevision: number | null;
   readonly viewerIntegrationVersion: string;
-  readonly events: readonly (typeof BASELINE_TELEMETRY_EVENTS)[number][];
+  readonly events: readonly CompiledTelemetryEvent[];
   readonly sceneTransitionFailureCategories: readonly SceneTransitionFailureCategory[];
+  readonly videoPlaybackFailureCategories?: readonly string[];
 }
 
 /** This opaque JSON is renderer-specific and may only be created by an adapter. */
@@ -273,11 +302,87 @@ export interface ViewerIntegrationInput {
   readonly sceneIndex?: readonly CompiledSceneIndexEntry[];
 }
 
+export interface ViewerVideoIntegrationInput {
+  readonly settings: CanonicalProjectSettings;
+  readonly branding: CompiledBranding;
+  readonly video: CompiledVideoMedia;
+  readonly timeline: readonly CompiledTimelineInteraction[];
+}
+
 export interface ViewerIntegrationAdapter {
   readonly viewerIntegrationVersion: string;
   adapt(input: ViewerIntegrationInput): ViewerIntegrationOutput;
   adaptScene(scene: CompiledScene): ViewerSceneIntegrationOutput;
+  adaptVideo(input: ViewerVideoIntegrationInput): ViewerIntegrationOutput;
 }
+
+/* --------------------------------------------------------------------- */
+/* 360 video                                                              */
+/* --------------------------------------------------------------------- */
+
+export interface CompiledVideoPlaybackProfile {
+  readonly profileId: VideoPlaybackProfileId;
+  readonly media: CompiledMediaReference;
+  readonly constraints: {
+    readonly maxWidth: number;
+    readonly handheldSafe: boolean;
+    readonly mimeType: string;
+  };
+}
+
+export interface CompiledVideoSelectionPolicy {
+  readonly policyVersion: number;
+  readonly strategy: 'ordered-candidates-client-selects';
+  readonly handheldMaxWidth: number;
+  readonly defaultProfileId: VideoPlaybackProfileId;
+  readonly fallbackProfileId: VideoPlaybackProfileId;
+  /** A server-side selection endpoint for players that prefer to delegate. */
+  readonly selectionUrl?: string;
+}
+
+export interface CompiledVideoMedia {
+  readonly assetId: string;
+  readonly projection: 'equirectangular' | 'cubemap';
+  readonly durationMs: number;
+  readonly width: number;
+  readonly height: number;
+  readonly frameRate?: number;
+  readonly audioPresent: boolean;
+  readonly stereoMode: 'mono' | 'top-bottom' | 'left-right';
+  readonly poster?: CompiledMediaReference;
+  /** Ordered best-first; handheld-safe candidates lead the list. */
+  readonly profiles: readonly CompiledVideoPlaybackProfile[];
+  readonly selectionPolicy: CompiledVideoSelectionPolicy;
+}
+
+export interface CompiledTimelineInteraction {
+  readonly id: string;
+  readonly kind: CanonicalTimelineInteractionKind;
+  readonly timeMs: number;
+  readonly endTimeMs: number | null;
+  readonly geometry?: { readonly kind: 'point' };
+  readonly position?: SphericalPosition;
+  readonly viewpoint?: CanonicalViewpoint;
+  readonly appearance?: CompiledHotspotAppearance;
+  readonly content?: CompiledTimelineContent;
+  readonly action: CompiledTimelineAction;
+  readonly enabled: boolean;
+  readonly visibilityRules: JsonObject;
+}
+
+export interface CompiledTimelineContent extends CompiledHotspotContent {
+  readonly ctaLabel?: string;
+  readonly ctaUrl?: string;
+}
+
+export type CompiledTimelineAction =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'showInformation' }
+  | { readonly kind: 'openUrl'; readonly url: string }
+  | { readonly kind: 'openAsset'; readonly media: CompiledMediaReference }
+  | { readonly kind: 'setViewpoint' };
+
+export type { CanonicalTimelineInteraction, VideoProfileCandidate };
 
 export interface CompiledPublishedSceneDefinition {
   readonly sceneDefinitionVersion: typeof COMPILED_SCENE_VERSION;
@@ -293,25 +398,50 @@ export interface CompiledExperienceBundle {
   readonly sceneDefinitions: readonly CompiledPublishedSceneDefinition[];
 }
 
-export interface CompiledExperienceManifest {
+export interface CompiledExperienceManifestBase {
   readonly manifestVersion: typeof COMPILED_MANIFEST_VERSION;
   readonly schemaVersion: number;
   readonly experienceId: string;
   readonly experienceName: string;
-  readonly experienceType: 'image360';
   readonly projectRevision: number;
   readonly publicationRevision: number | null;
   readonly target: CompileTarget;
   readonly visibility: PublicationVisibility;
   readonly viewerIntegrationVersion: string;
-  readonly initialSceneId: string;
   readonly settings: CanonicalProjectSettings;
   readonly branding: CompiledBranding;
-  /** All definitions for embedded tours; only the initial definition for progressive tours. */
-  readonly scenes: readonly CompiledScene[];
-  readonly tour: CompiledTourDelivery;
   readonly capabilities: readonly RuntimeCapabilityDeclaration[];
   readonly runtime: RuntimeDeclarations;
   readonly telemetry: CompiledTelemetryMetadata;
   readonly viewerIntegration: ViewerIntegrationOutput;
+}
+
+export interface CompiledImageExperienceManifest extends CompiledExperienceManifestBase {
+  readonly experienceType: 'image360';
+  readonly initialSceneId: string;
+  /** All definitions for embedded tours; only the initial definition for progressive tours. */
+  readonly scenes: readonly CompiledScene[];
+  readonly tour: CompiledTourDelivery;
+}
+
+export interface CompiledVideoExperienceManifest extends CompiledExperienceManifestBase {
+  readonly experienceType: 'video360';
+  readonly video: CompiledVideoMedia;
+  readonly timeline: readonly CompiledTimelineInteraction[];
+}
+
+export type CompiledExperienceManifest =
+  | CompiledImageExperienceManifest
+  | CompiledVideoExperienceManifest;
+
+export function isImageExperienceManifest(
+  manifest: CompiledExperienceManifest,
+): manifest is CompiledImageExperienceManifest {
+  return manifest.experienceType === 'image360';
+}
+
+export function isVideoExperienceManifest(
+  manifest: CompiledExperienceManifest,
+): manifest is CompiledVideoExperienceManifest {
+  return manifest.experienceType === 'video360';
 }

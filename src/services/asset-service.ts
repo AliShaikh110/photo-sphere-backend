@@ -8,26 +8,46 @@ import { AppError, conflict, notFound } from '../errors/app-error';
 import { storage as defaultStorage } from '../integrations/storage';
 import type { StorageProvider } from '../integrations/storage';
 import { malwareScanner as defaultMalwareScanner, type MalwareScanner } from '../integrations/malware-scanner';
-import { validateImageUpload, safeUploadFilename } from '../media/file-policy';
+import { safeUploadFilename, validateImageUpload, validateVideoUpload } from '../media/file-policy';
+import { VIDEO_STAGE_BY_DERIVATIVE_KIND } from '../media/video-derivatives';
 import {
   Asset,
   AssetDerivative,
   Hotspot,
   MediaJob,
+  MediaJobStage,
   Project,
   Publication,
   PublishedSceneDefinition,
   Scene,
+  TimelineInteraction,
   UploadSession,
   User
 } from '../models';
-import type { JsonObject } from '../models/model.types';
+import type { AssetDerivativeKind, JsonObject, MediaJobStageName } from '../models/model.types';
 import { sha256 } from '../utils/hash';
 import { getOwnedProject } from './project-service';
 import {
   drainStorageDeletionJobs,
   enqueueStorageDeletions,
 } from './storage-deletion-service';
+
+const VIDEO_MEDIA_TYPES = ['video360', 'video'] as const;
+type UploadMediaType = 'panorama_image' | 'image' | 'logo' | 'video360' | 'video';
+
+function isVideoMediaType(mediaType: UploadMediaType): boolean {
+  return (VIDEO_MEDIA_TYPES as readonly string[]).includes(mediaType);
+}
+
+/** Product-language playback profile names for the reprocess API. */
+export const REPROCESS_TARGETS = ['poster', 'desktop', 'mobile'] as const;
+export type ReprocessTarget = (typeof REPROCESS_TARGETS)[number];
+
+const DERIVATIVE_KIND_BY_TARGET: Readonly<Record<ReprocessTarget, AssetDerivativeKind>> = {
+  poster: 'videoPoster',
+  desktop: 'desktopVideoProfile',
+  mobile: 'mobileVideoProfile'
+};
 
 export function serializeAsset(asset: Asset): Record<string, unknown> {
   return {
@@ -42,6 +62,19 @@ export function serializeAsset(asset: Asset): Record<string, unknown> {
     metadata: asset.metadata,
     processingStatus: asset.processingStatus,
     processingError: asset.processingError,
+    ...(asset.mediaJobStages === undefined
+      ? {}
+      : {
+        processingStages: asset.mediaJobStages.map((stage) => ({
+          stage: stage.stage,
+          status: stage.status,
+          derivativeKind: stage.derivativeKind,
+          derivativeVersion: stage.derivativeVersion,
+          required: stage.required,
+          error: stage.error,
+          finishedAt: stage.finishedAt
+        }))
+      }),
     derivatives: asset.derivatives?.map((derivative) => ({
       id: derivative.id,
       kind: derivative.kind,
@@ -61,8 +94,14 @@ export function serializeAsset(asset: Asset): Record<string, unknown> {
 async function ownedAsset(assetId: string, ownerId: string): Promise<Asset> {
   const asset = await Asset.findOne({
     where: { id: assetId, ownerId },
-    include: [{ model: AssetDerivative, as: 'derivatives' }],
-    order: [[{ model: AssetDerivative, as: 'derivatives' }, 'version', 'ASC']]
+    include: [
+      { model: AssetDerivative, as: 'derivatives' },
+      { model: MediaJobStage, as: 'mediaJobStages' }
+    ],
+    order: [
+      [{ model: AssetDerivative, as: 'derivatives' }, 'version', 'ASC'],
+      [{ model: MediaJobStage, as: 'mediaJobStages' }, 'createdAt', 'ASC']
+    ]
   });
   if (!asset) throw notFound('asset', assetId);
   return asset;
@@ -72,18 +111,21 @@ export async function createUploadSession(
   ownerId: string,
   input: {
     projectId?: string;
-    mediaType: 'panorama_image' | 'image' | 'logo';
+    mediaType: UploadMediaType;
     filename: string;
     mimeType: string;
     sizeBytes: number;
     checksumSha256?: string;
   }
 ): Promise<Record<string, unknown>> {
-  if (input.sizeBytes > config.maxImageUploadBytes) {
-    throw new AppError('UPLOAD_TOO_LARGE', 'The image exceeds the configured upload limit.', {
+  const maxBytes = isVideoMediaType(input.mediaType)
+    ? config.maxVideoUploadBytes
+    : config.maxImageUploadBytes;
+  if (input.sizeBytes > maxBytes) {
+    throw new AppError('UPLOAD_TOO_LARGE', 'The upload exceeds the configured size limit.', {
       status: 413,
       path: 'sizeBytes',
-      details: { maxBytes: config.maxImageUploadBytes }
+      details: { maxBytes }
     });
   }
   if (input.projectId) await getOwnedProject(input.projectId, ownerId);
@@ -176,7 +218,7 @@ export async function storeUploadContent(options: {
   const declaredContentType = uploadSession.declaredMimeType === 'image/jpg'
     ? 'image/jpeg'
     : uploadSession.declaredMimeType;
-  if ((requestContentType === 'image/jpg' ? 'image/jpeg' : requestContentType) !== declaredContentType) {
+  if (normalizeUploadContentType(requestContentType) !== declaredContentType) {
     throw new AppError('UPLOAD_CONTENT_TYPE_MISMATCH', 'The upload Content-Type does not match its session.', {
       status: 422,
       path: 'headers.Content-Type'
@@ -191,12 +233,20 @@ export async function storeUploadContent(options: {
       }
     });
   }
-  const validated = validateImageUpload({
-    bytes: options.bytes,
-    filename: uploadSession.filename,
-    claimedMimeType: uploadSession.declaredMimeType,
-    maxBytes: config.maxImageUploadBytes
-  });
+  const isVideo = isVideoMediaType(uploadSession.asset.mediaType as UploadMediaType);
+  const validated = isVideo
+    ? validateVideoUpload({
+      bytes: options.bytes,
+      filename: uploadSession.filename,
+      claimedMimeType: uploadSession.declaredMimeType,
+      maxBytes: config.maxVideoUploadBytes
+    })
+    : validateImageUpload({
+      bytes: options.bytes,
+      filename: uploadSession.filename,
+      claimedMimeType: uploadSession.declaredMimeType,
+      maxBytes: config.maxImageUploadBytes
+    });
   const checksum = sha256(options.bytes);
   const expectedChecksum = uploadSession.metadata.checksumSha256;
   if (typeof expectedChecksum === 'string' && expectedChecksum !== checksum) {
@@ -239,6 +289,12 @@ export async function storeUploadContent(options: {
     );
   });
   return { uploadSessionId: uploadSession.id, assetId: uploadSession.assetId, status: 'uploaded' };
+}
+
+function normalizeUploadContentType(contentType: string | undefined): string | undefined {
+  if (contentType === 'image/jpg') return 'image/jpeg';
+  if (contentType === 'video/x-m4v' || contentType === 'video/quicktime') return 'video/mp4';
+  return contentType;
 }
 
 export async function completeUpload(options: {
@@ -300,6 +356,8 @@ export async function reprocessAsset(options: {
   assetId: string;
   ownerId: string;
   operationKey: string;
+  /** Regenerate only these playback profiles; omit to regenerate everything. */
+  targets?: readonly ReprocessTarget[];
 }): Promise<Record<string, unknown>> {
   await sequelize.transaction(async (transaction) => {
     const asset = await Asset.findOne({
@@ -338,6 +396,21 @@ export async function reprocessAsset(options: {
       where: { assetId: asset.id },
       transaction
     })) ?? 0);
+    const targets = options.targets ?? [];
+    if (targets.length > 0 && !VIDEO_MEDIA_TYPES.includes(asset.mediaType as 'video360' | 'video')) {
+      throw new AppError('REPROCESS_TARGET_NOT_SUPPORTED', 'Playback profiles can only be regenerated for videos.', {
+        status: 422,
+        entityId: asset.id,
+        path: 'profiles'
+      });
+    }
+    // A targeted reprocess regenerates one profile at a new derivative version
+    // while the logical asset ID and its other profiles stay unchanged.
+    const stages: MediaJobStageName[] = targets.map(
+      (target) => VIDEO_STAGE_BY_DERIVATIVE_KIND[
+        DERIVATIVE_KIND_BY_TARGET[target] as keyof typeof VIDEO_STAGE_BY_DERIVATIVE_KIND
+      ]
+    );
     await MediaJob.create(
       {
         assetId: asset.id,
@@ -349,7 +422,7 @@ export async function reprocessAsset(options: {
         attempt: 0,
         maxAttempts: 3,
         progress: 0,
-        payload: {},
+        payload: stages.length === 0 ? {} : { stages },
         error: null,
         availableAt: new Date(),
         lockedAt: null,
@@ -420,6 +493,10 @@ export async function deleteAsset(
     });
     const projectIds = projects.map((project) => project.id);
     const sceneReference = await Scene.count({ where: { panoramaAssetId: assetId }, transaction });
+    const videoProjectReference = await Project.count({
+      where: { videoAssetId: assetId },
+      transaction
+    });
     const scenes = projectIds.length === 0
       ? []
       : await Scene.findAll({
@@ -456,7 +533,28 @@ export async function deleteAsset(
       jsonContains(definition.compiledScene, assetId)
         || derivativeIds.some((derivativeId) => jsonContains(definition.compiledScene, derivativeId))
     );
-    if (sceneReference > 0 || embeddedReference || publicationReference) {
+    const timelineReference = projectIds.length === 0
+      ? 0
+      : await TimelineInteraction.count({
+        where: { projectId: { [Op.in]: projectIds } },
+        transaction
+      }).then(async (count) => {
+        if (count === 0) return 0;
+        const interactions = await TimelineInteraction.findAll({
+          where: { projectId: { [Op.in]: projectIds } },
+          transaction
+        });
+        return interactions.filter((interaction) => jsonContains(interaction.content, assetId)
+          || jsonContains(interaction.action, assetId)
+          || jsonContains(interaction.appearance, assetId)).length;
+      });
+    if (
+      sceneReference > 0
+      || videoProjectReference > 0
+      || timelineReference > 0
+      || embeddedReference
+      || publicationReference
+    ) {
       throw conflict('ASSET_IN_USE', 'The asset is referenced by an experience and cannot be deleted.', { assetId });
     }
     const storageKeys = [...new Set([
@@ -467,6 +565,7 @@ export async function deleteAsset(
       ])
     ])];
     await enqueueStorageDeletions({ assetId, storageKeys, transaction });
+    await MediaJobStage.destroy({ where: { assetId }, transaction });
     await MediaJob.destroy({ where: { assetId }, transaction });
     await AssetDerivative.destroy({ where: { assetId }, transaction });
     await UploadSession.destroy({ where: { assetId }, transaction });

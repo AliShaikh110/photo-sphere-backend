@@ -1,9 +1,10 @@
 import { Op, type Transaction } from 'sequelize';
 import { sequelize } from '../database';
 import { AppError, conflict, notFound } from '../errors/app-error';
-import { Asset, Hotspot, Project, Scene, SceneConnection, User } from '../models';
+import { Asset, Hotspot, Project, Scene, SceneConnection, TimelineInteraction, User } from '../models';
 import type { JsonObject, JsonValue } from '../models/model.types';
 import { sanitizePlainText } from '../security';
+import { timelineInteractionPayload } from './timeline-service';
 import {
   sanitizeBranding,
   sanitizeHotspotAction,
@@ -14,10 +15,11 @@ import {
 } from './content-service';
 
 type ProjectCreateInput = {
-  type: 'image360';
+  type: 'image360' | 'video360';
   name: string;
   settings?: Record<string, unknown>;
   branding?: Record<string, unknown>;
+  videoSettings?: Record<string, unknown>;
 };
 
 type ProjectUpdateInput = {
@@ -25,6 +27,8 @@ type ProjectUpdateInput = {
   name?: string;
   settings?: Record<string, unknown>;
   branding?: Record<string, unknown>;
+  videoAssetId?: string | null;
+  videoSettings?: Record<string, unknown>;
 };
 
 export async function getOwnedProject(projectId: string, ownerId: string, transaction?: Transaction): Promise<Project> {
@@ -80,6 +84,9 @@ function projectSummary(project: Project): Record<string, unknown> {
     schemaVersion: project.schemaVersion,
     revision: project.revision,
     publication: project.publicationMetadata,
+    ...(project.type === 'video360'
+      ? { videoAssetId: project.videoAssetId, videoSettings: project.videoSettings }
+      : {}),
     createdAt: project.createdAt,
     updatedAt: project.updatedAt
   };
@@ -169,8 +176,8 @@ export async function listProjects(ownerId: string): Promise<Record<string, unkn
 }
 
 export async function createProject(ownerId: string, input: ProjectCreateInput): Promise<Record<string, unknown>> {
-  if (input.type !== 'image360') {
-    throw new AppError('PROJECT_TYPE_NOT_AVAILABLE', 'Only 360 image projects are available in this release.', {
+  if (input.type !== 'image360' && input.type !== 'video360') {
+    throw new AppError('PROJECT_TYPE_NOT_AVAILABLE', 'That experience type is not available in this release.', {
       status: 422,
       path: 'type'
     });
@@ -181,16 +188,27 @@ export async function createProject(ownerId: string, input: ProjectCreateInput):
     await assertBrandingAssets(branding, undefined, ownerId, transaction);
     return Project.create({
       ownerId,
-      type: 'image360',
+      type: input.type,
       name: sanitizeRequiredPlainText(input.name, 'name'),
       schemaVersion: 1,
       revision: 1,
       settings: sanitizeProjectSettings(input.settings ?? {}),
       branding,
+      videoAssetId: null,
+      videoSettings: input.type === 'video360'
+        ? ((input.videoSettings ?? {}) as JsonObject)
+        : {},
       publicationMetadata: {}
     }, { transaction });
   });
-  return { ...projectSummary(project), settings: project.settings, branding: project.branding, scenes: [], assets: [] };
+  return {
+    ...projectSummary(project),
+    settings: project.settings,
+    branding: project.branding,
+    scenes: [],
+    ...(project.type === 'video360' ? { timeline: [] } : {}),
+    assets: []
+  };
 }
 
 export async function readProject(projectId: string, ownerId: string): Promise<Record<string, unknown>> {
@@ -215,11 +233,20 @@ export async function readProject(projectId: string, ownerId: string): Promise<R
     ]
   });
   if (!project) throw notFound('project', projectId);
+  const timeline = project.type === 'video360'
+    ? await TimelineInteraction.findAll({
+      where: { projectId },
+      order: [['timeMs', 'ASC'], ['sortOrder', 'ASC'], ['id', 'ASC']]
+    })
+    : [];
   return {
     ...projectSummary(project),
     settings: project.settings,
     branding: project.branding,
     scenes: project.scenes?.map(scenePayload) ?? [],
+    ...(project.type === 'video360'
+      ? { timeline: timeline.map(timelineInteractionPayload) }
+      : {}),
     assets: project.assets?.map(assetSummary) ?? []
   };
 }
@@ -230,8 +257,15 @@ export async function updateProject(
   input: ProjectUpdateInput
 ): Promise<Record<string, unknown>> {
   await sequelize.transaction(async (transaction) => {
-    await getOwnedProject(projectId, ownerId, transaction);
-    const values: Partial<{ name: string; settings: JsonObject; branding: JsonObject; revision: number }> = {
+    const project = await getOwnedProject(projectId, ownerId, transaction);
+    const values: Partial<{
+      name: string;
+      settings: JsonObject;
+      branding: JsonObject;
+      videoAssetId: string | null;
+      videoSettings: JsonObject;
+      revision: number;
+    }> = {
       revision: input.revision + 1
     };
     if (input.name !== undefined) values.name = sanitizeRequiredPlainText(input.name, 'name');
@@ -239,6 +273,22 @@ export async function updateProject(
     if (input.branding !== undefined) {
       values.branding = sanitizeBranding(input.branding);
       await assertBrandingAssets(values.branding, projectId, ownerId, transaction);
+    }
+    if (input.videoSettings !== undefined || input.videoAssetId !== undefined) {
+      if (project.type !== 'video360') {
+        throw new AppError('PROJECT_TYPE_MISMATCH', 'Video settings are only available on 360 video experiences.', {
+          status: 422,
+          entityId: projectId,
+          path: input.videoAssetId === undefined ? 'videoSettings' : 'videoAssetId'
+        });
+      }
+      if (input.videoSettings !== undefined) {
+        values.videoSettings = input.videoSettings as JsonObject;
+      }
+      if (input.videoAssetId !== undefined) {
+        await assertPrimaryVideoAsset(input.videoAssetId, projectId, ownerId, transaction);
+        values.videoAssetId = input.videoAssetId;
+      }
     }
     const [affected] = await Project.update(values, {
       where: { id: projectId, ownerId, revision: input.revision },
@@ -313,6 +363,43 @@ async function assertDisplayAsset(
       status: 422,
       entityId: assetId,
       path
+    });
+  }
+}
+
+/** The primary 360 video of a video360 project. */
+async function assertPrimaryVideoAsset(
+  assetId: string | null,
+  projectId: string,
+  ownerId: string,
+  transaction: Transaction
+): Promise<void> {
+  if (assetId === null) return;
+  const asset = await Asset.findOne({
+    where: {
+      id: assetId,
+      ownerId,
+      mediaType: 'video360',
+      [Op.or]: [{ projectId }, { projectId: null }]
+    },
+    transaction,
+    lock: transaction.LOCK.KEY_SHARE
+  });
+  if (!asset) {
+    throw new AppError('INVALID_ASSET_REFERENCE', 'The 360 video is not available to this project.', {
+      status: 422,
+      entityId: assetId,
+      path: 'videoAssetId'
+    });
+  }
+}
+
+function assertSceneCapableProject(project: Project): void {
+  if (project.type !== 'image360') {
+    throw new AppError('PROJECT_TYPE_MISMATCH', 'Scenes are only available on 360 image experiences.', {
+      status: 422,
+      entityId: project.id,
+      path: 'type'
     });
   }
 }
@@ -627,7 +714,7 @@ export async function createScene(
   input: SceneInput & { name: string }
 ): Promise<Record<string, unknown>> {
   return sequelize.transaction(async (transaction) => {
-    await getOwnedProject(projectId, ownerId, transaction);
+    assertSceneCapableProject(await getOwnedProject(projectId, ownerId, transaction));
     await assertPanoramaAsset(input.panoramaAssetId, projectId, ownerId, transaction);
     const existingScenes = await Scene.findAll({
       where: { projectId },

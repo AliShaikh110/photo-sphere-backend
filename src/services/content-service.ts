@@ -59,6 +59,27 @@ export function sanitizeHotspotContent(input: Record<string, unknown>): JsonObje
   return output as JsonObject;
 }
 
+/**
+ * Timed content passes through exactly the same trust boundary as scene
+ * hotspot content: there is no separate sanitizer for the video timeline.
+ */
+export function sanitizeTimelineContent(input: Record<string, unknown>): JsonObject {
+  const output = sanitizeHotspotContent(input) as Record<string, unknown>;
+  if (output.ctaLabel !== undefined) {
+    const label = sanitizePlainText(output.ctaLabel).trim();
+    if (label) output.ctaLabel = label;
+    else delete output.ctaLabel;
+  }
+  const ctaUrl = safeExternalUrl(output.ctaUrl, 'content.ctaUrl');
+  if (ctaUrl === undefined) delete output.ctaUrl;
+  else output.ctaUrl = ctaUrl;
+  return output as JsonObject;
+}
+
+export function sanitizeTimelineAction(input: Record<string, unknown>): JsonObject {
+  return sanitizeHotspotAction(input);
+}
+
 export function sanitizeHotspotAppearance(input: Record<string, unknown>): JsonObject {
   const output = structuredClone(input) as Record<string, unknown>;
   if (output.label !== undefined) {

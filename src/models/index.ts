@@ -5,6 +5,7 @@ import { Asset } from './asset.model';
 import { Hotspot } from './hotspot.model';
 import { IdempotencyRecord } from './idempotency-record.model';
 import { MediaJob } from './media-job.model';
+import { MediaJobStage } from './media-job-stage.model';
 import { Project } from './project.model';
 import { Publication } from './publication.model';
 import { PublishedSceneDefinition } from './published-scene-definition.model';
@@ -12,6 +13,7 @@ import { RuntimeEvent } from './runtime-event.model';
 import { Scene } from './scene.model';
 import { SceneConnection } from './scene-connection.model';
 import { StorageDeletionJob } from './storage-deletion-job.model';
+import { TimelineInteraction } from './timeline-interaction.model';
 import { UploadSession } from './upload-session.model';
 import { User } from './user.model';
 
@@ -20,6 +22,7 @@ export { Asset } from './asset.model';
 export { Hotspot } from './hotspot.model';
 export { IdempotencyRecord } from './idempotency-record.model';
 export { MediaJob } from './media-job.model';
+export { MediaJobStage } from './media-job-stage.model';
 export * from './model.types';
 export { Project } from './project.model';
 export { Publication } from './publication.model';
@@ -28,6 +31,7 @@ export { RuntimeEvent } from './runtime-event.model';
 export { Scene } from './scene.model';
 export { SceneConnection } from './scene-connection.model';
 export { StorageDeletionJob } from './storage-deletion-job.model';
+export { TimelineInteraction } from './timeline-interaction.model';
 export { UploadSession } from './upload-session.model';
 export { User } from './user.model';
 
@@ -38,10 +42,12 @@ export interface ModelRegistry {
   readonly AssetDerivative: typeof AssetDerivative;
   readonly UploadSession: typeof UploadSession;
   readonly MediaJob: typeof MediaJob;
+  readonly MediaJobStage: typeof MediaJobStage;
   readonly StorageDeletionJob: typeof StorageDeletionJob;
   readonly Scene: typeof Scene;
   readonly SceneConnection: typeof SceneConnection;
   readonly Hotspot: typeof Hotspot;
+  readonly TimelineInteraction: typeof TimelineInteraction;
   readonly Publication: typeof Publication;
   readonly PublishedSceneDefinition: typeof PublishedSceneDefinition;
   readonly IdempotencyRecord: typeof IdempotencyRecord;
@@ -58,9 +64,11 @@ export function initializeModels(sequelize: Sequelize): ModelRegistry {
     AssetDerivative: AssetDerivative.initialize(sequelize),
     UploadSession: UploadSession.initialize(sequelize),
     MediaJob: MediaJob.initialize(sequelize),
+    MediaJobStage: MediaJobStage.initialize(sequelize),
     StorageDeletionJob: StorageDeletionJob.initialize(sequelize),
     Scene: Scene.initialize(sequelize),
     Hotspot: Hotspot.initialize(sequelize),
+    TimelineInteraction: TimelineInteraction.initialize(sequelize),
     SceneConnection: SceneConnection.initialize(sequelize),
     Publication: Publication.initialize(sequelize),
     PublishedSceneDefinition: PublishedSceneDefinition.initialize(sequelize),
@@ -174,6 +182,57 @@ function registerAssociations(models: ModelRegistry): void {
   models.MediaJob.belongsTo(models.Asset, {
     as: 'asset',
     foreignKey: 'assetId',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+
+  models.Asset.hasMany(models.Project, {
+    as: 'videoProjects',
+    foreignKey: 'videoAssetId',
+    onDelete: 'RESTRICT',
+    onUpdate: 'CASCADE',
+  });
+  models.Project.belongsTo(models.Asset, {
+    as: 'videoAsset',
+    foreignKey: 'videoAssetId',
+    onDelete: 'RESTRICT',
+    onUpdate: 'CASCADE',
+  });
+
+  models.MediaJob.hasMany(models.MediaJobStage, {
+    as: 'stages',
+    foreignKey: 'mediaJobId',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+  models.MediaJobStage.belongsTo(models.MediaJob, {
+    as: 'mediaJob',
+    foreignKey: 'mediaJobId',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+  models.Asset.hasMany(models.MediaJobStage, {
+    as: 'mediaJobStages',
+    foreignKey: 'assetId',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+  models.MediaJobStage.belongsTo(models.Asset, {
+    as: 'asset',
+    foreignKey: 'assetId',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+
+  models.Project.hasMany(models.TimelineInteraction, {
+    as: 'timeline',
+    foreignKey: 'projectId',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+  models.TimelineInteraction.belongsTo(models.Project, {
+    as: 'project',
+    foreignKey: 'projectId',
     onDelete: 'CASCADE',
     onUpdate: 'CASCADE',
   });

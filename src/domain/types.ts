@@ -66,6 +66,23 @@ export interface CanonicalInformationSettings extends JsonObject {
   readonly externalUrl?: string;
 }
 
+/**
+ * Product-level playback preferences. Codecs, bitrate ladders, container
+ * choices and transcoder vendor settings are deliberately absent: those are
+ * infrastructure configuration resolved by the media pipeline, never project
+ * data.
+ */
+export interface CanonicalVideoSettings extends JsonObject {
+  readonly autoplay?: boolean;
+  readonly loop?: boolean;
+  readonly muted?: boolean;
+  readonly showControls?: boolean;
+  readonly showTimeline?: boolean;
+  readonly startAtMs?: number;
+  /** Product-level bias; the runtime still applies device capability policy. */
+  readonly qualityPreference?: 'automatic' | 'dataSaver' | 'high';
+}
+
 export interface CanonicalProjectSettings extends JsonObject {
   readonly appearance?: CanonicalAppearanceSettings;
   readonly navigation?: CanonicalNavigationSettings;
@@ -74,6 +91,7 @@ export interface CanonicalProjectSettings extends JsonObject {
   readonly compass?: CanonicalCompassSettings;
   readonly quality?: CanonicalQualitySettings;
   readonly information?: CanonicalInformationSettings;
+  readonly video?: CanonicalVideoSettings;
 }
 
 export interface CanonicalBranding extends JsonObject {
@@ -204,6 +222,68 @@ export interface CanonicalScene {
   readonly runtimeHints?: CanonicalSceneRuntimeHints;
 }
 
+/**
+ * Product vocabulary for timed video interactions. These are creator-facing
+ * concepts, not renderer plugin or viewer event names.
+ */
+export const TIMELINE_INTERACTION_KINDS = [
+  'information',
+  'hotspot',
+  'viewpoint',
+  'image',
+  'video',
+  'link',
+  'cta',
+] as const;
+export type CanonicalTimelineInteractionKind = (typeof TIMELINE_INTERACTION_KINDS)[number];
+
+/** A product-level camera target expressed in degrees, not renderer radians. */
+export interface CanonicalViewpoint extends JsonObject {
+  readonly headingDegrees: number;
+  readonly pitchDegrees: number;
+  readonly horizontalFovDegrees?: number;
+  readonly transition?: 'cut' | 'smooth';
+  readonly transitionMs?: number;
+}
+
+export interface CanonicalTimelineContent extends CanonicalHotspotContent {
+  readonly ctaLabel?: string;
+  readonly ctaUrl?: string;
+}
+
+export type CanonicalTimelineAction =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'showInformation' }
+  | { readonly kind: 'openUrl'; readonly url: string }
+  | { readonly kind: 'openAsset'; readonly assetId: string }
+  | { readonly kind: 'setViewpoint' };
+
+export interface CanonicalTimelineVisibilityRules extends JsonObject {
+  readonly enabled?: boolean;
+  /** Keep the interaction on screen until dismissed rather than until endTimeMs. */
+  readonly persistUntilDismissed?: boolean;
+  readonly pauseVideoWhenShown?: boolean;
+}
+
+export interface CanonicalTimelineInteraction {
+  readonly id: string;
+  readonly projectId: string;
+  readonly kind: CanonicalTimelineInteractionKind;
+  readonly timeMs: number;
+  readonly endTimeMs?: number | null;
+  readonly geometry?: CanonicalHotspotGeometry;
+  readonly position?: SphericalPosition;
+  readonly viewpoint?: CanonicalViewpoint;
+  readonly appearance?: CanonicalHotspotAppearance;
+  readonly content?: CanonicalTimelineContent;
+  readonly action: CanonicalTimelineAction;
+  readonly visibilityRules?: CanonicalTimelineVisibilityRules;
+  /** Deterministic tie-break when two interactions share a timestamp. */
+  readonly sortOrder?: number;
+  readonly createdAt?: Date | string;
+  readonly updatedAt?: Date | string;
+}
+
 export interface CanonicalPublicationMetadata extends JsonObject {
   readonly slug?: string;
   readonly visibility?: 'public' | 'private' | 'unlisted';
@@ -219,6 +299,10 @@ export interface CanonicalProject {
   readonly settings: CanonicalProjectSettings;
   readonly branding: CanonicalBranding;
   readonly scenes: readonly CanonicalScene[];
+  /** Present for `video360` projects; the primary logical 360 video asset. */
+  readonly videoAssetId?: string | null;
+  /** Present for `video360` projects; ordered by time then deterministic key. */
+  readonly timeline?: readonly CanonicalTimelineInteraction[];
   readonly publication?: CanonicalPublicationMetadata;
 }
 

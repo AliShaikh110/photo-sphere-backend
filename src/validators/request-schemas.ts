@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { SCENE_TRANSITION_FAILURE_CATEGORIES } from '../runtime';
+import { VIDEO_PLAYBACK_FAILURE_CATEGORIES } from '../models/model.types';
 
 const id = z.string().uuid();
 const databaseRevision = z.number().int().positive().max(2_147_483_647);
@@ -102,6 +103,18 @@ const qualitySchema = z
   .object({ preference: z.enum(['automatic', 'standard', 'high']).optional() })
   .strict();
 
+const videoSettingsSchema = z
+  .object({
+    autoplay: z.boolean().optional(),
+    loop: z.boolean().optional(),
+    muted: z.boolean().optional(),
+    showControls: z.boolean().optional(),
+    showTimeline: z.boolean().optional(),
+    startAtMs: z.number().int().min(0).max(24 * 60 * 60 * 1000).optional(),
+    qualityPreference: z.enum(['automatic', 'dataSaver', 'high']).optional()
+  })
+  .strict();
+
 export const projectSettingsSchema = z
   .object({
     appearance: appearanceSchema.optional(),
@@ -110,6 +123,7 @@ export const projectSettingsSchema = z
     autorotation: autorotationSchema.optional(),
     compass: compassSchema.optional(),
     quality: qualitySchema.optional(),
+    video: videoSettingsSchema.optional(),
     information: z
       .object({
         title: z.string().trim().max(240).optional(),
@@ -136,10 +150,11 @@ export const brandingSchema = z
 
 export const createProjectSchema = z
   .object({
-    type: z.literal('image360').default('image360'),
+    type: z.enum(['image360', 'video360']).default('image360'),
     name: safeName,
     settings: projectSettingsSchema.optional(),
-    branding: brandingSchema.optional()
+    branding: brandingSchema.optional(),
+    videoSettings: videoSettingsSchema.optional()
   })
   .strict();
 
@@ -148,12 +163,19 @@ export const updateProjectSchema = z
     revision: databaseRevision,
     name: safeName.optional(),
     settings: projectSettingsSchema.optional(),
-    branding: brandingSchema.optional()
+    branding: brandingSchema.optional(),
+    videoAssetId: id.nullable().optional(),
+    videoSettings: videoSettingsSchema.optional()
   })
   .strict()
-  .refine((value) => value.name !== undefined || value.settings !== undefined || value.branding !== undefined, {
-    message: 'At least one editable field is required.'
-  });
+  .refine(
+    (value) => value.name !== undefined
+      || value.settings !== undefined
+      || value.branding !== undefined
+      || value.videoAssetId !== undefined
+      || value.videoSettings !== undefined,
+    { message: 'At least one editable field is required.' }
+  );
 
 export const projectRevisionSchema = z.object({ revision: databaseRevision }).strict();
 export const projectMutationRevisionSchema = z
@@ -322,14 +344,152 @@ export const updateHotspotSchema = z
   })
   .strict();
 
+const timelineTimeMs = z.number().int().min(0).max(24 * 60 * 60 * 1000);
+
+const viewpointSchema = z
+  .object({
+    headingDegrees: z.number().min(-180).max(180),
+    pitchDegrees: z.number().min(-90).max(90),
+    horizontalFovDegrees: z.number().min(30).max(120).optional(),
+    transition: z.enum(['cut', 'smooth']).optional(),
+    transitionMs: z.number().int().min(0).max(10_000).optional()
+  })
+  .strict();
+
+const timelineContentSchema = hotspotContentSchema.extend({
+  ctaLabel: z.string().trim().max(120).optional(),
+  ctaUrl: z.string().trim().max(2048).optional()
+}).strict();
+
+const timelineActionSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('none') }).strict(),
+  z.object({ kind: z.literal('showInformation') }).strict(),
+  z.object({ kind: z.literal('openUrl'), url: z.string().trim().max(2048) }).strict(),
+  z.object({ kind: z.literal('openAsset'), assetId: id }).strict(),
+  z.object({ kind: z.literal('setViewpoint') }).strict()
+]);
+
+const timelineVisibilityRulesSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    persistUntilDismissed: z.boolean().optional(),
+    pauseVideoWhenShown: z.boolean().optional()
+  })
+  .strict();
+
+const timelineInteractionKindSchema = z.enum([
+  'information',
+  'hotspot',
+  'viewpoint',
+  'image',
+  'video',
+  'link',
+  'cta'
+]);
+
+export const createTimelineInteractionSchema = z
+  .object({
+    projectRevision: databaseRevision,
+    kind: timelineInteractionKindSchema,
+    timeMs: timelineTimeMs,
+    endTimeMs: timelineTimeMs.nullable().optional(),
+    geometry: z.object({ kind: z.literal('point') }).strict().optional(),
+    position: pointPositionSchema.optional(),
+    viewpoint: viewpointSchema.optional(),
+    appearance: hotspotAppearanceSchema.optional(),
+    content: timelineContentSchema.optional(),
+    action: timelineActionSchema.optional(),
+    visibilityRules: timelineVisibilityRulesSchema.optional()
+  })
+  .strict()
+  .refine(
+    (value) => value.endTimeMs === undefined
+      || value.endTimeMs === null
+      || value.endTimeMs >= value.timeMs,
+    { path: ['endTimeMs'], message: 'endTimeMs must not precede timeMs.' }
+  );
+
+export const updateTimelineInteractionSchema = z
+  .object({
+    projectRevision: databaseRevision,
+    kind: timelineInteractionKindSchema.optional(),
+    timeMs: timelineTimeMs.optional(),
+    endTimeMs: timelineTimeMs.nullable().optional(),
+    geometry: z.object({ kind: z.literal('point') }).strict().optional(),
+    position: pointPositionSchema.optional(),
+    viewpoint: viewpointSchema.optional(),
+    appearance: hotspotAppearanceSchema.optional(),
+    content: timelineContentSchema.optional(),
+    action: timelineActionSchema.optional(),
+    visibilityRules: timelineVisibilityRulesSchema.optional()
+  })
+  .strict()
+  .refine(
+    (value) => value.timeMs === undefined
+      || value.endTimeMs === undefined
+      || value.endTimeMs === null
+      || value.endTimeMs >= value.timeMs,
+    { path: ['endTimeMs'], message: 'endTimeMs must not precede timeMs.' }
+  );
+
+export const duplicateTimelineInteractionSchema = z
+  .object({
+    projectRevision: databaseRevision,
+    timeMs: timelineTimeMs.optional()
+  })
+  .strict();
+
+export const bulkUpdateTimelineSchema = z
+  .object({
+    projectRevision: databaseRevision,
+    interactions: z
+      .array(
+        z
+          .object({
+            id,
+            timeMs: timelineTimeMs,
+            endTimeMs: timelineTimeMs.nullable().optional()
+          })
+          .strict()
+      )
+      .min(1)
+      .max(500)
+  })
+  .strict()
+  .refine(
+    (value) => new Set(value.interactions.map((entry) => entry.id)).size
+      === value.interactions.length,
+    { path: ['interactions'], message: 'Interaction IDs must not repeat in one update.' }
+  );
+
 export const uploadSessionSchema = z
   .object({
     projectId: id.optional(),
-    mediaType: z.enum(['panorama_image', 'image', 'logo']).default('panorama_image'),
+    mediaType: z
+      .enum(['panorama_image', 'image', 'logo', 'video360', 'video'])
+      .default('panorama_image'),
     filename: z.string().trim().min(1).max(255),
-    mimeType: z.enum(['image/jpeg', 'image/jpg', 'image/png', 'image/webp']),
+    mimeType: z.enum([
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/webp',
+      'video/mp4',
+      'video/webm'
+    ]),
     sizeBytes: z.number().int().positive(),
     checksumSha256: z.string().regex(/^[a-fA-F0-9]{64}$/).optional()
+  })
+  .strict()
+  .refine(
+    (value) => (value.mediaType === 'video360' || value.mediaType === 'video')
+      === value.mimeType.startsWith('video/'),
+    { path: ['mimeType'], message: 'The media type and file type must match.' }
+  );
+
+export const reprocessAssetSchema = z
+  .object({
+    profiles: z.array(z.enum(['poster', 'desktop', 'mobile'])).min(1).max(3).optional()
   })
   .strict();
 
@@ -357,7 +517,17 @@ export const runtimeEventNameSchema = z.enum([
   'asset_failed',
   'scene_transition_failed',
   'viewer_error',
-  'experience_exited'
+  'experience_exited',
+  'video_started',
+  'video_paused',
+  'video_resumed',
+  'video_seeked',
+  'video_stalled',
+  'video_ended',
+  'video_profile_selected',
+  'video_playback_failed',
+  'timeline_interaction_shown',
+  'timeline_interaction_clicked'
 ]);
 
 const runtimeEventBaseSchema = z
@@ -388,6 +558,77 @@ const existingRuntimeEventSchema = runtimeEventBaseSchema
   })
   .strict();
 
+const videoPlaybackPayloadSchema = z
+  .object({
+    assetId: id.optional(),
+    derivativeId: id.optional(),
+    profileId: z.enum(['desktop', 'mobile']).optional(),
+    currentTimeMs: z.number().int().min(0).optional(),
+    durationMs: z.number().int().min(0).optional()
+  })
+  .passthrough();
+
+const videoPlaybackEventSchema = runtimeEventBaseSchema
+  .extend({
+    eventName: z.enum([
+      'video_started',
+      'video_paused',
+      'video_resumed',
+      'video_seeked',
+      'video_stalled',
+      'video_ended'
+    ]),
+    payload: videoPlaybackPayloadSchema
+  })
+  .strict();
+
+export const videoProfileSelectedPayloadSchema = z
+  .object({
+    assetId: id,
+    derivativeId: id,
+    profileId: z.enum(['desktop', 'mobile']),
+    reason: z.string().trim().max(120).optional(),
+    candidateProfileIds: z.array(z.enum(['desktop', 'mobile'])).max(4).optional()
+  })
+  .passthrough();
+
+const videoProfileSelectedEventSchema = runtimeEventBaseSchema
+  .extend({
+    eventName: z.literal('video_profile_selected'),
+    payload: videoProfileSelectedPayloadSchema
+  })
+  .strict();
+
+export const videoPlaybackFailurePayloadSchema = z
+  .object({
+    assetId: id,
+    derivativeId: id.optional(),
+    profileId: z.enum(['desktop', 'mobile']).optional(),
+    failureCategory: z.enum(VIDEO_PLAYBACK_FAILURE_CATEGORIES),
+    currentTimeMs: z.number().int().min(0).optional()
+  })
+  .passthrough();
+
+const videoPlaybackFailedEventSchema = runtimeEventBaseSchema
+  .extend({
+    eventName: z.literal('video_playback_failed'),
+    payload: videoPlaybackFailurePayloadSchema
+  })
+  .strict();
+
+const timelineInteractionEventSchema = runtimeEventBaseSchema
+  .extend({
+    eventName: z.enum(['timeline_interaction_shown', 'timeline_interaction_clicked']),
+    payload: z
+      .object({
+        interactionId: id,
+        kind: z.enum(['information', 'hotspot', 'viewpoint', 'image', 'video', 'link', 'cta']),
+        timeMs: z.number().int().min(0).optional()
+      })
+      .passthrough()
+  })
+  .strict();
+
 export const sceneTransitionFailurePayloadSchema = z
   .object({
     sourceSceneId: id,
@@ -406,7 +647,11 @@ const sceneTransitionFailureEventSchema = runtimeEventBaseSchema
 
 export const runtimeEventSchema = z.discriminatedUnion('eventName', [
   existingRuntimeEventSchema,
-  sceneTransitionFailureEventSchema
+  sceneTransitionFailureEventSchema,
+  videoPlaybackEventSchema,
+  videoProfileSelectedEventSchema,
+  videoPlaybackFailedEventSchema,
+  timelineInteractionEventSchema
 ]);
 
 export const runtimeEventsSchema = z.union([
@@ -419,6 +664,7 @@ export const assetIdParams = z.object({ assetId: id });
 export const uploadSessionParams = z.object({ uploadSessionId: id });
 export const sceneParams = z.object({ projectId: id, sceneId: id });
 export const hotspotParams = z.object({ projectId: id, sceneId: id, hotspotId: id });
+export const timelineInteractionParams = z.object({ projectId: id, interactionId: id });
 export const derivativeParams = z.object({ derivativeId: id });
 const nonNegativePathInteger = z.string().regex(/^(0|[1-9][0-9]*)$/).refine(
   (value) => Number.isSafeInteger(Number(value)),
@@ -447,6 +693,17 @@ export const publicationMediaTileParams = publicationMediaParams.extend({
 });
 export const slugParams = z.object({ slug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(100) });
 export const publishedSceneParams = slugParams.extend({ sceneId: id });
+export const playbackProfileRequestSchema = z
+  .object({
+    viewportClass: z.enum(['constrained', 'standard', 'capable']).optional(),
+    handheld: z.boolean().optional(),
+    touch: z.boolean().optional(),
+    maxTextureSize: z.number().int().min(0).max(65_536).optional(),
+    networkClass: z.enum(['offline', 'constrained', 'standard', 'fast']).optional(),
+    supportedMimeTypes: z.array(z.string().trim().max(120)).max(20).optional(),
+    dataSaver: z.boolean().optional()
+  })
+  .strict();
 export const revisionedPublishedSceneParams = publishedSceneParams.extend({
   publicationRevision: publicationRevisionParam
 });

@@ -20,13 +20,24 @@ import {
   publish,
   validateDraft
 } from '../controllers/experience-controller';
+import {
+  addInteraction,
+  duplicateInteraction,
+  patchInteraction,
+  patchTimeline,
+  readTimeline,
+  removeInteraction
+} from '../controllers/timeline-controller';
 import { requireAuth } from '../middlewares/auth';
 import { validate } from '../middlewares/validate';
 import { asyncHandler } from '../utils/async-handler';
 import {
+  bulkUpdateTimelineSchema,
   createHotspotSchema,
   createProjectSchema,
   createSceneSchema,
+  createTimelineInteractionSchema,
+  duplicateTimelineInteractionSchema,
   hotspotParams,
   projectIdParams,
   projectMutationRevisionSchema,
@@ -34,9 +45,11 @@ import {
   publishSchema,
   reorderScenesSchema,
   sceneParams,
+  timelineInteractionParams,
   updateHotspotSchema,
   updateProjectSchema,
-  updateSceneSchema
+  updateSceneSchema,
+  updateTimelineInteractionSchema
 } from '../validators/request-schemas';
 
 export const projectRouter = Router();
@@ -100,6 +113,42 @@ projectRouter.delete(
   validate('params', sceneParams),
   validate('body', projectMutationRevisionSchema),
   asyncHandler(removeScene)
+);
+
+projectRouter.get(
+  '/:projectId/timeline',
+  validate('params', projectIdParams),
+  asyncHandler(readTimeline)
+);
+projectRouter.patch(
+  '/:projectId/timeline',
+  validate('params', projectIdParams),
+  validate('body', bulkUpdateTimelineSchema),
+  asyncHandler(patchTimeline)
+);
+projectRouter.post(
+  '/:projectId/timeline/interactions',
+  validate('params', projectIdParams),
+  validate('body', createTimelineInteractionSchema),
+  asyncHandler(addInteraction)
+);
+projectRouter.post(
+  '/:projectId/timeline/interactions/:interactionId/duplicate',
+  validate('params', timelineInteractionParams),
+  validate('body', duplicateTimelineInteractionSchema),
+  asyncHandler(duplicateInteraction)
+);
+projectRouter.patch(
+  '/:projectId/timeline/interactions/:interactionId',
+  validate('params', timelineInteractionParams),
+  validate('body', updateTimelineInteractionSchema),
+  asyncHandler(patchInteraction)
+);
+projectRouter.delete(
+  '/:projectId/timeline/interactions/:interactionId',
+  validate('params', timelineInteractionParams),
+  validate('body', projectMutationRevisionSchema),
+  asyncHandler(removeInteraction)
 );
 
 projectRouter.post(

@@ -1,10 +1,11 @@
 # Sphere Backend
 
-Backend for the No-Code 360° Experience Platform. Sprint 01 implements the
-renderer-independent 360° image workflow:
+Backend for the No-Code 360° Experience Platform. It implements the
+renderer-independent authoring and delivery workflow:
 
-authenticate → create project → upload panorama → process derivatives → edit
-scenes and point hotspots → preview → publish → share.
+authenticate → create project → upload 360° image or video → process
+derivatives → edit scenes, hotspots and video timelines → preview → publish →
+share.
 
 Canonical Experience data is stored independently of Photo Sphere Viewer.
 Preview and publish pass through the same compiler; only the versioned viewer
@@ -16,9 +17,10 @@ integration adapter emits renderer-specific configuration.
 - Express 5 REST API
 - PostgreSQL 17 and Sequelize 6
 - Sharp for image inspection and derivatives
+- Dependency-free MP4/WebM container inspection with a pluggable video transcoder
 - Bearer JWT authentication
 - PostgreSQL-backed durable media and storage-cleanup jobs
-- Private local filesystem storage for development and the Sprint 01 runtime
+- Private local filesystem storage for development and the single-host runtime
 - Vitest, Supertest, ESLint, and TypeScript checks
 
 The local storage provider is behind a storage interface. Source files and
@@ -108,17 +110,18 @@ Upload completion, reprocessing, and publishing require a caller-generated
 <code>Idempotency-Key</code> header. Repeating the same operation with the same
 key and payload returns the original outcome without duplicating side effects.
 
-## Image upload flow
+## Media upload flow
 
 The API uses an upload-session protocol instead of multipart form data.
 
 1. <code>POST /api/v1/assets/uploads</code> with <code>mediaType</code>, filename,
    MIME type, byte size, optional project ID, and optional SHA-256 checksum.
    <code>mediaType</code> accepts <code>panorama_image</code>, <code>image</code>,
-   or <code>logo</code> and defaults to <code>panorama_image</code>.
+   <code>logo</code>, <code>video360</code>, or <code>video</code> and defaults
+   to <code>panorama_image</code>.
 2. Send the original bytes to the returned local target:
    <code>PUT /api/v1/assets/uploads/:uploadSessionId/content</code>. The request
-   body is the raw image and must use the declared <code>Content-Type</code>.
+   body is the raw media and must use the declared <code>Content-Type</code>.
 3. Call <code>POST /api/v1/assets/:assetId/complete</code> with
    <code>{ "uploadSessionId": "..." }</code> and an
    <code>Idempotency-Key</code>.
@@ -129,8 +132,45 @@ Filename extensions are not trusted. The raw PUT validates byte count, optional
 checksum, file signature/MIME policy, and extension consistency. Asynchronous
 inspection then validates decodability, orientation-aware dimensions, and the
 configured pixel limit. Panorama assets additionally require supported
-equirectangular geometry and valid GPano/XMP crop metadata. All three media
-types receive the baseline image derivatives used by the compiler.
+equirectangular geometry and valid GPano/XMP crop metadata. Image, panorama and
+logo assets receive the baseline image derivatives used by the compiler.
+
+## 360 video pipeline
+
+Supported video containers are MP4 and WebM. Inspection is dependency-free: the
+platform reads container structure for dimensions, duration, frame rate,
+codecs, audio presence, rotation and 360 projection markers, and a
+<code>video360</code> asset must be recognisable as 360 content from Spherical
+Video V2 / GSpherical metadata or a 2:1 equirectangular shape.
+
+Processing then produces a poster and playback profiles as tracked child stages
+(<code>inspect</code>, <code>poster</code>, <code>transcodeDesktop</code>,
+<code>transcodeMobile</code>, <code>finalize</code>). The original upload is
+never assumed to be a safe playback source: a profile is only published when it
+provably satisfies that profile's constraints, and the handheld profile is
+capped at the renderer's documented 4096-pixel limit for 360 video. One failed
+profile does not discard the others — the asset stays <code>ready</code> while at
+least one publishable profile exists and names what is unavailable, and a single
+profile can be regenerated with
+<code>POST /api/v1/assets/:assetId/reprocess</code> and
+<code>{ "profiles": ["mobile"] }</code> without changing the logical asset ID.
+
+Encoding is delegated to a transcoder integration chosen by
+<code>VIDEO_TRANSCODER</code>. Codecs, ladders and vendor settings are
+configuration, never project or manifest data. See
+[the runbook](docs/runbook.md) for the modes and their trade-offs.
+
+A <code>video360</code> project references one primary video asset and owns a
+timeline of product-level timed interactions (information, hotspot, viewpoint,
+image, video, link, CTA). Timeline times are validated against the inspected
+media duration, timed content passes through the same sanitizer and URL policy
+as scene hotspots, and every timeline write uses the same
+<code>projectRevision</code> precondition as scene and hotspot editing.
+
+Published <code>video360</code> manifests carry an ordered list of playback
+profile candidates, handheld-safe first, so a player can select locally.
+<code>POST /view/:slug/playback-profile</code> performs the same selection
+server-side when a deployment prefers the decision to be observable centrally.
 
 ## Commands
 
@@ -200,14 +240,22 @@ Internal stack traces, database details, and storage keys are not returned.
 - [Product architecture](docs/product_architecture.md)
 - [Backend TRD](docs/trd.md)
 - [Sprint 01 execution plan](docs/sprint/sprint-01-backend-foundation-image-mvp.md)
+- [Sprint 02 execution plan](docs/sprint/sprint-02-tours-runtime-capability-resolver.md)
+- [Sprint 03 execution plan](docs/sprint/sprint-03-360-video-timeline-playback.md)
 
-## Sprint 01 boundaries
+## Current boundaries
 
-Sprint 01 creates <code>image360</code> projects, generates thumbnail,
-low-resolution-base, and standard-web image derivatives, and supports canonical
-point hotspots. Multi-scene storage is already supported, but tour authoring,
-360° video processing, tiled panoramas, map/plan, immersive modes, advanced
-geometry authoring, and creator analytics dashboards belong to later sprints.
+The backend creates <code>image360</code> and <code>video360</code> projects. It
+generates thumbnail, low-resolution-base, standard-web and tiled panorama
+derivatives for images, and poster plus desktop/handheld playback profiles for
+360 video. It supports canonical point hotspots, multi-scene tours with
+progressive scene delivery, and video timelines with timed interactions.
+
+The video editor is an interactive experience builder, not a non-linear editor:
+there are no cuts, trims, transitions, audio mixing or multi-track operations.
+Live/MediaStream 360 input, dual-fisheye ingest, map/plan, immersive modes,
+advanced geometry authoring, and creator analytics dashboards belong to later
+sprints.
 
 MVP operational assumptions are explicit: private manifests are owner-only,
 their media references are short-lived signed URLs, publication visibility is

@@ -69,6 +69,41 @@ export type MediaJobType = (typeof MEDIA_JOB_TYPES)[number];
 export const MEDIA_JOB_STATUSES = ['queued', 'running', 'succeeded', 'failed', 'cancelled'] as const;
 export type MediaJobStatus = (typeof MEDIA_JOB_STATUSES)[number];
 
+/**
+ * Child stages tracked inside a single logical media job. Video processing
+ * needs per-profile status so one failed playback profile stays actionable
+ * without discarding the profiles that succeeded.
+ */
+export const MEDIA_JOB_STAGE_NAMES = [
+  'inspect',
+  'poster',
+  'transcodeDesktop',
+  'transcodeMobile',
+  'derivatives',
+  'finalize',
+] as const;
+export type MediaJobStageName = (typeof MEDIA_JOB_STAGE_NAMES)[number];
+
+export const MEDIA_JOB_STAGE_STATUSES = [
+  'pending',
+  'running',
+  'succeeded',
+  'failed',
+  'skipped',
+] as const;
+export type MediaJobStageStatus = (typeof MEDIA_JOB_STAGE_STATUSES)[number];
+
+export const TIMELINE_INTERACTION_KINDS = [
+  'information',
+  'hotspot',
+  'viewpoint',
+  'image',
+  'video',
+  'link',
+  'cta',
+] as const;
+export type TimelineInteractionKind = (typeof TIMELINE_INTERACTION_KINDS)[number];
+
 export const STORAGE_DELETION_JOB_STATUSES = ['queued', 'running', 'succeeded'] as const;
 export type StorageDeletionJobStatus = (typeof STORAGE_DELETION_JOB_STATUSES)[number];
 
@@ -93,8 +128,29 @@ export const RUNTIME_EVENT_NAMES = [
   'scene_transition_failed',
   'viewer_error',
   'experience_exited',
+  'video_paused',
+  'video_resumed',
+  'video_seeked',
+  'video_ended',
+  'video_profile_selected',
+  'video_playback_failed',
+  'timeline_interaction_shown',
+  'timeline_interaction_clicked',
 ] as const;
 export type RuntimeEventName = (typeof RUNTIME_EVENT_NAMES)[number];
+
+/** Stable, product-level categories accepted by video playback telemetry. */
+export const VIDEO_PLAYBACK_FAILURE_CATEGORIES = [
+  'profile_unavailable',
+  'media_unavailable',
+  'decode_failed',
+  'codec_unsupported',
+  'network_error',
+  'autoplay_blocked',
+  'viewer_error',
+  'unknown',
+] as const;
+export type VideoPlaybackFailureCategory = (typeof VIDEO_PLAYBACK_FAILURE_CATEGORIES)[number];
 
 export const emptyJsonObject = (): JsonObject => ({});
 export const emptyJsonArray = (): JsonValue[] => [];

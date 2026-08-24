@@ -11,6 +11,7 @@ import {
 } from 'sequelize';
 
 import type { Asset } from './asset.model';
+import type { MediaJobStage } from './media-job-stage.model';
 import { emptyJsonObject, MEDIA_JOB_STATUSES, MEDIA_JOB_TYPES } from './model.types';
 import type { JsonObject, MediaJobStatus, MediaJobType } from './model.types';
 
@@ -36,6 +37,7 @@ export class MediaJob extends Model<InferAttributes<MediaJob>, InferCreationAttr
   declare updatedAt: CreationOptional<Date>;
 
   declare asset?: NonAttribute<Asset>;
+  declare stages?: NonAttribute<MediaJobStage[]>;
 
   static initialize(sequelize: Sequelize): typeof MediaJob {
     if (sequelize.models.MediaJob === MediaJob) {

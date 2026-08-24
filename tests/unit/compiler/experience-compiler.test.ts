@@ -5,9 +5,11 @@ import {
   ExperienceCompiler,
 } from '../../../src/compiler/experience-compiler';
 import type {
+  CompiledImageExperienceManifest,
   CompileExperienceInput,
   MediaUrlResolutionRequest,
 } from '../../../src/compiler/types';
+import { isImageExperienceManifest } from '../../../src/compiler/types';
 import { derivative, canonicalProject, panoramaAsset } from './fixtures';
 
 function compilerInput(
@@ -41,18 +43,28 @@ function createCompiler(requests: MediaUrlResolutionRequest[] = []): ExperienceC
   });
 }
 
+function expectImageManifest(
+  manifest: Awaited<ReturnType<ExperienceCompiler['compile']>>,
+): CompiledImageExperienceManifest {
+  if (!isImageExperienceManifest(manifest)) {
+    throw new Error('Expected an image360 manifest.');
+  }
+  return manifest;
+}
+
 describe('Experience compiler', () => {
   it('compiles deterministic protected previews through the shared adapter path', async () => {
     const requests: MediaUrlResolutionRequest[] = [];
     const compiler = createCompiler(requests);
     const input = compilerInput();
 
-    const first = await compiler.compile(input);
+    const first = expectImageManifest(await compiler.compile(input));
     const second = await compiler.compile(input);
 
     expect(second).toEqual(first);
     expect(first).toMatchObject({
-      manifestVersion: 1,
+      manifestVersion: 3,
+      experienceType: 'image360',
       schemaVersion: 1,
       experienceId: 'project-1',
       projectRevision: 7,
@@ -62,8 +74,8 @@ describe('Experience compiler', () => {
       viewerIntegrationVersion: 'psv-5.14.3-adapter-1',
       initialSceneId: 'scene-1',
       capabilities: expect.arrayContaining([
-        expect.objectContaining({ id: 'panorama.image' }),
-        expect.objectContaining({ id: 'hotspot.point' }),
+        expect.objectContaining({ id: 'basicPanorama', required: true }),
+        expect.objectContaining({ id: 'hotspots' }),
       ]),
       telemetry: expect.objectContaining({
         experienceId: 'project-1',
@@ -94,6 +106,7 @@ describe('Experience compiler', () => {
       target: 'publication',
       publicationRevision: 3,
       visibility: 'public',
+      publicationSlug: 'museum-tour',
     }));
     expect(published.publicationRevision).toBe(3);
     expect(published.visibility).toBe('public');
@@ -104,6 +117,7 @@ describe('Experience compiler', () => {
       target: 'publication',
       publicationRevision: 4,
       visibility: 'private',
+      publicationSlug: 'museum-tour',
     }));
     expect(privateManifest.visibility).toBe('private');
     expect(privateRequests.every((request) => request.access === 'protected')).toBe(true);
@@ -170,7 +184,9 @@ describe('Experience compiler', () => {
         derivative('asset-panorama', 'standardWeb'),
       ],
     });
-    const manifest = await createCompiler().compile(compilerInput({ assets: [croppedAsset] }));
+    const manifest = expectImageManifest(
+      await createCompiler().compile(compilerInput({ assets: [croppedAsset] })),
+    );
 
     expect(manifest.scenes[0]!.panorama.crop).toEqual({
       fullWidthPixels: 8192,
@@ -242,10 +258,10 @@ describe('Experience compiler', () => {
       await createCompiler().compile(compilerInput({ target: 'publication' }));
     } catch (error) {
       expect(error).toMatchObject({
-        issues: [expect.objectContaining({
+        issues: expect.arrayContaining([expect.objectContaining({
           code: 'INVALID_FIELD',
           path: 'publicationRevision',
-        })],
+        })]),
       });
     }
   });

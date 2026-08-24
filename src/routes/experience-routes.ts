@@ -3,6 +3,7 @@ import {
   manifest,
   media,
   mediaTile,
+  playbackProfile,
   publicationMedia,
   publicationMediaTile,
   publishedScene,
@@ -26,6 +27,12 @@ export const mediaRouter = Router();
 export const publicationMediaRouter = Router();
 
 viewRouter.get('/:slug/manifest', optionalAuth, validate('params', slugParams), asyncHandler(manifest));
+viewRouter.post(
+  '/:slug/playback-profile',
+  optionalAuth,
+  validate('params', slugParams),
+  asyncHandler(playbackProfile)
+);
 viewRouter.get(
   '/:slug/revisions/:publicationRevision/scenes/:sceneId',
   optionalAuth,

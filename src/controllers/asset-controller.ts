@@ -13,6 +13,7 @@ import { requireIdempotencyKey, withIdempotency } from '../services/idempotency-
 import { mediaWorker } from '../services/media-worker-service';
 import { sendData } from '../utils/http-response';
 import { routeParam } from '../utils/route-param';
+import { reprocessAssetSchema } from '../validators/request-schemas';
 
 function ownerId(request: Request): string {
   return request.auth!.userId;
@@ -65,15 +66,21 @@ export async function read(request: Request, response: Response): Promise<void> 
 export async function reprocess(request: Request, response: Response): Promise<void> {
   const key = requireIdempotencyKey(request.header('idempotency-key'));
   const assetId = routeParam(request, 'assetId');
+  const body = reprocessAssetSchema.parse(request.body ?? {});
   const operation = await withIdempotency({
     ownerId: ownerId(request),
     operation: 'asset.reprocess',
     key,
-    request: { assetId },
+    request: { assetId, ...body },
     responseStatus: 202,
     resourceType: 'asset',
     resourceId: () => assetId,
-    execute: () => reprocessAsset({ assetId, ownerId: ownerId(request), operationKey: key })
+    execute: () => reprocessAsset({
+      assetId,
+      ownerId: ownerId(request),
+      operationKey: key,
+      ...(body.profiles === undefined ? {} : { targets: body.profiles })
+    })
   });
   if (config.mediaWorkerMode === 'embedded' && !operation.replayed) mediaWorker.kick();
   response.setHeader('idempotency-replayed', String(operation.replayed));

@@ -12,6 +12,10 @@ export const CAPABILITY_IDS = [
   'videoContent',
   'externalLink',
   'video360',
+  'videoTimeline',
+  'timedHotspots',
+  'timedViewpoint',
+  'cta',
   'map',
   'plan',
   'gyroscope',
@@ -24,7 +28,8 @@ export const CAPABILITY_IDS = [
 export type CapabilityId = (typeof CAPABILITY_IDS)[number];
 
 export const INITIAL_CAPABILITY_IDS = CAPABILITY_IDS.slice(0, 12) as readonly CapabilityId[];
-export const RESERVED_CAPABILITY_IDS = CAPABILITY_IDS.slice(12) as readonly CapabilityId[];
+export const VIDEO_CAPABILITY_IDS = CAPABILITY_IDS.slice(12, 17) as readonly CapabilityId[];
+export const RESERVED_CAPABILITY_IDS = CAPABILITY_IDS.slice(17) as readonly CapabilityId[];
 
 export const DEVICE_REQUIREMENTS = [
   'video-playback',
@@ -42,6 +47,8 @@ export const MEDIA_REQUIREMENTS = [
   'ready-image-content',
   'ready-video-content',
   'ready-video360-source',
+  'ready-video360-playback-profile',
+  'known-video-duration',
   'map-spatial-data',
   'plan-spatial-data',
 ] as const;
@@ -110,6 +117,8 @@ export interface CapabilityViewLimits {
 export interface CapabilitySemanticConfiguration {
   readonly compassEnabled?: boolean;
   readonly viewLimits?: CapabilityViewLimits;
+  readonly timelineInteractionCount?: number;
+  readonly videoDurationMs?: number;
 }
 
 export type CapabilityAssetState = 'missing' | 'processing' | 'failed' | 'ready';

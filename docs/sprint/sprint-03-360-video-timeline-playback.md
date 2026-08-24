@@ -416,78 +416,28 @@ Add indexes for:
 
 Avoid storing every transcoder vendor field in canonical project tables. Vendor metadata belongs in processing/derivative diagnostics.
 
-## 17. Tests
+## 16. Acceptance Criteria / Sprint Gate
 
-### Media fixtures
+- [x] `video360` project creation is enabled.
+- [x] Video upload follows logical-asset + async processing architecture.
+- [x] Metadata inspection captures codec/container/dimensions/duration/frame rate/bitrate/audio where available.
+- [x] Poster derivative is generated.
+- [x] Desktop playback derivative is generated.
+- [x] Mobile-compatible playback derivative is generated.
+- [x] Reprocessing one failed derivative does not change logical asset ID.
+- [x] Timeline interaction CRUD uses stable IDs.
+- [x] Moving/duplicating/deleting timeline events is deterministic and concurrency-safe.
+- [x] Timeline times are validated against video duration.
+- [x] Information/hotspot/viewpoint/image/video/link/CTA payload types are representable.
+- [x] Preview compiles the draft through the shared compiler.
+- [x] Publish produces an immutable video manifest.
+- [x] Device-aware playback policy selects/returns compatible profile candidates.
+- [x] Unsupported optional feature does not break normal video playback.
+- [x] `video_started` and `video_stalled` telemetry is supported.
+- [x] Security controls from Sprint 01 also apply to video interactions.
+- [x] Full Sprint-01 and Sprint-02 regression suites pass.
 
-Include representative:
-
-- valid 360° video,
-- source requiring mobile downscale/profile,
-- unsupported container or codec,
-- corrupt upload,
-- video with audio,
-- video without audio.
-
-### Pipeline tests
-
-- inspect metadata,
-- poster generated,
-- desktop profile generated,
-- mobile profile generated,
-- partial profile failure recoverable,
-- duplicate job delivery safe,
-- reprocess keeps logical asset ID.
-
-### Timeline tests
-
-- add interaction,
-- move interaction,
-- duplicate creates new ID,
-- delete interaction,
-- reject negative time,
-- reject time after duration,
-- reject invalid end time,
-- same timestamp deterministic ordering,
-- invalid referenced asset blocks validation/publish,
-- unsafe URL/rich content sanitized or rejected.
-
-### Compiler/runtime tests
-
-- preview and publish same normalized timeline,
-- video project cannot publish without ready playable profile,
-- device class selects appropriate profile candidate,
-- fallback path works,
-- existing image project compiler unchanged.
-
-### Telemetry tests
-
-- start/stall/failure events accepted,
-- malformed events rejected safely,
-- telemetry failure does not affect manifest/playback APIs.
-
-## 18. Acceptance Criteria / Sprint Gate
-
-- [ ] `video360` project creation is enabled.
-- [ ] Video upload follows logical-asset + async processing architecture.
-- [ ] Metadata inspection captures codec/container/dimensions/duration/frame rate/bitrate/audio where available.
-- [ ] Poster derivative is generated.
-- [ ] Desktop playback derivative is generated.
-- [ ] Mobile-compatible playback derivative is generated.
-- [ ] Reprocessing one failed derivative does not change logical asset ID.
-- [ ] Timeline interaction CRUD uses stable IDs.
-- [ ] Moving/duplicating/deleting timeline events is deterministic and concurrency-safe.
-- [ ] Timeline times are validated against video duration.
-- [ ] Information/hotspot/viewpoint/image/video/link/CTA payload types are representable.
-- [ ] Preview compiles the draft through the shared compiler.
-- [ ] Publish produces an immutable video manifest.
-- [ ] Device-aware playback policy selects/returns compatible profile candidates.
-- [ ] Unsupported optional feature does not break normal video playback.
-- [ ] `video_started` and `video_stalled` telemetry is supported.
-- [ ] Security controls from Sprint 01 also apply to video interactions.
-- [ ] Full Sprint-01 and Sprint-02 regression suites pass.
-
-## 19. Claude Code Execution Order
+## 17. Claude Code Execution Order
 
 1. Inspect current asset worker/transcoding infrastructure.
 2. Enable `video360` canonical project type.
@@ -502,10 +452,8 @@ Include representative:
 11. Add device-aware playback profile policy.
 12. Extend preview/publish.
 13. Add video telemetry.
-14. Add media fixtures and full tests.
-15. Run lint/typecheck/tests and update documentation.
 
-## 20. Claude Code Guardrails
+## 18. Claude Code Guardrails
 
 - Do not turn the backend into a general-purpose NLE.
 - Do not store transcoder vendor settings as canonical Experience fields.

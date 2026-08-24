@@ -60,6 +60,7 @@ function adapterInput(): ViewerIntegrationInput {
       connections: [],
       spatialData: {},
       runtimeHints: {},
+  preloadSceneIds: [],
     }],
   };
 }

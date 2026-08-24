@@ -1,4 +1,4 @@
-# Backend Schema — Sprint 01
+# Backend Schema — Sprints 01–03
 
 This document describes both the renderer-independent canonical Experience
 model and its PostgreSQL persistence representation. API payload details are in
@@ -30,7 +30,7 @@ Preview and publish use this same pipeline.
 
 ## Canonical Experience model
 
-The current Sprint 01 schema version is <code>1</code>. Every project persists a
+The current canonical schema version is <code>1</code>. Every project persists a
 <code>schemaVersion</code> so future revisions can migrate canonical data
 without coupling saved projects to a renderer release.
 
@@ -40,12 +40,14 @@ without coupling saved projects to a renderer release.
 | --- | --- |
 | <code>id</code> | Stable UUID. |
 | <code>ownerId</code> | Owning user UUID. |
-| <code>type</code> | <code>image360</code> for Sprint 01. <code>video360</code> is reserved. |
+| <code>type</code> | <code>image360</code> or <code>video360</code>. Immutable after creation. |
 | <code>name</code> | Creator-facing name. |
 | <code>schemaVersion</code> | Canonical schema version. |
 | <code>revision</code> | Monotonic optimistic-concurrency revision. |
 | <code>settings</code> | Product-level appearance, navigation, and information settings. |
 | <code>branding</code> | Company copy, logical branding asset references, and product colors. |
+| <code>videoAssetId</code> | <code>video360</code> only. The primary logical 360 video asset. |
+| <code>videoSettings</code> | <code>video360</code> only. Product-level playback preferences. |
 | <code>publicationMetadata</code> | Draft slug and visibility preferences. |
 | <code>createdAt</code>, <code>updatedAt</code> | Audit timestamps. |
 
@@ -254,13 +256,17 @@ compatibility, but Sprint 01 publishing exposes only <code>public</code> and
 ~~~text
 users
   +-- projects
-  |     +-- scenes
+  |     +-- scenes                 (image360)
   |     |     +-- hotspots
+  |     |     +-- scene_connections
+  |     +-- timeline_interactions  (video360)
   |     +-- assets (optional project scope)
   |     |     +-- asset_derivatives
   |     |     +-- upload_sessions
   |     |     +-- media_jobs
+  |     |           +-- media_job_stages
   |     +-- publications
+  |     |     +-- published_scene_definitions
   |     +-- runtime_events
   +-- assets
   +-- upload_sessions
@@ -289,6 +295,11 @@ Indexes:
 
 - owner plus update time for project lists
 - project ID plus revision uniqueness
+- primary video asset, for <code>video360</code> reference integrity
+
+A check constraint keeps <code>video_asset_id</code> null unless the project is
+a <code>video360</code> project. The foreign key uses <code>RESTRICT</code>, so a
+published experience cannot lose its only playback source.
 
 Every successful project, scene, or hotspot mutation checks and increments
 <code>revision</code> inside one database transaction.
@@ -379,6 +390,41 @@ Indexes:
 Every claim assigns a new lease token. Heartbeats and terminal writes compare
 both job status and that token, preventing an expired worker from finalizing a
 job after another worker has recovered it.
+
+### media_job_stages
+
+Per-stage progress inside one logical media job: <code>inspect</code>,
+<code>poster</code>, <code>transcodeDesktop</code>, <code>transcodeMobile</code>,
+<code>derivatives</code>, <code>finalize</code>. Each row carries a status, the
+derivative kind it produces, the derivative version, the attempt number, whether
+the stage is required, a machine-readable error, and safe diagnostics.
+
+Indexes:
+
+- unique media job plus stage
+- asset plus stage plus status, for child-job lookup
+
+Transcoder vendor detail belongs in <code>diagnostics</code> here, never in
+canonical project or manifest data. A video asset only becomes <code>ready</code>
+when at least one publishable playback profile exists; a single failed profile
+leaves an actionable stage row while the surviving profiles remain usable.
+
+### timeline_interactions
+
+Persists canonical timed interactions for <code>video360</code> projects. Kind,
+times, and ordering are typed columns; geometry, position, viewpoint,
+appearance, content, action, and visibility rules are JSONB.
+
+Indexes:
+
+- project, time, sort order, ID — the total authoring and compile order
+- project plus kind
+
+Check constraints enforce the supported kinds, <code>time_ms >= 0</code>,
+<code>sort_order >= 0</code>, and <code>end_time_ms >= time_ms</code> when
+present. Every timeline mutation checks and increments the project
+<code>revision</code> inside one transaction, so concurrent editors cannot
+silently overwrite each other.
 
 ### storage_deletion_jobs
 
@@ -472,8 +518,11 @@ independent:
 
 - <code>schemaVersion</code> controls saved Experience compatibility.
 - <code>manifestVersion</code> controls the runtime manifest contract. It is a
-  compiler-code-owned numeric schema version, currently <code>1</code>, rather
-  than a deployment environment setting.
+  compiler-code-owned numeric schema version, currently <code>3</code>, rather
+  than a deployment environment setting. <code>experienceType</code>
+  discriminates its payload: <code>image360</code> manifests carry scenes and
+  tour delivery, <code>video360</code> manifests carry the video media contract
+  and the compiled timeline.
 - <code>viewerIntegrationVersion</code> identifies the pinned adapter/renderer
   behavior used for compilation and telemetry.
 

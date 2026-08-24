@@ -8,12 +8,14 @@ import {
   publishExperience,
   resolveDerivativeTile,
   resolveManifest,
+  resolvePlaybackProfile,
   resolvePublishedScene,
   validateExperience
 } from '../services/experience-service';
 import { requireIdempotencyKey, withIdempotency } from '../services/idempotency-service';
 import { sendData } from '../utils/http-response';
 import { routeParam } from '../utils/route-param';
+import { playbackProfileRequestSchema } from '../validators/request-schemas';
 
 function ownerId(request: Request): string {
   return request.auth!.userId;
@@ -74,6 +76,28 @@ export async function manifest(request: Request, response: Response): Promise<vo
       ? 'public, max-age=0, must-revalidate'
       : 'private, no-store'
   );
+  sendData(response, result);
+}
+
+export async function playbackProfile(request: Request, response: Response): Promise<void> {
+  const device = playbackProfileRequestSchema.parse(request.body ?? {});
+  const result = await resolvePlaybackProfile({
+    slug: routeParam(request, 'slug'),
+    device: {
+      ...(device.viewportClass === undefined ? {} : { deviceClass: device.viewportClass }),
+      ...(device.handheld === undefined ? {} : { handheld: device.handheld }),
+      ...(device.touch === undefined ? {} : { touch: device.touch }),
+      ...(device.maxTextureSize === undefined ? {} : { maxTextureSize: device.maxTextureSize }),
+      ...(device.networkClass === undefined ? {} : { networkClass: device.networkClass }),
+      ...(device.supportedMimeTypes === undefined
+        ? {}
+        : { supportedMimeTypes: device.supportedMimeTypes }),
+      ...(device.dataSaver === undefined ? {} : { dataSaver: device.dataSaver })
+    },
+    ...(request.auth?.userId === undefined ? {} : { authenticatedUserId: request.auth.userId })
+  });
+  // Selection depends on the caller's device, so it must never be cached.
+  response.setHeader('cache-control', 'private, no-store');
   sendData(response, result);
 }
 

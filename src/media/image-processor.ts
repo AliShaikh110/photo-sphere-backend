@@ -1,5 +1,6 @@
 import sharp, { type Metadata, type Sharp } from 'sharp';
 import { AppError } from '../errors/app-error';
+import type { GeneratedDerivative, GeneratedStorageObject } from './derivative-types';
 import { sha256 } from '../utils/hash';
 import type { SupportedImageMime } from './file-policy';
 import {
@@ -30,29 +31,7 @@ export type PanoramaInspection = ImageInspection & {
   is360: true;
 };
 
-export type GeneratedStorageObject = {
-  storageKey: string;
-  mimeType: string;
-  sizeBytes: number;
-  checksum: string;
-  body: Buffer;
-  metadata: Record<string, string>;
-};
-
-export type GeneratedDerivative = {
-  kind: 'thumbnail' | 'lowResolutionBase' | 'standardWeb' | 'tiledLevels';
-  version: number;
-  storageKey: string;
-  mimeType: string;
-  width: number;
-  height: number;
-  sizeBytes: number;
-  checksum: string;
-  body: Buffer;
-  metadata: Record<string, unknown>;
-  /** Supporting immutable objects which must be stored before the parent object. */
-  supportingObjects?: readonly GeneratedStorageObject[];
-};
+export type { GeneratedDerivative, GeneratedStorageObject } from './derivative-types';
 
 export async function inspectPanorama(options: {
   bytes: Buffer;

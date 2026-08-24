@@ -4,6 +4,8 @@ import type {
   CanonicalBranding,
   CanonicalHotspot,
   CanonicalProjectSettings,
+  CanonicalTimelineInteraction,
+  CanonicalViewpoint,
   JsonObject,
   JsonValue,
 } from '../domain/types';
@@ -14,7 +16,10 @@ import {
   DEFAULT_ADJACENT_SCENE_PRELOAD_POLICY,
   DEFAULT_RUNTIME_CACHE_POLICY,
   DEFAULT_TOUR_STRATEGY_POLICY,
+  HANDHELD_MAX_VIDEO_WIDTH,
   SCENE_TRANSITION_FAILURE_CATEGORIES,
+  VIDEO_PLAYBACK_POLICY_VERSION,
+  defaultCandidateOrder,
   resolveRuntimeCachePolicy,
   selectAdjacentScenePreloads,
   selectTourRuntimeStrategy,
@@ -31,10 +36,16 @@ import {
 import { preflightExperience } from './preflight';
 import { readPanoramaCrop } from './panorama-metadata';
 import { readTiledPanoramaMetadata } from './tiled-panorama';
+import { VIDEO_PLAYBACK_FAILURE_CATEGORIES } from '../models/model.types';
+import {
+  isHandheldSafeProfile,
+  selectVideoDerivatives,
+} from './video-derivative-selector';
 import {
   BASELINE_TELEMETRY_EVENTS,
   COMPILED_MANIFEST_VERSION,
   COMPILED_SCENE_VERSION,
+  VIDEO_TELEMETRY_EVENTS,
 } from './types';
 import type {
   CompileExperienceInput,
@@ -45,14 +56,23 @@ import type {
   CompiledHotspotAction,
   CompiledHotspotAppearance,
   CompiledHotspotContent,
+  CompiledImageExperienceManifest,
   CompiledMediaReference,
   CompiledScene,
+  CompiledTelemetryMetadata,
+  CompiledTimelineAction,
+  CompiledTimelineContent,
+  CompiledTimelineInteraction,
+  CompiledVideoExperienceManifest,
+  CompiledVideoMedia,
+  CompiledVideoPlaybackProfile,
   MediaAccess,
   MediaUrlResolution,
   MediaUrlResolutionRequest,
   MediaUrlResolver,
   PublicationVisibility,
   RuntimeCapabilityDeclaration,
+  RuntimeDeclarations,
   ViewerIntegrationAdapter,
 } from './types';
 import { PhotoSphereViewerIntegrationAdapter } from './viewer-integration-adapter';
@@ -134,6 +154,9 @@ export class ExperienceCompiler {
     const preflight = this.preflight(input);
     if (!preflight.valid) {
       throw new ExperienceCompilationError(preflight.issues);
+    }
+    if (input.project.type === 'video360') {
+      return this.compileVideoBundle(input, preflight.capabilityResolution);
     }
     const capabilityResolution = preflight.capabilityResolution;
     const tiledPanoramaEnabled = capabilityResolution.capabilities.includes('tiledPanorama');
@@ -339,7 +362,7 @@ export class ExperienceCompiler {
       ? input.publicationRevision!
       : null;
     const viewerIntegrationVersion = this.viewerIntegrationAdapter.viewerIntegrationVersion;
-    const manifest: CompiledExperienceManifest = {
+    const manifest: CompiledImageExperienceManifest = {
       manifestVersion: COMPILED_MANIFEST_VERSION,
       schemaVersion: input.project.schemaVersion,
       experienceId: input.project.id,
@@ -417,6 +440,332 @@ export class ExperienceCompiler {
       : [];
 
     return deepFreeze({ manifest, sceneDefinitions });
+  }
+
+  /**
+   * Compiles a video360 experience. It shares the preflight, capability
+   * resolution, media resolution, sanitization and integration-adapter path
+   * used by image experiences; only the media and timeline shapes differ.
+   */
+  private async compileVideoBundle(
+    input: CompileExperienceInput,
+    capabilityResolution: ReturnType<typeof preflightExperience>['capabilityResolution'],
+  ): Promise<CompiledExperienceBundle> {
+    const visibility = resolveVisibility(input);
+    const access: MediaAccess = input.target === 'preview' || visibility === 'private'
+      ? 'protected'
+      : 'public';
+    const context: ResolutionContext = { input, access, cache: new Map() };
+    const assetsById = new Map(input.assets.map((asset) => [asset.id, asset]));
+    const settings = deepFreeze(compileSettings(input.project.settings));
+    const branding = deepFreeze(await this.compileBranding(
+      input.project.branding,
+      input.project.id,
+      assetsById,
+      context,
+    ));
+
+    const videoAsset = assetsById.get(input.project.videoAssetId!)!;
+    const video = deepFreeze(await this.compileVideoMedia(videoAsset, input, context));
+    const timeline: CompiledTimelineInteraction[] = [];
+    for (const [index, interaction] of (input.project.timeline ?? []).entries()) {
+      timeline.push(await this.compileTimelineInteraction(
+        interaction,
+        `timeline[${index}]`,
+        assetsById,
+        context,
+      ));
+    }
+    const frozenTimeline = deepFreeze(sortTimeline(timeline));
+
+    const adapterOutput = this.viewerIntegrationAdapter.adaptVideo({
+      settings,
+      branding,
+      video,
+      timeline: frozenTimeline,
+    });
+    if (adapterOutput.viewerIntegrationVersion
+      !== this.viewerIntegrationAdapter.viewerIntegrationVersion) {
+      throw new ExperienceCompilationError([{
+        code: 'VIEWER_INTEGRATION_VERSION_MISMATCH',
+        message: 'The viewer integration adapter emitted an inconsistent version.',
+        entityType: 'project',
+        entityId: input.project.id,
+        path: 'viewerIntegrationVersion',
+        retryable: false,
+      }]);
+    }
+
+    const publicationRevision = input.target === 'publication'
+      ? input.publicationRevision!
+      : null;
+    const viewerIntegrationVersion = this.viewerIntegrationAdapter.viewerIntegrationVersion;
+    const capabilities: RuntimeCapabilityDeclaration[] = capabilityResolution.capabilities.map((id) => {
+      const fallback = capabilityResolution.fallbacks.find((candidate) => candidate.capabilityId === id);
+      return {
+        id,
+        required: id === 'video360',
+        ...(fallback === undefined ? {} : { fallback: fallback.message }),
+      };
+    });
+    const telemetry: CompiledTelemetryMetadata = {
+      enabled: true,
+      experienceId: input.project.id,
+      projectRevision: input.project.revision,
+      publicationRevision,
+      viewerIntegrationVersion,
+      events: [...BASELINE_TELEMETRY_EVENTS, ...VIDEO_TELEMETRY_EVENTS],
+      sceneTransitionFailureCategories: [...SCENE_TRANSITION_FAILURE_CATEGORIES],
+      videoPlaybackFailureCategories: [...VIDEO_PLAYBACK_FAILURE_CATEGORIES],
+    };
+    const runtime: RuntimeDeclarations = {
+      modules: capabilityResolution.runtimeModules,
+      moduleDeclarations: capabilityResolution.moduleDeclarations,
+      capabilityFallbacks: capabilityResolution.fallbacks,
+      preload: {
+        strategy: 'video-progressive',
+        maxScenesPerSource: 0,
+        content: 'poster-and-first-video-segments',
+      },
+      cache: {
+        defaultProfile: 'standard',
+        profiles: {
+          constrained: resolveRuntimeCachePolicy(
+            { deviceClass: 'constrained', mediaClass: 'video-tour' },
+            this.cachePolicy,
+          ),
+          standard: resolveRuntimeCachePolicy(
+            { deviceClass: 'standard', mediaClass: 'video-tour' },
+            this.cachePolicy,
+          ),
+          capable: resolveRuntimeCachePolicy(
+            { deviceClass: 'capable', mediaClass: 'video-tour' },
+            this.cachePolicy,
+          ),
+        },
+      },
+      fallbackPolicy: {
+        video: 'ordered-playback-profile-candidates',
+        optionalCapabilities: 'continue-without-capability',
+      },
+    };
+
+    const manifest: CompiledVideoExperienceManifest = {
+      manifestVersion: COMPILED_MANIFEST_VERSION,
+      schemaVersion: input.project.schemaVersion,
+      experienceId: input.project.id,
+      experienceName: sanitizePlainText(input.project.name),
+      experienceType: 'video360',
+      projectRevision: input.project.revision,
+      publicationRevision,
+      target: input.target,
+      visibility,
+      viewerIntegrationVersion,
+      settings,
+      branding,
+      video,
+      timeline: frozenTimeline,
+      capabilities: deepFreeze(capabilities),
+      runtime,
+      telemetry,
+      viewerIntegration: adapterOutput,
+    };
+
+    // A video experience has no progressively fetched scene definitions.
+    return deepFreeze({ manifest, sceneDefinitions: [] });
+  }
+
+  private async compileVideoMedia(
+    videoAsset: CanonicalAsset,
+    input: CompileExperienceInput,
+    context: ResolutionContext,
+  ): Promise<CompiledVideoMedia> {
+    const selected = selectVideoDerivatives(videoAsset);
+    const profiles: CompiledVideoPlaybackProfile[] = [];
+    for (const candidate of selected.profiles) {
+      const media = await this.resolveDerivative(videoAsset, candidate.derivative, context, {
+        entityType: 'project',
+        entityId: input.project.id,
+        path: 'videoAssetId',
+      });
+      profiles.push({
+        profileId: candidate.profileId,
+        media,
+        constraints: {
+          maxWidth: candidate.derivative.width ?? HANDHELD_MAX_VIDEO_WIDTH,
+          handheldSafe: isHandheldSafeProfile(candidate.derivative),
+          mimeType: candidate.derivative.mimeType,
+        },
+      });
+    }
+    if (profiles.length === 0) {
+      throw new ExperienceCompilationError([{
+        code: 'VIDEO_PROFILE_UNAVAILABLE',
+        message: 'The 360 video has no compatible playback profile.',
+        entityType: 'asset',
+        entityId: videoAsset.id,
+        path: 'videoAssetId',
+        retryable: true,
+      }]);
+    }
+    // Ordered so a player that simply takes the first playable entry is safe
+    // on a handheld device.
+    const ordered = defaultCandidateOrder(profiles.map((profile) => ({
+      profileId: profile.profileId,
+      derivativeId: profile.media.derivativeId,
+      mimeType: profile.constraints.mimeType,
+      width: profile.media.width ?? profile.constraints.maxWidth,
+      height: profile.media.height ?? 0,
+      handheldSafe: profile.constraints.handheldSafe,
+    })));
+    const orderedProfiles = ordered.map(
+      (candidate) => profiles.find((profile) => profile.profileId === candidate.profileId)!,
+    );
+    const poster = selected.poster === undefined
+      ? undefined
+      : await this.resolveDerivative(videoAsset, selected.poster, context, {
+        entityType: 'project',
+        entityId: input.project.id,
+        path: 'videoAssetId',
+      });
+
+    const metadata = videoAsset.metadata ?? {};
+    const defaultProfileId = orderedProfiles[0]!.profileId;
+    const handheldSafeProfile = orderedProfiles.find(
+      (profile) => profile.constraints.handheldSafe,
+    ) ?? orderedProfiles[orderedProfiles.length - 1]!;
+    return {
+      assetId: videoAsset.id,
+      projection: videoAsset.projection === 'cubemap' ? 'cubemap' : 'equirectangular',
+      durationMs: readCompiledNumber(metadata.durationMs) ?? 0,
+      width: readCompiledNumber(metadata.width) ?? 0,
+      height: readCompiledNumber(metadata.height) ?? 0,
+      ...(readCompiledNumber(metadata.frameRate) === undefined
+        ? {}
+        : { frameRate: readCompiledNumber(metadata.frameRate)! }),
+      audioPresent: metadata.audioPresent === true,
+      stereoMode: metadata.stereoMode === 'top-bottom' || metadata.stereoMode === 'left-right'
+        ? metadata.stereoMode
+        : 'mono',
+      ...(poster === undefined ? {} : { poster }),
+      profiles: orderedProfiles,
+      selectionPolicy: {
+        policyVersion: VIDEO_PLAYBACK_POLICY_VERSION,
+        strategy: 'ordered-candidates-client-selects',
+        handheldMaxWidth: HANDHELD_MAX_VIDEO_WIDTH,
+        defaultProfileId,
+        fallbackProfileId: handheldSafeProfile.profileId,
+        ...(input.target === 'publication' && input.publicationSlug !== undefined
+          ? { selectionUrl: `/view/${input.publicationSlug}/playback-profile` }
+          : {}),
+      },
+    };
+  }
+
+  private async compileTimelineInteraction(
+    interaction: CanonicalTimelineInteraction,
+    path: string,
+    assetsById: ReadonlyMap<string, CanonicalAsset>,
+    context: ResolutionContext,
+  ): Promise<CompiledTimelineInteraction> {
+    const appearance = await this.compileHotspotAppearance(
+      { ...interaction, sceneId: '', geometry: { kind: 'point' } } as unknown as CanonicalHotspot,
+      path,
+      assetsById,
+      context,
+    );
+    const baseContent = interaction.content === undefined
+      ? undefined
+      : await this.compileHotspotContent(
+        {
+          id: interaction.id,
+          sceneId: '',
+          geometry: { kind: 'point' },
+          position: interaction.position ?? {
+            coordinateSystem: 'spherical_degrees',
+            longitudeDegrees: 0,
+            latitudeDegrees: 0,
+          },
+          content: interaction.content,
+          action: { kind: 'none' },
+        },
+        path,
+        assetsById,
+        context,
+      );
+    const content: CompiledTimelineContent | undefined = baseContent === undefined
+      ? undefined
+      : {
+        ...baseContent,
+        ...(interaction.content?.ctaLabel === undefined
+          ? {}
+          : { ctaLabel: sanitizePlainText(interaction.content.ctaLabel) }),
+        ...(interaction.content?.ctaUrl === undefined
+          ? {}
+          : { ctaUrl: normalizeTrustedUrl(interaction.content.ctaUrl) }),
+        properties: {
+          ...baseContent.properties,
+          ...(interaction.content?.ctaLabel === undefined
+            ? {}
+            : { ctaLabel: sanitizePlainText(interaction.content.ctaLabel) }),
+          ...(interaction.content?.ctaUrl === undefined
+            ? {}
+            : { ctaUrl: normalizeTrustedUrl(interaction.content.ctaUrl) }),
+        },
+      };
+
+    let action: CompiledTimelineAction;
+    switch (interaction.action.kind) {
+      case 'openUrl':
+        action = { kind: 'openUrl', url: normalizeTrustedUrl(interaction.action.url) };
+        break;
+      case 'openAsset':
+        action = {
+          kind: 'openAsset',
+          media: await this.resolveDisplayAsset(
+            interaction.action.assetId,
+            assetsById,
+            context,
+            { entityType: 'project', entityId: interaction.id, path: `${path}.action.assetId` },
+          ),
+        };
+        break;
+      case 'setViewpoint':
+        action = { kind: 'setViewpoint' };
+        break;
+      case 'showInformation':
+        action = { kind: 'showInformation' };
+        break;
+      default:
+        action = { kind: 'none' };
+    }
+
+    return {
+      id: interaction.id,
+      kind: interaction.kind,
+      timeMs: interaction.timeMs,
+      endTimeMs: interaction.endTimeMs ?? null,
+      ...(interaction.geometry?.kind === 'point' ? { geometry: { kind: 'point' as const } } : {}),
+      ...(interaction.position === undefined ? {} : { position: { ...interaction.position } }),
+      ...(interaction.viewpoint === undefined
+        ? {}
+        : { viewpoint: compileViewpoint(interaction.viewpoint) }),
+      ...(appearance === undefined ? {} : { appearance }),
+      ...(content === undefined ? {} : { content }),
+      action,
+      enabled: interaction.visibilityRules?.enabled ?? true,
+      visibilityRules: {
+        ...(interaction.visibilityRules?.enabled === undefined
+          ? {}
+          : { enabled: interaction.visibilityRules.enabled }),
+        ...(interaction.visibilityRules?.persistUntilDismissed === undefined
+          ? {}
+          : { persistUntilDismissed: interaction.visibilityRules.persistUntilDismissed }),
+        ...(interaction.visibilityRules?.pauseVideoWhenShown === undefined
+          ? {}
+          : { pauseVideoWhenShown: interaction.visibilityRules.pauseVideoWhenShown }),
+      },
+    };
   }
 
   private async compileBranding(
@@ -675,7 +1024,9 @@ export class ExperienceCompiler {
     const asset = assetsById.get(assetId)!;
     const derivative = selectPreferredReadyDerivative(
       asset,
-      asset.mediaType === 'video'
+      asset.mediaType === 'video' || asset.mediaType === 'video360'
+        // Timed video content plays back through the same generated profiles,
+        // handheld-safe first; the original upload is never a candidate.
         ? ['mobileVideoProfile', 'desktopVideoProfile']
         : undefined,
     )!;
@@ -851,6 +1202,23 @@ function compileSettings(
         : { preference: settings.quality.preference }),
     };
   }
+  if (settings.video !== undefined) {
+    compiled.video = {
+      ...(settings.video.autoplay === undefined ? {} : { autoplay: settings.video.autoplay }),
+      ...(settings.video.loop === undefined ? {} : { loop: settings.video.loop }),
+      ...(settings.video.muted === undefined ? {} : { muted: settings.video.muted }),
+      ...(settings.video.showControls === undefined
+        ? {}
+        : { showControls: settings.video.showControls }),
+      ...(settings.video.showTimeline === undefined
+        ? {}
+        : { showTimeline: settings.video.showTimeline }),
+      ...(settings.video.startAtMs === undefined ? {} : { startAtMs: settings.video.startAtMs }),
+      ...(settings.video.qualityPreference === undefined
+        ? {}
+        : { qualityPreference: settings.video.qualityPreference }),
+    };
+  }
   if (settings.information !== undefined) {
     compiled.information = {
       ...(settings.information.title === undefined
@@ -917,6 +1285,31 @@ function readStringArray(value: JsonValue | undefined): string[] {
   return Array.isArray(value)
     ? value.filter((candidate): candidate is string => typeof candidate === 'string')
     : [];
+}
+
+function compileViewpoint(viewpoint: CanonicalViewpoint): CanonicalViewpoint {
+  return {
+    headingDegrees: viewpoint.headingDegrees,
+    pitchDegrees: viewpoint.pitchDegrees,
+    ...(viewpoint.horizontalFovDegrees === undefined
+      ? {}
+      : { horizontalFovDegrees: viewpoint.horizontalFovDegrees }),
+    ...(viewpoint.transition === undefined ? {} : { transition: viewpoint.transition }),
+    ...(viewpoint.transitionMs === undefined ? {} : { transitionMs: viewpoint.transitionMs }),
+  };
+}
+
+/** Total, deterministic ordering even when interactions share a timestamp. */
+function sortTimeline(
+  timeline: readonly CompiledTimelineInteraction[],
+): CompiledTimelineInteraction[] {
+  return [...timeline].sort((left, right) => (
+    left.timeMs === right.timeMs ? left.id.localeCompare(right.id) : left.timeMs - right.timeMs
+  ));
+}
+
+function readCompiledNumber(value: JsonValue | undefined): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
 function publishedSceneUrlTemplate(input: CompileExperienceInput): string {

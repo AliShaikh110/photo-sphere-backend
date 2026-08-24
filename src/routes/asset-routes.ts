@@ -18,7 +18,9 @@ assetRouter.post('/uploads', validate('body', uploadSessionSchema), asyncHandler
 assetRouter.put(
   '/uploads/:uploadSessionId/content',
   validate('params', uploadSessionParams),
-  express.raw({ type: () => true, limit: config.maxImageUploadBytes }),
+  // The per-media-type ceiling is enforced against the upload session; this
+  // body limit only has to admit the largest supported upload.
+  express.raw({ type: () => true, limit: config.maxUploadBytes }),
   asyncHandler(uploadContent)
 );
 assetRouter.post(
@@ -28,5 +30,6 @@ assetRouter.post(
   asyncHandler(complete)
 );
 assetRouter.get('/:assetId', validate('params', assetIdParams), asyncHandler(read));
+// The body is optional here, so the schema is applied inside the controller.
 assetRouter.post('/:assetId/reprocess', validate('params', assetIdParams), asyncHandler(reprocess));
 assetRouter.delete('/:assetId', validate('params', assetIdParams), asyncHandler(remove));

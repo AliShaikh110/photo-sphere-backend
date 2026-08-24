@@ -1,4 +1,4 @@
-# Backend API — Sprint 01
+# Backend API — Sprints 01–03
 
 This document defines the HTTP contract for the image360 backend MVP. The
 canonical source of data is the Experience model described in
@@ -139,6 +139,12 @@ returned.
 | POST | <code>/api/v1/projects/:projectId/scenes/:sceneId/hotspots</code> | Bearer, owner | <code>projectRevision</code> |
 | PATCH | <code>/api/v1/projects/:projectId/scenes/:sceneId/hotspots/:hotspotId</code> | Bearer, owner | <code>projectRevision</code> |
 | DELETE | <code>/api/v1/projects/:projectId/scenes/:sceneId/hotspots/:hotspotId</code> | Bearer, owner | <code>projectRevision</code> |
+| GET | <code>/api/v1/projects/:projectId/timeline</code> | Bearer, owner | <code>video360</code> project |
+| PATCH | <code>/api/v1/projects/:projectId/timeline</code> | Bearer, owner | <code>projectRevision</code> |
+| POST | <code>/api/v1/projects/:projectId/timeline/interactions</code> | Bearer, owner | <code>projectRevision</code> |
+| PATCH | <code>/api/v1/projects/:projectId/timeline/interactions/:interactionId</code> | Bearer, owner | <code>projectRevision</code> |
+| DELETE | <code>/api/v1/projects/:projectId/timeline/interactions/:interactionId</code> | Bearer, owner | <code>projectRevision</code> |
+| POST | <code>/api/v1/projects/:projectId/timeline/interactions/:interactionId/duplicate</code> | Bearer, owner | <code>projectRevision</code> |
 | POST | <code>/api/v1/assets/uploads</code> | Bearer | None |
 | PUT | <code>/api/v1/assets/uploads/:uploadSessionId/content</code> | Bearer, owner | Raw body |
 | POST | <code>/api/v1/assets/:assetId/complete</code> | Bearer, owner | <code>Idempotency-Key</code> |
@@ -148,6 +154,7 @@ returned.
 | POST | <code>/api/v1/projects/:projectId/publish</code> | Bearer, owner | <code>revision</code>, <code>Idempotency-Key</code> |
 | GET | <code>/api/v1/projects/:projectId/publications</code> | Bearer, owner | None |
 | GET | <code>/view/:slug/manifest</code> | Optional bearer | Visibility policy |
+| POST | <code>/view/:slug/playback-profile</code> | Optional bearer | Visibility policy, <code>video360</code> publication |
 | GET | <code>/api/v1/media/:derivativeId</code> | Optional bearer or signed <code>token</code> | Owner or valid media capability |
 | GET | <code>/api/v1/publications/:projectId/:publicationRevision/media/:derivativeId</code> | None | Exact reference in current public publication |
 | POST | <code>/api/v1/runtime/events</code> | No creator bearer required | Valid event payload |
@@ -210,10 +217,13 @@ an email address exists.
 
 ## Projects
 
-Only <code>image360</code> is accepted for project creation in Sprint 01.
-Project reads return canonical settings, branding, publication metadata, schema
-version, current revision, and timestamps. Project detail may include its scenes
-and point hotspots.
+Project creation accepts <code>image360</code> and <code>video360</code>. The
+type is immutable after creation. Project reads return canonical settings,
+branding, publication metadata, schema version, current revision, and
+timestamps. An <code>image360</code> project detail includes its scenes and
+point hotspots; a <code>video360</code> project detail includes
+<code>videoAssetId</code>, <code>videoSettings</code>, and its
+<code>timeline</code>.
 
 ### GET /api/v1/projects
 
@@ -254,6 +264,36 @@ owner's project.
 
 <code>settings</code> and <code>branding</code> are optional. New projects use
 the current canonical <code>schemaVersion</code> and begin at revision 1.
+
+A <code>video360</code> project additionally accepts <code>videoSettings</code>
+at creation and on update:
+
+~~~json
+{
+  "type": "video360",
+  "name": "Harbour Tour",
+  "videoSettings": {
+    "autoplay": true,
+    "loop": false,
+    "muted": true,
+    "showControls": true,
+    "showTimeline": true,
+    "startAtMs": 0,
+    "qualityPreference": "automatic"
+  }
+}
+~~~
+
+These are product-level playback preferences. Codecs, bitrate ladders and
+container choices are never project data: the media pipeline decides which
+playback profiles exist, and the runtime chooses among them.
+
+<code>PATCH /api/v1/projects/:projectId</code> assigns the primary video with
+<code>videoAssetId</code>. The asset must be a <code>video360</code> asset owned
+by the caller and available to the project; otherwise the request returns
+<code>422 INVALID_ASSET_REFERENCE</code>. Sending <code>videoAssetId</code> or
+<code>videoSettings</code> to an <code>image360</code> project returns
+<code>422 PROJECT_TYPE_MISMATCH</code>.
 
 ### GET /api/v1/projects/:projectId
 
@@ -331,6 +371,119 @@ protected derivative reference contains a short-lived signed
 owner-authenticated; the signed URL is the capability used by the player to
 fetch its derivative without forwarding the creator bearer token. An owner
 bearer token can also fetch the unscoped derivative route.
+
+## 360 video timeline
+
+Timelines exist only on <code>video360</code> projects. A request against an
+<code>image360</code> project returns <code>422 TIMELINE_NOT_AVAILABLE</code>,
+and scene routes on a <code>video360</code> project return
+<code>422 PROJECT_TYPE_MISMATCH</code>.
+
+Timed interactions are product entities. Timestamps are plain milliseconds on
+the media timeline and are validated against the inspected duration of the
+project's video asset, so the project must already reference a ready video:
+
+| Condition | Error |
+| --- | --- |
+| No video assigned | <code>422 VIDEO_ASSET_NOT_ASSIGNED</code> |
+| Video still processing | <code>409 VIDEO_ASSET_NOT_READY</code> (retryable) |
+| Duration not yet inspected | <code>409 VIDEO_DURATION_UNKNOWN</code> (retryable) |
+| Time outside the video | <code>422 TIMELINE_TIME_OUT_OF_RANGE</code> |
+| Referenced media missing or not ready | <code>422 TIMELINE_REFERENCE_INVALID</code> |
+| Payload incomplete for the chosen kind | <code>422 TIMELINE_PAYLOAD_INVALID</code> |
+
+### GET /api/v1/projects/:projectId/timeline
+
+Returns the timeline in a total, deterministic order (time, then a stable
+ordering key, then ID) together with the media duration:
+
+~~~json
+{
+  "timeline": {
+    "projectId": "project-id",
+    "projectRevision": 7,
+    "videoAssetId": "asset-id",
+    "durationMs": 154000,
+    "interactions": []
+  }
+}
+~~~
+
+<code>durationMs</code> is <code>null</code> while the video is still being
+prepared; the timeline stays readable in that state.
+
+### POST /api/v1/projects/:projectId/timeline/interactions
+
+~~~json
+{
+  "projectRevision": 7,
+  "kind": "information",
+  "timeMs": 80000,
+  "endTimeMs": 86000,
+  "content": { "title": "Engine room", "bodyHtml": "<p>Take a closer look</p>" },
+  "visibilityRules": { "enabled": true, "pauseVideoWhenShown": true }
+}
+~~~
+
+<code>kind</code> is one of <code>information</code>, <code>hotspot</code>,
+<code>viewpoint</code>, <code>image</code>, <code>video</code>,
+<code>link</code>, or <code>cta</code>. These are product terms, not renderer
+event or plugin names. Each kind carries its own required payload:
+
+| Kind | Required payload |
+| --- | --- |
+| <code>information</code> | <code>content</code> |
+| <code>hotspot</code> | <code>position</code> (point geometry) |
+| <code>viewpoint</code> | <code>viewpoint.headingDegrees</code> and <code>viewpoint.pitchDegrees</code> |
+| <code>image</code> | <code>content.imageAssetId</code> |
+| <code>video</code> | <code>content.videoAssetId</code> |
+| <code>link</code> | <code>action.kind = "openUrl"</code> |
+| <code>cta</code> | <code>content.ctaLabel</code> or an <code>openUrl</code> action |
+
+<code>action</code> accepts <code>none</code>, <code>showInformation</code>,
+<code>openUrl</code>, <code>openAsset</code>, or <code>setViewpoint</code>.
+Changing an interaction's kind clears payload sections that do not belong to the
+new kind, so an interaction never retains incompatible fields.
+
+Rich text, tooltips, button labels and every URL pass through the same
+sanitizer and URL policy used by scene hotspots.
+
+### PATCH /api/v1/projects/:projectId/timeline/interactions/:interactionId
+
+Accepts the same fields as creation, all optional except
+<code>projectRevision</code>. Moving an interaction is a <code>timeMs</code>
+update.
+
+### DELETE /api/v1/projects/:projectId/timeline/interactions/:interactionId
+
+Body: <code>{ "projectRevision": 7 }</code>.
+
+### POST /api/v1/projects/:projectId/timeline/interactions/:interactionId/duplicate
+
+~~~json
+{ "projectRevision": 7, "timeMs": 92000 }
+~~~
+
+The duplicate always receives a new stable ID. Omitting <code>timeMs</code>
+copies the source timestamp; supplying one shifts any <code>endTimeMs</code> by
+the same amount, clamped to the media duration.
+
+### PATCH /api/v1/projects/:projectId/timeline
+
+Atomic multi-move for drag-heavy editing:
+
+~~~json
+{
+  "projectRevision": 7,
+  "interactions": [
+    { "id": "interaction-a", "timeMs": 4200 },
+    { "id": "interaction-b", "timeMs": 51000, "endTimeMs": 56000 }
+  ]
+}
+~~~
+
+Every entry is validated before any row is written. A rejected batch leaves the
+timeline and the project revision unchanged.
 
 ## Scenes
 
@@ -451,12 +604,15 @@ and scene IDs do not change.
 The original upload is immutable. Database records store logical IDs and storage
 keys; API clients never provide or receive a trusted local filesystem path.
 
-Supported Sprint 01 inputs are policy-approved JPEG (including the
-<code>image/jpg</code> alias), PNG, or WebP images. The backend validates actual
-signatures, not only the declared MIME type or filename extension. A
-<code>panorama_image</code> must pass panorama geometry and GPano/XMP checks;
-ordinary <code>image</code> and <code>logo</code> assets use the general image
-inspection path and can supply branding or display-image references.
+Supported image inputs are policy-approved JPEG (including the
+<code>image/jpg</code> alias), PNG, or WebP. Supported video inputs are MP4 and
+WebM. The backend validates actual signatures, not only the declared MIME type
+or filename extension. A <code>panorama_image</code> must pass panorama geometry
+and GPano/XMP checks; ordinary <code>image</code> and <code>logo</code> assets
+use the general image inspection path and can supply branding or display-image
+references. A <code>video360</code> asset must be recognisable as 360 content,
+either from Spherical Video V2 / GSpherical container metadata or from a 2:1
+equirectangular shape.
 
 ### POST /api/v1/assets/uploads
 
@@ -471,10 +627,12 @@ inspection path and can supply branding or display-image references.
 }
 ~~~
 
-<code>mediaType</code> accepts <code>panorama_image</code>, <code>image</code>, or
-<code>logo</code> and defaults to <code>panorama_image</code> when omitted. The
-size must be within <code>MAX_IMAGE_UPLOAD_BYTES</code>. If supplied, the project
-must belong to the caller.
+<code>mediaType</code> accepts <code>panorama_image</code>, <code>image</code>,
+<code>logo</code>, <code>video360</code>, or <code>video</code> and defaults to
+<code>panorama_image</code> when omitted. The declared media type and file type
+must agree. Image uploads must be within <code>MAX_IMAGE_UPLOAD_BYTES</code> and
+video uploads within <code>MAX_VIDEO_UPLOAD_BYTES</code>. If supplied, the
+project must belong to the caller.
 
 The response contains a logical asset and an expiring authenticated local upload
 target equivalent to:
@@ -554,13 +712,43 @@ Terminal processing states are <code>ready</code> and <code>failed</code>.
 Non-terminal states are <code>uploaded</code>, <code>inspecting</code>, and
 <code>processing</code>.
 
-Ready Sprint 01 assets include:
+Ready image assets include the <code>thumbnail</code>,
+<code>lowResolutionBase</code> and <code>standardWeb</code> derivatives, plus
+<code>tiledLevels</code> when the tiling policy applies. Ready video assets
+include a <code>videoPoster</code> and at least one playback profile:
+<code>desktopVideoProfile</code>, <code>mobileVideoProfile</code>, or both.
 
-- <code>thumbnail</code>
-- <code>lowResolutionBase</code>
-- <code>standardWeb</code>
+A video asset also exposes <code>processingStages</code>, the per-stage record of
+its last media job (<code>inspect</code>, <code>poster</code>,
+<code>transcodeDesktop</code>, <code>transcodeMobile</code>,
+<code>finalize</code>). One playback profile can fail without discarding the
+others: the asset still becomes <code>ready</code> as long as at least one
+publishable profile exists, and <code>metadata.unavailablePlaybackProfiles</code>
+names what could not be produced and why. If no publishable profile exists the
+asset becomes <code>failed</code> with a <code>VIDEO_PROFILE_UNAVAILABLE</code>
+diagnosis.
+
+<code>metadata</code> on a ready video asset carries the inspected facts used by
+compiler policy and internal diagnostics: container, codec, width, height,
+<code>durationMs</code>, <code>frameRate</code>, bitrate, audio presence and
+codec, rotation, stereo mode, and derived compatibility flags. Transcoder vendor
+settings are never stored here or on the project; they live in processing
+diagnostics.
 
 ### POST /api/v1/assets/:assetId/reprocess
+
+An optional body regenerates only the named playback profiles of a video asset:
+
+~~~json
+{ "profiles": ["mobile"] }
+~~~
+
+<code>profiles</code> accepts <code>poster</code>, <code>desktop</code>, and
+<code>mobile</code>. A targeted reprocess writes new derivative versions for the
+named profiles only; the logical asset ID and the untouched profiles keep their
+existing identity and version. Supplying <code>profiles</code> for a non-video
+asset returns <code>422 REPROCESS_TARGET_NOT_SUPPORTED</code>.
+
 
 Requires <code>Idempotency-Key</code>. No request body is required beyond an
 optional empty JSON object. Reprocessing preserves the logical asset ID and
@@ -657,7 +845,10 @@ Bearer authentication is optional at the middleware level:
 
 The immutable manifest includes the canonical experience identity, project and
 publication revisions, manifest version, viewer integration version, compiled
-runtime settings, scenes/hotspots, and logical derivative URLs. Public manifests
+runtime settings, and logical derivative URLs. <code>experienceType</code>
+discriminates the payload: an <code>image360</code> manifest carries
+<code>scenes</code> and <code>tour</code>, while a <code>video360</code> manifest
+carries <code>video</code> and <code>timeline</code> instead. Public manifests
 contain revision-scoped URLs of the form
 <code>/api/v1/publications/:projectId/:publicationRevision/media/:derivativeId</code>.
 Private manifests are hydrated at read time with short-lived signed
@@ -671,6 +862,47 @@ Public manifest responses use
 <code>Cache-Control: public, max-age=0, must-revalidate</code> so a slug is
 revalidated when the current publication changes. Private responses use
 <code>Cache-Control: private, no-store</code>.
+
+### POST /view/:slug/playback-profile
+
+Optional server-side playback profile selection for <code>video360</code>
+publications. It applies the same visibility policy as the manifest route.
+
+~~~json
+{
+  "handheld": true,
+  "viewportClass": "constrained",
+  "maxTextureSize": 4096,
+  "networkClass": "constrained",
+  "supportedMimeTypes": ["video/mp4"],
+  "dataSaver": false
+}
+~~~
+
+Every field is optional. The response returns the chosen profile, the reason for
+the decision, the rejected candidates, and the ordered candidate IDs:
+
+~~~json
+{
+  "experienceId": "project-id",
+  "publicationRevision": 3,
+  "selection": {
+    "policyVersion": 1,
+    "reason": "handheld-width-constraint",
+    "rejected": [{ "profileId": "desktop", "reason": "exceeds-handheld-width" }],
+    "selected": { "profileId": "mobile", "media": {}, "constraints": {} },
+    "candidateProfileIds": ["mobile"]
+  }
+}
+~~~
+
+The published manifest already contains the same ordered candidates under
+<code>video.profiles</code>, handheld-safe first, so a player that selects
+locally never needs this call. When no published profile is compatible with the
+supplied device facts the endpoint returns
+<code>422 VIDEO_PLAYBACK_CAPABILITY_UNSUPPORTED</code> rather than offering an
+unsupported source. Responses use <code>Cache-Control: private, no-store</code>
+because the decision is caller-specific.
 
 ### GET /api/v1/media/:derivativeId
 
@@ -736,13 +968,35 @@ names are:
 - <code>experience_load_started</code>
 - <code>first_panorama_visible</code>
 - <code>time_to_interactive</code>
+- <code>scene_changed</code>
+- <code>scene_transition_failed</code>
 - <code>hotspot_clicked</code>
 - <code>asset_failed</code>
 - <code>viewer_error</code>
 - <code>experience_exited</code>
 
-The schema also reserves later runtime event names such as
-<code>scene_changed</code>. Duplicate <code>eventId</code> delivery is safe.
+360 video experiences add:
+
+- <code>video_started</code> and <code>video_stalled</code> (required for
+  playback engagement and reliability reporting)
+- <code>video_paused</code>, <code>video_resumed</code>,
+  <code>video_seeked</code>, <code>video_ended</code>
+- <code>video_profile_selected</code> — requires <code>assetId</code>,
+  <code>derivativeId</code> and <code>profileId</code>
+- <code>video_playback_failed</code> — requires <code>assetId</code> and a
+  <code>failureCategory</code> of <code>profile_unavailable</code>,
+  <code>media_unavailable</code>, <code>decode_failed</code>,
+  <code>codec_unsupported</code>, <code>network_error</code>,
+  <code>autoplay_blocked</code>, <code>viewer_error</code>, or
+  <code>unknown</code>
+- <code>timeline_interaction_shown</code> and
+  <code>timeline_interaction_clicked</code> — require
+  <code>interactionId</code> and <code>kind</code>
+
+Every event carries the experience ID, publication revision and viewer
+integration version, so playback and profile-selection problems can be traced to
+a specific published revision and renderer integration. Duplicate
+<code>eventId</code> delivery is safe.
 Clients must never block playback on telemetry delivery and may treat an
 accepted response as fire-and-forget.
 

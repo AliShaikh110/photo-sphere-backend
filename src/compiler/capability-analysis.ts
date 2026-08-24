@@ -6,8 +6,133 @@ import type {
 } from '../capabilities/types';
 import type { CanonicalAsset, CanonicalProject } from '../domain/types';
 import { selectPanoramaDerivatives } from './derivative-selector';
+import { hasPublishableVideoProfile } from './video-derivative-selector';
 
 export function analyzeProjectCapabilities(
+  project: CanonicalProject,
+  assets: readonly CanonicalAsset[],
+): CapabilityResolutionInput {
+  return project.type === 'video360'
+    ? analyzeVideoProjectCapabilities(project, assets)
+    : analyzeImageProjectCapabilities(project, assets);
+}
+
+/**
+ * A video360 experience is one video plus timed interactions; it never
+ * requests panorama or tour capabilities.
+ */
+export function analyzeVideoProjectCapabilities(
+  project: CanonicalProject,
+  assets: readonly CanonicalAsset[],
+): CapabilityResolutionInput {
+  const requested = new Set<CapabilityId>(['video360']);
+  const references: CapabilityAssetReference[] = [];
+  const assetsById = new Map(assets.map((asset) => [asset.id, asset]));
+  const videoAsset = project.videoAssetId === null || project.videoAssetId === undefined
+    ? undefined
+    : assetsById.get(project.videoAssetId);
+  const videoAssetId = project.videoAssetId ?? `missing-video:${project.id}`;
+  const durationMs = readNumber(videoAsset?.metadata?.durationMs);
+  const playbackReady = videoAsset !== undefined && hasPublishableVideoProfile(videoAsset);
+
+  references.push(assetReference({
+    assetId: videoAssetId,
+    capabilityId: 'video360',
+    requirement: 'ready-video360-source',
+    asset: videoAsset,
+    entityId: project.id,
+    path: 'videoAssetId',
+  }));
+  references.push(assetReference({
+    assetId: videoAssetId,
+    capabilityId: 'video360',
+    requirement: 'ready-video360-playback-profile',
+    asset: videoAsset,
+    derivativeReady: playbackReady,
+    entityId: project.id,
+    path: 'videoAssetId',
+  }));
+
+  const timeline = project.timeline ?? [];
+  if (timeline.length > 0) {
+    requested.add('videoTimeline');
+    references.push(assetReference({
+      assetId: videoAssetId,
+      capabilityId: 'videoTimeline',
+      requirement: 'known-video-duration',
+      asset: videoAsset,
+      derivativeReady: durationMs !== undefined && durationMs > 0,
+      entityId: project.id,
+      path: 'timeline',
+    }));
+  }
+
+  for (const [index, interaction] of timeline.entries()) {
+    const path = `timeline[${index}]`;
+    if (interaction.kind === 'hotspot') requested.add('timedHotspots');
+    if (interaction.kind === 'viewpoint') requested.add('timedViewpoint');
+    if (interaction.kind === 'cta') requested.add('cta');
+    if (interaction.kind === 'link'
+      || interaction.action.kind === 'openUrl'
+      || interaction.content?.externalUrl !== undefined
+      || interaction.content?.ctaUrl !== undefined) {
+      requested.add('externalLink');
+    }
+
+    const imageAssetIds = [
+      interaction.content?.imageAssetId,
+      interaction.action.kind === 'openAsset' ? interaction.action.assetId : undefined,
+    ].filter((assetId): assetId is string => assetId !== undefined);
+    for (const assetId of imageAssetIds) {
+      const asset = assetsById.get(assetId);
+      const capabilityId: CapabilityId = asset?.mediaType === 'video' || asset?.mediaType === 'video360'
+        ? 'videoContent'
+        : 'imageContent';
+      requested.add(capabilityId);
+      references.push(assetReference({
+        assetId,
+        capabilityId,
+        requirement: capabilityId === 'videoContent' ? 'ready-video-content' : 'ready-image-content',
+        asset,
+        entityId: interaction.id,
+        path: `${path}.${interaction.action.kind === 'openAsset' ? 'action.assetId' : 'content.imageAssetId'}`,
+      }));
+    }
+    if (interaction.content?.videoAssetId !== undefined) {
+      requested.add('videoContent');
+      const assetId = interaction.content.videoAssetId;
+      references.push(assetReference({
+        assetId,
+        capabilityId: 'videoContent',
+        requirement: 'ready-video-content',
+        asset: assetsById.get(assetId),
+        entityId: interaction.id,
+        path: `${path}.content.videoAssetId`,
+      }));
+    }
+  }
+
+  if (project.settings.information?.externalUrl !== undefined) requested.add('externalLink');
+
+  return {
+    projectId: project.id,
+    requestedCapabilities: [...requested],
+    availableDeviceRequirements: ['video-playback'],
+    availableMediaRequirements: mediaRequirementsSatisfied(references),
+    assetReferences: references,
+    configuration: {
+      timelineInteractionCount: timeline.length,
+      ...(durationMs === undefined ? {} : { videoDurationMs: durationMs }),
+    },
+    fallbackMode: 'apply',
+  };
+}
+
+function readNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function analyzeImageProjectCapabilities(
   project: CanonicalProject,
   assets: readonly CanonicalAsset[],
 ): CapabilityResolutionInput {

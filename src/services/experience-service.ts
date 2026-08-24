@@ -16,6 +16,11 @@ import type {
   CanonicalAsset,
   CanonicalBranding,
   CanonicalHotspot,
+  CanonicalTimelineAction,
+  CanonicalTimelineContent,
+  CanonicalTimelineInteraction,
+  CanonicalTimelineVisibilityRules,
+  CanonicalViewpoint,
   CanonicalHotspotAction,
   CanonicalHotspotAppearance,
   CanonicalHotspotContent,
@@ -41,10 +46,17 @@ import {
   PublishedSceneDefinition,
   Scene,
   SceneConnection,
+  TimelineInteraction,
   User
 } from '../models';
 import type { IdempotencyRecord } from '../models';
 import type { JsonObject } from '../models/model.types';
+import {
+  NoCompatibleVideoProfileError,
+  selectVideoPlaybackProfile,
+  type VideoDeviceCapabilities,
+  type VideoProfileCandidate
+} from '../runtime';
 import { sha256, stableJson } from '../utils/hash';
 import {
   completeIdempotencyLease,
@@ -103,6 +115,29 @@ function mapSceneConnection(connection: SceneConnection): CanonicalSceneConnecti
     ...(connection.importance === null ? {} : { importance: connection.importance }),
     ...(connection.preloadHint === null ? {} : { preloadHint: connection.preloadHint }),
     createdAt: connection.createdAt
+  };
+}
+
+function mapTimelineInteraction(interaction: TimelineInteraction): CanonicalTimelineInteraction {
+  const geometry = interaction.geometry as unknown as CanonicalHotspot['geometry'];
+  const position = interaction.position as unknown as SphericalPosition;
+  const viewpoint = interaction.viewpoint as unknown as CanonicalViewpoint;
+  return {
+    id: interaction.id,
+    projectId: interaction.projectId,
+    kind: interaction.kind,
+    timeMs: interaction.timeMs,
+    endTimeMs: interaction.endTimeMs,
+    ...(typeof interaction.geometry.kind === 'string' ? { geometry } : {}),
+    ...(interaction.position.coordinateSystem === 'spherical_degrees' ? { position } : {}),
+    ...(typeof interaction.viewpoint.headingDegrees === 'number' ? { viewpoint } : {}),
+    appearance: interaction.appearance as unknown as CanonicalHotspotAppearance,
+    content: interaction.content as unknown as CanonicalTimelineContent,
+    action: interaction.action as unknown as CanonicalTimelineAction,
+    visibilityRules: interaction.visibilityRules as unknown as CanonicalTimelineVisibilityRules,
+    sortOrder: interaction.sortOrder,
+    createdAt: interaction.createdAt,
+    updatedAt: interaction.updatedAt
   };
 }
 
@@ -200,6 +235,13 @@ async function loadExperience(options: {
     include: [{ model: AssetDerivative, as: 'derivatives' }],
     ...(options.transaction === undefined ? {} : { transaction: options.transaction })
   });
+  const timeline = project.type === 'video360'
+    ? await TimelineInteraction.findAll({
+      where: { projectId: options.projectId },
+      order: [['timeMs', 'ASC'], ['sortOrder', 'ASC'], ['id', 'ASC']],
+      ...(options.transaction === undefined ? {} : { transaction: options.transaction })
+    })
+    : [];
   const inputProject: CanonicalProject = {
     id: project.id,
     ownerId: project.ownerId,
@@ -207,9 +249,22 @@ async function loadExperience(options: {
     name: project.name,
     schemaVersion: project.schemaVersion,
     revision: project.revision,
-    settings: project.settings as unknown as CanonicalProjectSettings,
+    settings: {
+      ...(project.settings as unknown as CanonicalProjectSettings),
+      // Product-level video playback settings live on the project row, not in
+      // the generic settings blob; the canonical model presents them together.
+      ...(project.type === 'video360'
+        ? { video: project.videoSettings as unknown as NonNullable<CanonicalProjectSettings['video']> }
+        : {})
+    },
     branding: project.branding as unknown as CanonicalBranding,
     scenes: (project.scenes ?? []).map(mapScene),
+    ...(project.type === 'video360'
+      ? {
+        videoAssetId: project.videoAssetId,
+        timeline: timeline.map(mapTimelineInteraction)
+      }
+      : {}),
     publication: project.publicationMetadata as unknown as NonNullable<CanonicalProject['publication']>
   };
   return { project, inputProject, assets: assets.map(mapAsset) };
@@ -634,6 +689,16 @@ export async function authorizePublishedDerivative(options: {
   if (!publication) {
     throw new AppError('MEDIA_ACCESS_DENIED', 'You do not have access to this media.', { status: 403 });
   }
+  // A retired public revision stays addressable only while the experience is
+  // still published publicly. Republishing it as private revokes anonymous
+  // origin access to every earlier public revision.
+  const currentPublication = await Publication.findOne({
+    where: { projectId: options.projectId, isCurrent: true, status: 'published' },
+    attributes: ['visibility']
+  });
+  if (currentPublication?.visibility !== 'public') {
+    throw new AppError('MEDIA_ACCESS_DENIED', 'You do not have access to this media.', { status: 403 });
+  }
   let referenced = publication.compiledManifest !== null
     && manifestReferencesDerivative(publication.compiledManifest, options.derivativeId);
   if (!referenced) {
@@ -655,6 +720,84 @@ export async function authorizePublishedDerivative(options: {
   const derivative = await AssetDerivative.findByPk(options.derivativeId);
   if (!derivative) throw notFound('media');
   return derivative;
+}
+
+export interface PlaybackProfileResolution {
+  readonly experienceId: string;
+  readonly publicationRevision: number;
+  readonly selection: Record<string, unknown>;
+}
+
+/**
+ * Server-side playback profile selection. Players may instead choose from the
+ * ordered candidate list embedded in the manifest; this endpoint exists so the
+ * decision can also be made and observed on the platform side.
+ */
+export async function resolvePlaybackProfile(options: {
+  slug: string;
+  device: VideoDeviceCapabilities;
+  authenticatedUserId?: string;
+}): Promise<PlaybackProfileResolution> {
+  const publication = await Publication.findOne({
+    where: { slug: options.slug, isCurrent: true, status: 'published' },
+    include: [{ model: Project, as: 'project', attributes: ['id', 'ownerId'] }]
+  });
+  if (!publication?.compiledManifest || !publication.project) throw notFound('publication');
+  assertPublicationAccess(publication, options.authenticatedUserId);
+
+  const manifest = publication.visibility === 'private'
+    ? hydrateProtectedMediaUrls(publication.compiledManifest, publication.id)
+    : publication.compiledManifest;
+  if (manifest.experienceType !== 'video360') {
+    throw new AppError('PLAYBACK_PROFILE_NOT_APPLICABLE', 'This experience is not a 360 video.', {
+      status: 422,
+      entityId: publication.projectId
+    });
+  }
+  const video = record(manifest.video);
+  const profiles = Array.isArray(video?.profiles) ? video.profiles : [];
+  const candidates: VideoProfileCandidate[] = profiles.flatMap((entry) => {
+    const profile = record(entry);
+    const media = record(profile?.media);
+    const constraints = record(profile?.constraints);
+    if (!profile || !media || !constraints) return [];
+    if (typeof profile.profileId !== 'string' || typeof media.derivativeId !== 'string') return [];
+    return [{
+      profileId: profile.profileId as VideoProfileCandidate['profileId'],
+      derivativeId: media.derivativeId,
+      mimeType: String(constraints.mimeType ?? media.mimeType ?? 'video/mp4'),
+      width: Number(media.width ?? constraints.maxWidth ?? 0),
+      height: Number(media.height ?? 0),
+      handheldSafe: constraints.handheldSafe === true
+    }];
+  });
+
+  let selection;
+  try {
+    selection = selectVideoPlaybackProfile(candidates, options.device);
+  } catch (error) {
+    if (!(error instanceof NoCompatibleVideoProfileError)) throw error;
+    throw new AppError(
+      'VIDEO_PLAYBACK_CAPABILITY_UNSUPPORTED',
+      'No published playback profile is compatible with this device.',
+      { status: 422, entityId: publication.projectId, details: { candidates: candidates.length } }
+    );
+  }
+  const selectedProfile = profiles
+    .map((entry) => record(entry))
+    .find((profile) => profile?.profileId === selection.selected.profileId);
+
+  return {
+    experienceId: publication.projectId,
+    publicationRevision: publication.publicationRevision,
+    selection: {
+      policyVersion: selection.policyVersion,
+      reason: selection.reason,
+      rejected: selection.rejected,
+      selected: selectedProfile ?? null,
+      candidateProfileIds: selection.ordered.map((candidate) => candidate.profileId)
+    }
+  };
 }
 
 export interface DerivativeTileDescriptor {
