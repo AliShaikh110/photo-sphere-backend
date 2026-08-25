@@ -8,6 +8,8 @@ import {
   type MediaUrlResolutionRequest
 } from '../../../src/compiler/types';
 import type { AssetDerivative, CanonicalAsset, CanonicalProject } from '../../../src/domain/types';
+import { PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION } from '../../../src/compiler/viewer-integration-adapter';
+import { COMPILED_MANIFEST_VERSION } from '../../../src/compiler/types';
 
 function videoDerivative(
   kind: AssetDerivative['kind'],
@@ -126,7 +128,7 @@ function compilerInput(overrides: Partial<CompileExperienceInput> = {}): Compile
 
 function createCompiler(requests: MediaUrlResolutionRequest[] = []): ExperienceCompiler {
   return new ExperienceCompiler({
-    viewerIntegrationVersion: 'psv-5.14.3-adapter-1',
+    viewerIntegrationVersion: PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION,
     mediaUrlResolver: {
       resolve: vi.fn((request: MediaUrlResolutionRequest) => {
         requests.push(request);
@@ -155,14 +157,14 @@ describe('Experience compiler — 360 video', () => {
 
     expect(second).toEqual(first);
     expect(first).toMatchObject({
-      manifestVersion: 3,
+      manifestVersion: COMPILED_MANIFEST_VERSION,
       experienceType: 'video360',
       experienceId: 'project-1',
       projectRevision: 3,
       publicationRevision: null,
       target: 'preview',
       visibility: 'private',
-      viewerIntegrationVersion: 'psv-5.14.3-adapter-1'
+      viewerIntegrationVersion: PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION
     });
     expect(requests.every((request) => request.access === 'protected')).toBe(true);
     expect(Object.isFrozen(first)).toBe(true);

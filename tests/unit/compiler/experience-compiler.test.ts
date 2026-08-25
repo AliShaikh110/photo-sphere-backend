@@ -12,6 +12,8 @@ import type {
 import { isImageExperienceManifest } from '../../../src/compiler/types';
 import type { CanonicalOverlay } from '../../../src/domain/types';
 import { derivative, canonicalProject, panoramaAsset } from './fixtures';
+import { PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION } from '../../../src/compiler/viewer-integration-adapter';
+import { COMPILED_MANIFEST_VERSION } from '../../../src/compiler/types';
 
 function compilerInput(
   overrides: Partial<CompileExperienceInput> = {},
@@ -34,7 +36,7 @@ function compilerInput(
 
 function createCompiler(requests: MediaUrlResolutionRequest[] = []): ExperienceCompiler {
   return new ExperienceCompiler({
-    viewerIntegrationVersion: 'psv-5.14.3-adapter-1',
+    viewerIntegrationVersion: PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION,
     mediaUrlResolver: {
       resolve: vi.fn((request: MediaUrlResolutionRequest) => {
         requests.push(request);
@@ -64,7 +66,7 @@ describe('Experience compiler', () => {
 
     expect(second).toEqual(first);
     expect(first).toMatchObject({
-      manifestVersion: 3,
+      manifestVersion: COMPILED_MANIFEST_VERSION,
       experienceType: 'image360',
       schemaVersion: 1,
       experienceId: 'project-1',
@@ -72,7 +74,7 @@ describe('Experience compiler', () => {
       publicationRevision: null,
       target: 'preview',
       visibility: 'private',
-      viewerIntegrationVersion: 'psv-5.14.3-adapter-1',
+      viewerIntegrationVersion: PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION,
       initialSceneId: 'scene-1',
       capabilities: expect.arrayContaining([
         expect.objectContaining({ id: 'basicPanorama', required: true }),
@@ -80,7 +82,7 @@ describe('Experience compiler', () => {
       ]),
       telemetry: expect.objectContaining({
         experienceId: 'project-1',
-        viewerIntegrationVersion: 'psv-5.14.3-adapter-1',
+        viewerIntegrationVersion: PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION,
       }),
     });
     expect(first.scenes[0]!.panorama.base).toMatchObject({
@@ -226,10 +228,16 @@ describe('Experience compiler', () => {
     await expect(createCompiler().compile(compilerInput({ project: unsafeProject })))
       .rejects.toMatchObject({
         code: 'EXPERIENCE_COMPILATION_FAILED',
-        issues: [expect.objectContaining({
-          code: 'CAPABILITY_UNSUPPORTED',
-          path: 'scenes[0].overlays',
-        })],
+        issues: expect.arrayContaining([
+          expect.objectContaining({
+            code: 'INVALID_FIELD',
+            path: 'scenes[0].overlays[0].geometry',
+          }),
+          expect.objectContaining({
+            code: 'INVALID_FIELD',
+            path: 'scenes[0].overlays[0].action',
+          }),
+        ]),
       });
   });
 
@@ -272,7 +280,7 @@ describe('Experience compiler', () => {
   it('fails closed when the injected resolver returns an unsafe URL', async () => {
     const compiler = new ExperienceCompiler({
       mediaUrlResolver: { resolve: () => 'javascript:alert(1)' },
-      viewerIntegrationVersion: 'psv-5.14.3-adapter-1',
+      viewerIntegrationVersion: PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION,
     });
     await expect(compiler.compile(compilerInput())).rejects.toMatchObject({
       code: 'EXPERIENCE_COMPILATION_FAILED',

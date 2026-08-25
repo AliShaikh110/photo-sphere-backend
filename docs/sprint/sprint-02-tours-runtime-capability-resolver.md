@@ -467,23 +467,37 @@ If scene definitions are materialized as compiled publication artifacts rather t
 
 ## 19. Acceptance Criteria / Sprint Gate
 
-- [ ] Multi-scene projects persist with stable scene IDs.
-- [ ] Scene connections are validated and broken references cannot publish.
-- [ ] Scene reorder and delete rules are deterministic.
-- [ ] Gallery/navigation/autorotation/compass/view-limits exist as product-level settings.
-- [ ] Capability registry exists as a shared backend contract.
-- [ ] Validation resolves dependencies/incompatibilities before publish.
-- [ ] Small-tour and large-tour compiler strategies both exist.
-- [ ] Large-tour initial manifest contains lightweight scene index rather than every heavy scene payload.
-- [ ] Published scene-definition route resolves immutable publication data.
-- [ ] Private large-tour scene fetch is authorization-protected.
-- [ ] Preload policy selects likely adjacent scenes only.
-- [ ] Runtime cache policy is bounded and platform-controlled.
+- [x] Multi-scene projects persist with stable scene IDs.
+- [x] Scene connections are validated and broken references cannot publish.
+- [x] Scene reorder and delete rules are deterministic.
+- [x] Gallery/navigation/autorotation/compass/view-limits exist as product-level settings.
+- [x] Capability registry exists as a shared backend contract.
+- [x] Validation resolves dependencies/incompatibilities before publish.
+- [x] Small-tour and large-tour compiler strategies both exist.
+- [x] Large-tour initial manifest contains lightweight scene index rather than every heavy scene payload.
+- [x] Published scene-definition route resolves immutable publication data.
+- [x] Private large-tour scene fetch is authorization-protected.
+- [x] Preload policy selects likely adjacent scenes only.
+- [x] Runtime cache policy is bounded and platform-controlled.
 - [ ] Tiled/high-resolution derivative generation is policy-driven and retry-safe.
-- [ ] Compiler can select low-res/base + high-detail tiled delivery.
-- [ ] Optional runtime modules are declared only when needed.
-- [ ] `scene_changed` and `scene_transition_failed` telemetry is supported.
-- [ ] Full regression suite from Sprint 01 still passes.
+- [x] Compiler can select low-res/base + high-detail tiled delivery.
+- [x] Optional runtime modules are declared only when needed.
+- [x] `scene_changed` and `scene_transition_failed` telemetry is supported.
+- [x] Full regression suite from Sprint 01 still passes.
+
+Verification on 2026-08-25: `npm run test:all` passed lint, typecheck, 135 tests
+across 26 files, and the production build. Tour behaviour is covered by
+`tests/integration/sprint-02-tour-api.test.ts` (scene IDs across reorder,
+inbound-reference delete refusal, embedded vs progressive delivery, private
+progressive-scene authorization, compiled tour settings, bounded preload/cache,
+scene telemetry) and by `tests/unit/reference/reference-experience-suite.test.ts`
+(`multi-scene-tour`, `large-tour` at 120 scenes, `high-resolution-panorama`
+asserting the tiled family is selected).
+
+Remaining gap: tiled derivative **generation** is implemented in
+`src/media/image-processor.ts` and `src/services/media-worker-service.ts` and its
+selection is proven, but the generation job itself has no test asserting the
+policy trigger or retry-safety. Everything downstream of it is covered.
 
 ## 20. Claude Code Execution Order
 

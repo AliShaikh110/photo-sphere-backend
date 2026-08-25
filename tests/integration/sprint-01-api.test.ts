@@ -10,6 +10,7 @@ import {
   truncateApplicationData,
   type IntegrationTestContext
 } from '../helpers/postgres-test-context';
+import { PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION } from '../../src/compiler/viewer-integration-adapter';
 
 describe.sequential('Sprint 01 HTTP integration', () => {
   let context: IntegrationTestContext;
@@ -664,7 +665,7 @@ describe.sequential('Sprint 01 HTTP integration', () => {
       eventName: 'first_panorama_visible',
       experienceId: projectId,
       publicationRevision: 2,
-      viewerIntegrationVersion: 'psv-5.14.3-adapter-1',
+      viewerIntegrationVersion: PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION,
       sessionId: 'session-12345678',
       deviceContext: { platform: 'integration-test' },
       payload: { elapsedMs: 123 },

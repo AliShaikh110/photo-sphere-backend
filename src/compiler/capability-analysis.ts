@@ -312,8 +312,10 @@ function analyzeImageProjectCapabilities(
     for (const [overlayIndex, overlay] of overlays.entries()) {
       const path = `scenes[${sceneIndex}].overlays[${overlayIndex}]`;
       requested.add('advancedOverlay');
-      if (overlay.action.kind === 'goToScene') hasSceneNavigation = true;
-      if (overlay.action.kind === 'openUrl'
+      // A malformed record is reported by the compiler, which owns the stable
+      // issue codes; analysis only has to survive long enough to get there.
+      if (overlay.action?.kind === 'goToScene') hasSceneNavigation = true;
+      if (overlay.action?.kind === 'openUrl'
         || overlay.content?.externalUrl !== undefined) requested.add('externalLink');
       const geometry = analyzeGeometry(
         overlay.geometry,
@@ -398,13 +400,18 @@ function analyzeImageProjectCapabilities(
  * asset readiness requirement.
  */
 function analyzeGeometry(
-  geometry: CanonicalInteractionGeometry,
+  geometry: CanonicalInteractionGeometry | undefined,
   path: string,
   entityId: string,
   assetsById: ReadonlyMap<string, CanonicalAsset>,
   requested: Set<CapabilityId>,
   references: CapabilityAssetReference[],
 ): GeometryAnalysis {
+  // A record without a recognizable geometry requests no capability here.
+  // Preflight raises the stable issue for it; analysis just has to not throw.
+  if (geometry?.kind === undefined) {
+    return { advancedGeometryCount: 0, customInteractionCount: 0 };
+  }
   switch (geometry.kind) {
     case 'point':
       return { advancedGeometryCount: 0, customInteractionCount: 0 };
@@ -444,7 +451,7 @@ function analyzeOverlayContent(
 ): void {
   const imageAssetIds = [
     overlay.content?.imageAssetId,
-    overlay.action.kind === 'openAsset' ? overlay.action.assetId : undefined,
+    overlay.action?.kind === 'openAsset' ? overlay.action.assetId : undefined,
   ].filter((assetId): assetId is string => assetId !== undefined);
   for (const assetId of imageAssetIds) {
     const asset = assetsById.get(assetId);

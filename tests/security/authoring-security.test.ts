@@ -202,6 +202,9 @@ describe.sequential('Sprint 01 authoring security boundaries', () => {
       .expect(422)
       .expect(({ body }) => expect(body.error.code).toBe('VALIDATION_FAILED'));
 
+    // Overlays became a validated canonical entity in Sprint 04, so an
+    // unrecognized bag is now refused at the write boundary instead of being
+    // stored and rejected later by the compiler.
     await request(context.app)
       .post(`/api/v1/projects/${projectId}/scenes`)
       .set(auth)
@@ -211,38 +214,36 @@ describe.sequential('Sprint 01 authoring security boundaries', () => {
         panoramaAssetId: seeded.assetId,
         overlays: [{ html: '<img src=x onerror=steal()>' }]
       })
-      .expect(201);
-
-    await request(context.app)
-      .post(`/api/v1/projects/${projectId}/validate`)
-      .set(auth)
-      .send({ revision: 2 })
-      .expect(200)
-      .expect(({ body }) => expect(body.data).toMatchObject({
-        valid: false,
-        issues: [expect.objectContaining({
-          code: 'CAPABILITY_UNSUPPORTED',
-          path: 'scenes[0].overlays'
-        })]
-      }));
-    await request(context.app)
-      .post(`/api/v1/projects/${projectId}/preview-manifest`)
-      .set(auth)
-      .send({ revision: 2 })
       .expect(422)
-      .expect(({ body }) => expect(body.error.code).toBe('EXPERIENCE_VALIDATION_FAILED'));
+      .expect(({ body }) => expect(body.error.code).toBe('VALIDATION_FAILED'));
+
+    // Neither rejected write may leave a scene behind.
+    await request(context.app)
+      .get(`/api/v1/projects/${projectId}/scenes`)
+      .set(auth)
+      .expect(200)
+      .expect(({ body }) => expect(body.data.scenes).toHaveLength(0));
+
+    // A legitimate scene still publishes, and the manifest it produces carries
+    // no renderer plumbing and no unsanitized authored markup.
+    await request(context.app)
+      .post(`/api/v1/projects/${projectId}/scenes`)
+      .set(auth)
+      .send({ projectRevision: 1, name: 'Lobby', panoramaAssetId: seeded.assetId })
+      .expect(201);
     await request(context.app)
       .post(`/api/v1/projects/${projectId}/publish`)
       .set(auth)
-      .set('Idempotency-Key', `unsupported-${randomUUID()}`)
-      .send({ revision: 2, slug: 'unsupported-runtime-bag', visibility: 'public' })
-      .expect(422);
+      .set('Idempotency-Key', `supported-${randomUUID()}`)
+      .send({ revision: 2, slug: 'supported-runtime-bag', visibility: 'public' })
+      .expect(201);
 
-    const { Publication } = await import('../../src/models');
-    expect(await Publication.findOne({ where: { projectId } })).toMatchObject({
-      status: 'publish_failed',
-      isCurrent: false,
-      compiledManifest: null
-    });
+    const manifest = await request(context.app)
+      .get('/view/supported-runtime-bag/manifest')
+      .expect(200);
+    const serialized = JSON.stringify(manifest.body);
+    expect(serialized).not.toContain('unsafe-runtime-plugin');
+    expect(serialized).not.toContain('onerror');
+    expect(serialized).not.toContain('viewerConfig');
   }, 60_000);
 });

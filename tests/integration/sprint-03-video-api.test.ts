@@ -10,6 +10,7 @@ import {
   truncateApplicationData,
   type IntegrationTestContext
 } from '../helpers/postgres-test-context';
+import { PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION } from '../../src/compiler/viewer-integration-adapter';
 
 const VIDEO_DURATION_MS = 6_000;
 
@@ -407,7 +408,7 @@ describe.sequential('Sprint 03 — 360 video, timeline and device-aware playback
             eventName: 'video_started',
             experienceId: projectId,
             publicationRevision: 1,
-            viewerIntegrationVersion: 'psv-5.14.3-adapter-1',
+            viewerIntegrationVersion: PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION,
             sessionId,
             occurredAt: new Date().toISOString(),
             payload: { assetId, profileId: 'mobile', currentTimeMs: 0 }
@@ -417,7 +418,7 @@ describe.sequential('Sprint 03 — 360 video, timeline and device-aware playback
             eventName: 'video_stalled',
             experienceId: projectId,
             publicationRevision: 1,
-            viewerIntegrationVersion: 'psv-5.14.3-adapter-1',
+            viewerIntegrationVersion: PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION,
             sessionId,
             occurredAt: new Date().toISOString(),
             payload: { assetId, currentTimeMs: 2_400 }
@@ -427,7 +428,7 @@ describe.sequential('Sprint 03 — 360 video, timeline and device-aware playback
             eventName: 'video_profile_selected',
             experienceId: projectId,
             publicationRevision: 1,
-            viewerIntegrationVersion: 'psv-5.14.3-adapter-1',
+            viewerIntegrationVersion: PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION,
             sessionId,
             occurredAt: new Date().toISOString(),
             payload: {
@@ -442,7 +443,7 @@ describe.sequential('Sprint 03 — 360 video, timeline and device-aware playback
             eventName: 'video_playback_failed',
             experienceId: projectId,
             publicationRevision: 1,
-            viewerIntegrationVersion: 'psv-5.14.3-adapter-1',
+            viewerIntegrationVersion: PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION,
             sessionId,
             occurredAt: new Date().toISOString(),
             payload: { assetId, failureCategory: 'codec_unsupported', currentTimeMs: 100 }
@@ -452,7 +453,7 @@ describe.sequential('Sprint 03 — 360 video, timeline and device-aware playback
             eventName: 'timeline_interaction_shown',
             experienceId: projectId,
             publicationRevision: 1,
-            viewerIntegrationVersion: 'psv-5.14.3-adapter-1',
+            viewerIntegrationVersion: PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION,
             sessionId,
             occurredAt: new Date().toISOString(),
             payload: { interactionId: hotspotId, kind: 'hotspot', timeMs: 500 }
@@ -469,7 +470,7 @@ describe.sequential('Sprint 03 — 360 video, timeline and device-aware playback
         eventName: 'video_playback_failed',
         experienceId: projectId,
         publicationRevision: 1,
-        viewerIntegrationVersion: 'psv-5.14.3-adapter-1',
+        viewerIntegrationVersion: PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION,
         sessionId,
         occurredAt: new Date().toISOString(),
         payload: { assetId, failureCategory: 'not-a-category' }

@@ -1486,8 +1486,8 @@ function collectPinnedExtensions(
   project: CanonicalProject,
 ): Record<string, string> {
   const pinned: Record<string, string> = {};
-  const record = (geometry: CanonicalInteractionGeometry): void => {
-    if (geometry.kind === 'custom') {
+  const record = (geometry: CanonicalInteractionGeometry | undefined): void => {
+    if (geometry?.kind === 'custom') {
       pinned[geometry.extensionId] = geometry.extensionVersion;
     }
   };

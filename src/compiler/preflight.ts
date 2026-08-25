@@ -166,6 +166,9 @@ function preflightImageExperience(input: CompileExperienceInput): CompilerPrefli
     }
 
     for (const [overlayIndex, overlay] of (scene.overlays ?? []).entries()) {
+      // Schema validation already reported this record; its asset references
+      // cannot be resolved and reading them would only throw.
+      if (overlay?.geometry?.kind === undefined || overlay.action?.kind === undefined) continue;
       const path = `scenes[${sceneIndex}].overlays[${overlayIndex}]`;
       requireGeometryMedia(
         overlay.geometry,

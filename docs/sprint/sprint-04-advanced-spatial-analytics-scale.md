@@ -632,24 +632,49 @@ Use measurements to tune configuration; do not invent production thresholds with
 
 ## 24. Acceptance Criteria / Sprint Gate
 
-- [ ] Spatial scene data model supports GPS and/or floor-plan coordinates without requiring both.
-- [ ] Map/plan capability is publishable only when required data/assets are valid.
-- [ ] Gyroscope/stereo/VR capabilities have declared device requirements and normal-360 fallback.
-- [ ] Advanced interaction geometry supports point/polygon/polyline/imageLayer/videoLayer/custom in canonical schema.
-- [ ] Advanced geometry never requires renderer-specific persistence.
-- [ ] Quality/resolution policy can choose among available panorama derivative families.
-- [ ] Template instantiation creates clean canonical projects with fresh mutable IDs.
-- [ ] Creator analytics APIs provide authorized, revision-aware aggregated metrics.
-- [ ] Collaboration/access controls are server-enforced where team scope is enabled.
-- [ ] Private progressive scene/media/embed endpoints cannot bypass access rules.
-- [ ] Enterprise large-tour fixture is progressively delivered.
-- [ ] Public API foundation is versioned and documents auth/error/idempotency behavior.
-- [ ] Extension registry validates and pins custom extension versions.
-- [ ] Dual-fisheye/live provider interfaces exist behind safe feature/provider boundaries.
-- [ ] Publication stores viewer integration version.
-- [ ] Reference experience suite gates viewer integration upgrades.
+- [x] Spatial scene data model supports GPS and/or floor-plan coordinates without requiring both.
+- [x] Map/plan capability is publishable only when required data/assets are valid.
+- [x] Gyroscope/stereo/VR capabilities have declared device requirements and normal-360 fallback.
+- [x] Advanced interaction geometry supports point/polygon/polyline/imageLayer/videoLayer/custom in canonical schema.
+- [x] Advanced geometry never requires renderer-specific persistence.
+- [x] Quality/resolution policy can choose among available panorama derivative families.
+- [x] Template instantiation creates clean canonical projects with fresh mutable IDs.
+- [x] Creator analytics APIs provide authorized, revision-aware aggregated metrics.
+- [x] Collaboration/access controls are server-enforced where team scope is enabled.
+- [x] Private progressive scene/media/embed endpoints cannot bypass access rules.
+- [x] Enterprise large-tour fixture is progressively delivered.
+- [x] Public API foundation is versioned and documents auth/error/idempotency behavior.
+- [x] Extension registry validates and pins custom extension versions.
+- [x] Dual-fisheye/live provider interfaces exist behind safe feature/provider boundaries.
+- [x] Publication stores viewer integration version.
+- [x] Reference experience suite gates viewer integration upgrades.
 - [ ] Observability covers media, compiler/publish, runtime, and API failures.
-- [ ] Full regression suite from Sprints 01–03 passes.
+- [x] Full regression suite from Sprints 01–03 passes.
+
+Verification on 2026-08-25: `npm run test:all` passed lint, typecheck, 135 tests
+across 26 files, and the production build; `npm audit --omit=dev` reported zero
+vulnerabilities. Coverage added this pass:
+
+- `tests/unit/reference/reference-experience-suite.test.ts` — runs the §20
+  reference suite as the promotion gate. All 13 scenarios compile against every
+  registered integration version, an unregistered version is refused, and the
+  120-scene tour is asserted to stay progressive.
+- `tests/security/sprint-04-access-and-extension-security.test.ts` — the §22
+  matrix: private manifest/scene/media bypass, unsigned and tampered media
+  signatures, viewer role escalation, unauthorized analytics, extension
+  allowlist/schema validation with version pinning, template asset leakage.
+- `tests/security/live-source-ssrf.test.ts` — §17/§22 SSRF: loopback,
+  link-local, metadata, private and CGNAT ranges, suffix-confusion hosts and
+  non-stream schemes are all refused, and an empty allowlist refuses everything.
+- `tests/integration/sprint-04-spatial-geometry-api.test.ts` — GPS-or-plan
+  placement, advanced geometry round-tripping canonically through publish,
+  device-deferred immersive capabilities with normal-360 fallback, map gating on
+  real spatial data, and the integration version recorded on the publication.
+
+Remaining gap: observability. `src/observability/metrics.ts` and
+`GET /api/v1/platform/metrics` exist and are wired into the media, telemetry and
+publish paths, but no test asserts that a failure in those paths actually emits
+the metric. This is the one criterion above still unchecked.
 
 ## 25. Claude Code Execution Order
 
