@@ -51,12 +51,15 @@ import { sanitizePlainText } from '../security';
  */
 interface BlueprintHotspot {
   readonly key: string;
+  readonly geometryKind: InteractionGeometryKind;
   readonly geometry: JsonObject;
   readonly position: JsonObject;
   readonly appearance: JsonObject;
   readonly content: JsonObject;
   readonly action: JsonObject;
   readonly visibilityRules: JsonObject;
+  readonly extensionId: string | null;
+  readonly extensionVersion: string | null;
   readonly sortOrder: number;
 }
 
@@ -150,6 +153,88 @@ function asArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
 }
 
+function optionalString(value: unknown): string | null {
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+/**
+ * The geometry kind and extension pair an interaction must be stored with.
+ *
+ * Blueprints captured before the pair was recorded alongside the geometry only
+ * carry it inside the geometry object, so the geometry stays the fallback
+ * source. Kind and extension pair are always read together: `custom` geometry
+ * without a pinned extension violates the interaction's stored contract.
+ */
+function readGeometryIdentity(
+  stored: Record<string, unknown>,
+  geometry: Record<string, unknown>,
+  fallbackKind: InteractionGeometryKind
+): {
+  geometryKind: InteractionGeometryKind;
+  extensionId: string | null;
+  extensionVersion: string | null;
+} {
+  const geometryKind = (optionalString(stored.geometryKind)
+    ?? optionalString(geometry.kind)
+    ?? fallbackKind) as InteractionGeometryKind;
+  const extensionId = optionalString(stored.extensionId) ?? optionalString(geometry.extensionId);
+  const extensionVersion = optionalString(stored.extensionVersion)
+    ?? optionalString(geometry.extensionVersion);
+  if (geometryKind !== 'custom') {
+    // Only a custom interaction pins an extension; anything else stores none.
+    return { geometryKind, extensionId: null, extensionVersion: null };
+  }
+  if (extensionId === null || extensionVersion === null) {
+    throw new AppError(
+      'TEMPLATE_BLUEPRINT_INVALID',
+      'This template contains a custom interaction that is missing its extension.',
+      { status: 422, path: 'canonicalBlueprint' }
+    );
+  }
+  return { geometryKind, extensionId, extensionVersion };
+}
+
+type IdTranslator = (id: string) => string | null;
+
+/**
+ * Rewrites the scene a `goToScene` action points at.
+ *
+ * Scene links are mutable project data, so a blueprint has to carry a
+ * blueprint-local key rather than the source project's scene id. Without this
+ * an instantiated project would link back into the project it was captured
+ * from, which is both a broken link and a leak of the source's identifiers.
+ */
+function remapSceneAction(action: JsonObject, translate: IdTranslator): JsonObject {
+  if (action.kind !== 'goToScene' || typeof action.sceneId !== 'string') return action;
+  const target = translate(action.sceneId);
+  // A target that cannot be resolved would be a dangling link, so the action
+  // falls back to doing nothing rather than pointing outside the project.
+  return target === null ? { kind: 'none' } : { ...action, sceneId: target };
+}
+
+/** Preload hints name scenes, so they travel as keys for the same reason. */
+function remapRuntimeHints(hints: JsonObject, translate: IdTranslator): JsonObject {
+  const sceneIds = hints.likelyNextSceneIds;
+  if (!Array.isArray(sceneIds)) return hints;
+  return {
+    ...hints,
+    likelyNextSceneIds: sceneIds
+      .filter((value): value is string => typeof value === 'string')
+      .map(translate)
+      .filter((value): value is string => value !== null)
+  };
+}
+
+/** The default plan a plan-navigation experience opens on is a plan reference. */
+function remapPlanSettings(settings: JsonObject, translate: IdTranslator): JsonObject {
+  const plan = settings.plan;
+  if (typeof plan !== 'object' || plan === null || Array.isArray(plan)) return settings;
+  const { defaultPlanId, ...rest } = plan as Record<string, JsonValue>;
+  if (typeof defaultPlanId !== 'string') return settings;
+  const target = translate(defaultPlanId);
+  return { ...settings, plan: target === null ? rest : { ...rest, defaultPlanId: target } };
+}
+
 /* --------------------------------------------------------------------- */
 /* Capture: project -> blueprint                                          */
 /* --------------------------------------------------------------------- */
@@ -222,6 +307,7 @@ async function captureBlueprint(
     transaction
   });
   const sceneKeyById = new Map(scenes.map((scene, index) => [scene.id, `scene-${index + 1}`]));
+  const toSceneKey: IdTranslator = (sceneId) => sceneKeyById.get(sceneId) ?? null;
   const hotspotKeyById = new Map<string, string>();
   for (const scene of scenes) {
     for (const [index, hotspot] of (scene.hotspots ?? []).entries()) {
@@ -239,15 +325,21 @@ async function captureBlueprint(
     viewLimits: scene.viewLimits,
     // Plan placement is rewritten after plan keys exist.
     spatialData: scene.spatialData,
-    runtimeHints: scene.runtimeHints,
+    runtimeHints: remapRuntimeHints(scene.runtimeHints, toSceneKey),
     hotspots: (scene.hotspots ?? []).map((hotspot, index) => ({
       key: hotspotKeyById.get(hotspot.id)!,
+      geometryKind: hotspot.geometryKind,
       geometry: remapAssetIds(hotspot.geometry, toKey) as JsonObject,
       position: hotspot.position,
       appearance: remapAssetIds(hotspot.appearance, toKey) as JsonObject,
       content: remapAssetIds(hotspot.content, toKey) as JsonObject,
-      action: remapAssetIds(hotspot.action, toKey) as JsonObject,
+      action: remapSceneAction(remapAssetIds(hotspot.action, toKey) as JsonObject, toSceneKey),
       visibilityRules: hotspot.visibilityRules,
+      // A custom hotspot's extension pair travels with it: the geometry kind
+      // and the pinned extension version must stay consistent, exactly as the
+      // database constraint requires.
+      extensionId: hotspot.extensionId ?? null,
+      extensionVersion: hotspot.extensionVersion ?? null,
       sortOrder: hotspot.sortOrder ?? index
     })),
     overlays: (scene.overlays ?? []).map((overlay, index) => ({
@@ -258,7 +350,7 @@ async function captureBlueprint(
       position: overlay.position,
       appearance: remapAssetIds(overlay.appearance, toKey) as JsonObject,
       content: remapAssetIds(overlay.content, toKey) as JsonObject,
-      action: remapAssetIds(overlay.action, toKey) as JsonObject,
+      action: remapSceneAction(remapAssetIds(overlay.action, toKey) as JsonObject, toSceneKey),
       visibilityRules: overlay.visibilityRules,
       extensionId: overlay.extensionId,
       extensionVersion: overlay.extensionVersion,
@@ -341,7 +433,10 @@ async function captureBlueprint(
   return {
     blueprintVersion: SUPPORTED_BLUEPRINT_VERSION,
     experienceType: project.type,
-    settings: remapAssetIds(project.settings, toKey) as JsonObject,
+    settings: remapPlanSettings(
+      remapAssetIds(project.settings, toKey) as JsonObject,
+      (planId) => planKeyById.get(planId) ?? null
+    ),
     branding: remapAssetIds(project.branding, toKey) as JsonObject,
     videoSettings: project.videoSettings,
     videoAssetKey: assetKeys.key(project.videoAssetId),
@@ -387,9 +482,11 @@ function readBlueprint(stored: JsonObject): Blueprint {
         runtimeHints: asRecord(scene.runtimeHints) as JsonObject,
         hotspots: asArray(scene.hotspots).map((hotspotEntry, index) => {
           const hotspot = asRecord(hotspotEntry);
+          const geometry = asRecord(hotspot.geometry);
           return {
             key: String(hotspot.key ?? `${String(scene.key)}-hotspot-${index + 1}`),
-            geometry: asRecord(hotspot.geometry) as JsonObject,
+            ...readGeometryIdentity(hotspot, geometry, 'point'),
+            geometry: geometry as JsonObject,
             position: asRecord(hotspot.position) as JsonObject,
             appearance: asRecord(hotspot.appearance) as JsonObject,
             content: asRecord(hotspot.content) as JsonObject,
@@ -400,19 +497,17 @@ function readBlueprint(stored: JsonObject): Blueprint {
         }),
         overlays: asArray(scene.overlays).map((overlayEntry, index) => {
           const overlay = asRecord(overlayEntry);
+          const geometry = asRecord(overlay.geometry);
           return {
             key: String(overlay.key ?? `${String(scene.key)}-overlay-${index + 1}`),
             name: typeof overlay.name === 'string' ? overlay.name : null,
-            geometryKind: (overlay.geometryKind ?? 'polygon') as InteractionGeometryKind,
-            geometry: asRecord(overlay.geometry) as JsonObject,
+            ...readGeometryIdentity(overlay, geometry, 'polygon'),
+            geometry: geometry as JsonObject,
             position: asRecord(overlay.position) as JsonObject,
             appearance: asRecord(overlay.appearance) as JsonObject,
             content: asRecord(overlay.content) as JsonObject,
             action: asRecord(overlay.action) as JsonObject,
             visibilityRules: asRecord(overlay.visibilityRules) as JsonObject,
-            extensionId: typeof overlay.extensionId === 'string' ? overlay.extensionId : null,
-            extensionVersion:
-              typeof overlay.extensionVersion === 'string' ? overlay.extensionVersion : null,
             sortOrder: Number(overlay.sortOrder ?? index)
           };
         })
@@ -736,10 +831,26 @@ export async function instantiateTemplate(
 
   try {
     await sequelize.transaction(async (transaction) => {
+      const orderedPlans = [...blueprint.plans].sort(
+        (left, right) => left.sortOrder - right.sortOrder
+      );
+      const orderedScenes = [...blueprint.scenes].sort(
+        (left, right) => left.sortOrder - right.sortOrder
+      );
+      // Identities are minted before anything is written so a link between two
+      // entities can be resolved regardless of the order they are created in.
+      const planIdByKey = new Map(orderedPlans.map((plan) => [plan.key, randomUUID()]));
+      const sceneIdByKey = new Map(orderedScenes.map((scene) => [scene.key, randomUUID()]));
+      const hotspotIdByKey = new Map<string, string>();
+      const toSceneId: IdTranslator = (key) => sceneIdByKey.get(key) ?? null;
+
       await project.update(
         {
           settings: sanitizeProjectSettings(
-            resolveAssetReferences(blueprint.settings, resolution) as Record<string, unknown>
+            remapPlanSettings(
+              resolveAssetReferences(blueprint.settings, resolution),
+              (key) => planIdByKey.get(key) ?? null
+            ) as Record<string, unknown>
           ),
           branding: sanitizeBranding(
             resolveAssetReferences(blueprint.branding, resolution) as Record<string, unknown>
@@ -756,10 +867,10 @@ export async function instantiateTemplate(
         { transaction }
       );
 
-      const planIdByKey = new Map<string, string>();
-      for (const plan of [...blueprint.plans].sort((left, right) => left.sortOrder - right.sortOrder)) {
-        const created = await Plan.create(
+      for (const plan of orderedPlans) {
+        await Plan.create(
           {
+            id: planIdByKey.get(plan.key)!,
             projectId,
             name: sanitizeRequiredPlainText(plan.name, 'name'),
             assetId: plan.assetKey === null ? null : resolution.get(plan.assetKey) ?? null,
@@ -769,14 +880,8 @@ export async function instantiateTemplate(
           },
           { transaction }
         );
-        planIdByKey.set(plan.key, created.id);
       }
 
-      const sceneIdByKey = new Map<string, string>();
-      const hotspotIdByKey = new Map<string, string>();
-      const orderedScenes = [...blueprint.scenes].sort(
-        (left, right) => left.sortOrder - right.sortOrder
-      );
       for (const [index, scene] of orderedScenes.entries()) {
         const spatialData = { ...scene.spatialData };
         if (typeof spatialData.planId === 'string') {
@@ -786,6 +891,7 @@ export async function instantiateTemplate(
         }
         const created = await Scene.create(
           {
+            id: sceneIdByKey.get(scene.key)!,
             projectId,
             name: sanitizeRequiredPlainText(scene.name, 'name'),
             panoramaAssetId: scene.panoramaAssetKey === null
@@ -796,17 +902,16 @@ export async function instantiateTemplate(
             initialView: scene.initialView,
             viewLimits: scene.viewLimits,
             spatialData,
-            runtimeHints: scene.runtimeHints
+            runtimeHints: remapRuntimeHints(scene.runtimeHints, toSceneId)
           },
           { transaction }
         );
-        sceneIdByKey.set(scene.key, created.id);
 
         for (const hotspot of scene.hotspots) {
           const createdHotspot = await Hotspot.create(
             {
               sceneId: created.id,
-              geometryKind: (asRecord(hotspot.geometry).kind ?? 'point') as InteractionGeometryKind,
+              geometryKind: hotspot.geometryKind,
               geometry: resolveAssetReferences(hotspot.geometry, resolution),
               position: hotspot.position,
               appearance: sanitizeHotspotAppearance(
@@ -816,11 +921,14 @@ export async function instantiateTemplate(
                 resolveAssetReferences(hotspot.content, resolution) as Record<string, unknown>
               ),
               action: sanitizeHotspotAction(
-                resolveAssetReferences(hotspot.action, resolution) as Record<string, unknown>
+                remapSceneAction(
+                  resolveAssetReferences(hotspot.action, resolution),
+                  toSceneId
+                ) as Record<string, unknown>
               ),
               visibilityRules: hotspot.visibilityRules,
-              extensionId: null,
-              extensionVersion: null,
+              extensionId: hotspot.extensionId,
+              extensionVersion: hotspot.extensionVersion,
               sortOrder: hotspot.sortOrder
             },
             { transaction }
@@ -843,7 +951,10 @@ export async function instantiateTemplate(
                 resolveAssetReferences(overlay.content, resolution) as Record<string, unknown>
               ),
               action: sanitizeHotspotAction(
-                resolveAssetReferences(overlay.action, resolution) as Record<string, unknown>
+                remapSceneAction(
+                  resolveAssetReferences(overlay.action, resolution),
+                  toSceneId
+                ) as Record<string, unknown>
               ),
               visibilityRules: overlay.visibilityRules,
               extensionId: overlay.extensionId,

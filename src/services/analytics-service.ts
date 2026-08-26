@@ -24,7 +24,16 @@ export interface AnalyticsQuery extends AnalyticsRange {
   readonly publicationRevision?: number;
 }
 
-/** Sessions below this count are not broken down further, to avoid re-identification. */
+/**
+ * Suppression threshold for audience breakdowns.
+ *
+ * At 1 nothing is actually suppressed. That is deliberate rather than
+ * finished: the PRD lists the analytics retention/privacy model as an open
+ * product decision, and the sprint plan forbids inventing a production
+ * threshold without evidence. The seam is here so raising it is a
+ * one-line change once the privacy constraints are agreed; until then no
+ * suppression claim should be read into this value.
+ */
 const MIN_SESSIONS_FOR_BREAKDOWN = 1;
 const MAX_ROWS = 500;
 

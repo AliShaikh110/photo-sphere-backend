@@ -30,10 +30,51 @@ requests carrying a valid short-lived media token, routes require:
 Authorization: Bearer ACCESS_TOKEN
 ~~~
 
-The token is a JWT access token whose subject identifies the user. Ownership is
-checked for projects, scenes, hotspots, assets, upload sessions, publications,
-and private manifests. A valid ID belonging to another user does not grant
-access.
+The token is a JWT access token whose subject identifies the user. A valid ID
+belonging to a user without access does not grant access.
+
+### Project roles
+
+Sprint 04 replaced blanket ownership with a role resolved per request from
+project ownership, workspace membership, and per-project grants. The most
+privileged applicable role wins, and it is enforced server-side on every route:
+
+| Role | May |
+| --- | --- |
+| <code>viewer</code> | Read the project, its scenes, plans, overlays, timeline, publications and analytics. |
+| <code>editor</code> | Everything a viewer may, plus edit the draft: settings, branding, scenes, hotspots, overlays, plans, timeline and assets. |
+| <code>admin</code> | Everything an editor may, plus publish, unpublish, embed policy, share tokens, access grants and the audit log. |
+| <code>owner</code> | Everything an admin may. Held by the project's creator. |
+
+A caller with no applicable role receives HTTP 404 rather than 403, so the API
+cannot be used to discover that a project exists. A caller who has a role but
+not a sufficient one receives HTTP 403 with
+<code>PROJECT_ACCESS_DENIED</code>.
+
+Workspace routes use the same role names against workspace membership and
+return <code>WORKSPACE_ACCESS_DENIED</code>.
+
+### Operator surfaces
+
+Extension registration and viewer-integration rollout are operator actions
+gated by a <code>platform_admin</code> role stored on the user. The role is read
+from the database on every request, so revoking it takes effect immediately
+rather than at the next token refresh. A creator without it receives HTTP 403
+with <code>PLATFORM_ADMIN_REQUIRED</code>.
+
+### Token scopes
+
+Three audiences exist and are not interchangeable. A token minted for one
+surface is rejected on the others:
+
+| Audience | Purpose | Presented as |
+| --- | --- | --- |
+| <code>sphere-creator</code> | The authenticated API. | <code>Authorization: Bearer</code> |
+| <code>sphere-media</code> | One derivative of one publication, short-lived. | <code>?token=</code> on a media URL |
+| <code>sphere-telemetry</code> | Runtime events for one published revision. | <code>X-Telemetry-Token</code> |
+
+A media token is bound to the single derivative it was minted for; it does not
+open another object in the same publication.
 
 ### Optimistic revision preconditions
 
@@ -63,6 +104,7 @@ Idempotency-Key: 2f40952b-ec36-4696-a57e-90d05f190bf8
 - <code>POST /api/v1/assets/:assetId/complete</code>
 - <code>POST /api/v1/assets/:assetId/reprocess</code>
 - <code>POST /api/v1/projects/:projectId/publish</code>
+- <code>POST /api/v1/templates/:templateId/instantiate</code>
 
 Keys are scoped to the authenticated user and operation. Repeating the same key
 with the same request payload replays the recorded result without duplicating
@@ -127,40 +169,97 @@ returned.
 | POST | <code>/api/v1/auth/login</code> | None | None |
 | GET | <code>/api/v1/projects</code> | Bearer | None |
 | POST | <code>/api/v1/projects</code> | Bearer | None |
-| GET | <code>/api/v1/projects/:projectId</code> | Bearer, owner | None |
-| PATCH | <code>/api/v1/projects/:projectId</code> | Bearer, owner | <code>revision</code> |
-| POST | <code>/api/v1/projects/:projectId/validate</code> | Bearer, owner | <code>revision</code> |
-| POST | <code>/api/v1/projects/:projectId/preview-manifest</code> | Bearer, owner | <code>revision</code> |
-| GET | <code>/api/v1/projects/:projectId/scenes</code> | Bearer, owner | None |
-| POST | <code>/api/v1/projects/:projectId/scenes</code> | Bearer, owner | <code>projectRevision</code> |
-| POST | <code>/api/v1/projects/:projectId/scenes/reorder</code> | Bearer, owner | <code>projectRevision</code> |
-| GET | <code>/api/v1/projects/:projectId/scenes/:sceneId</code> | Bearer, owner | None |
-| PATCH | <code>/api/v1/projects/:projectId/scenes/:sceneId</code> | Bearer, owner | <code>projectRevision</code> |
-| DELETE | <code>/api/v1/projects/:projectId/scenes/:sceneId</code> | Bearer, owner | <code>projectRevision</code> |
-| POST | <code>/api/v1/projects/:projectId/scenes/:sceneId/hotspots</code> | Bearer, owner | <code>projectRevision</code> |
-| PATCH | <code>/api/v1/projects/:projectId/scenes/:sceneId/hotspots/:hotspotId</code> | Bearer, owner | <code>projectRevision</code> |
-| DELETE | <code>/api/v1/projects/:projectId/scenes/:sceneId/hotspots/:hotspotId</code> | Bearer, owner | <code>projectRevision</code> |
-| GET | <code>/api/v1/projects/:projectId/timeline</code> | Bearer, owner | <code>video360</code> project |
-| PATCH | <code>/api/v1/projects/:projectId/timeline</code> | Bearer, owner | <code>projectRevision</code> |
-| POST | <code>/api/v1/projects/:projectId/timeline/interactions</code> | Bearer, owner | <code>projectRevision</code> |
-| PATCH | <code>/api/v1/projects/:projectId/timeline/interactions/:interactionId</code> | Bearer, owner | <code>projectRevision</code> |
-| DELETE | <code>/api/v1/projects/:projectId/timeline/interactions/:interactionId</code> | Bearer, owner | <code>projectRevision</code> |
-| POST | <code>/api/v1/projects/:projectId/timeline/interactions/:interactionId/duplicate</code> | Bearer, owner | <code>projectRevision</code> |
-| POST | <code>/api/v1/assets/uploads</code> | Bearer | None |
-| PUT | <code>/api/v1/assets/uploads/:uploadSessionId/content</code> | Bearer, owner | Raw body |
-| POST | <code>/api/v1/assets/:assetId/complete</code> | Bearer, owner | <code>Idempotency-Key</code> |
-| GET | <code>/api/v1/assets/:assetId</code> | Bearer, owner | None |
-| POST | <code>/api/v1/assets/:assetId/reprocess</code> | Bearer, owner | <code>Idempotency-Key</code> |
-| DELETE | <code>/api/v1/assets/:assetId</code> | Bearer, owner | None |
-| POST | <code>/api/v1/projects/:projectId/publish</code> | Bearer, owner | <code>revision</code>, <code>Idempotency-Key</code> |
-| GET | <code>/api/v1/projects/:projectId/publications</code> | Bearer, owner | None |
-| GET | <code>/view/:slug/manifest</code> | Optional bearer | Visibility policy |
-| POST | <code>/view/:slug/playback-profile</code> | Optional bearer | Visibility policy, <code>video360</code> publication |
-| GET | <code>/view/:slug/scenes/:sceneId</code> | Optional bearer | Visibility policy, scene present in the current published revision |
-| GET | <code>/view/:slug/revisions/:publicationRevision/scenes/:sceneId</code> | Optional bearer | Visibility policy, scene present in that revision |
-| GET | <code>/view/:slug/revisions/:publicationRevision/scene-index</code> | Optional bearer | Visibility policy |
-| GET | <code>/api/v1/media/:derivativeId</code> | Optional bearer or signed <code>token</code> | Owner or valid media capability |
+| GET | <code>/api/v1/projects/:projectId</code> | Bearer, project viewer | None |
+| PATCH | <code>/api/v1/projects/:projectId</code> | Bearer, project editor | <code>revision</code> |
+| POST | <code>/api/v1/projects/:projectId/validate</code> | Bearer, project viewer | <code>revision</code> |
+| POST | <code>/api/v1/projects/:projectId/preview-manifest</code> | Bearer, project editor | <code>revision</code> |
+| GET | <code>/api/v1/projects/:projectId/scenes</code> | Bearer, project viewer | None |
+| POST | <code>/api/v1/projects/:projectId/scenes</code> | Bearer, project editor | <code>projectRevision</code> |
+| POST | <code>/api/v1/projects/:projectId/scenes/reorder</code> | Bearer, project editor | <code>projectRevision</code> |
+| GET | <code>/api/v1/projects/:projectId/scenes/:sceneId</code> | Bearer, project viewer | None |
+| PATCH | <code>/api/v1/projects/:projectId/scenes/:sceneId</code> | Bearer, project editor | <code>projectRevision</code> |
+| DELETE | <code>/api/v1/projects/:projectId/scenes/:sceneId</code> | Bearer, project editor | <code>projectRevision</code> |
+| POST | <code>/api/v1/projects/:projectId/scenes/:sceneId/hotspots</code> | Bearer, project editor | <code>projectRevision</code> |
+| PATCH | <code>/api/v1/projects/:projectId/scenes/:sceneId/hotspots/:hotspotId</code> | Bearer, project editor | <code>projectRevision</code> |
+| DELETE | <code>/api/v1/projects/:projectId/scenes/:sceneId/hotspots/:hotspotId</code> | Bearer, project editor | <code>projectRevision</code> |
+| GET | <code>/api/v1/projects/:projectId/timeline</code> | Bearer, project viewer | <code>video360</code> project |
+| PATCH | <code>/api/v1/projects/:projectId/timeline</code> | Bearer, project editor | <code>projectRevision</code> |
+| POST | <code>/api/v1/projects/:projectId/timeline/interactions</code> | Bearer, project editor | <code>projectRevision</code> |
+| PATCH | <code>/api/v1/projects/:projectId/timeline/interactions/:interactionId</code> | Bearer, project editor | <code>projectRevision</code> |
+| DELETE | <code>/api/v1/projects/:projectId/timeline/interactions/:interactionId</code> | Bearer, project editor | <code>projectRevision</code> |
+| POST | <code>/api/v1/projects/:projectId/timeline/interactions/:interactionId/duplicate</code> | Bearer, project editor | <code>projectRevision</code> |
+| POST | <code>/api/v1/assets/uploads</code> | Bearer | Project editor when <code>projectId</code> is given |
+| PUT | <code>/api/v1/assets/uploads/:uploadSessionId/content</code> | Bearer, asset owner | Raw body |
+| POST | <code>/api/v1/assets/:assetId/complete</code> | Bearer, asset owner | <code>Idempotency-Key</code> |
+| GET | <code>/api/v1/assets/:assetId</code> | Bearer, asset owner | None |
+| POST | <code>/api/v1/assets/:assetId/reprocess</code> | Bearer, asset owner | <code>Idempotency-Key</code> |
+| DELETE | <code>/api/v1/assets/:assetId</code> | Bearer, asset owner | None |
+| GET | <code>/api/v1/projects/:projectId/plans</code> | Bearer, project viewer | None |
+| POST | <code>/api/v1/projects/:projectId/plans</code> | Bearer, project editor | <code>projectRevision</code>, <code>image360</code> project |
+| POST | <code>/api/v1/projects/:projectId/plans/reorder</code> | Bearer, project editor | <code>projectRevision</code> |
+| PATCH | <code>/api/v1/projects/:projectId/plans/:planId</code> | Bearer, project editor | <code>projectRevision</code> |
+| DELETE | <code>/api/v1/projects/:projectId/plans/:planId</code> | Bearer, project editor | <code>projectRevision</code> |
+| GET | <code>/api/v1/projects/:projectId/scenes/:sceneId/overlays</code> | Bearer, project viewer | None |
+| POST | <code>/api/v1/projects/:projectId/scenes/:sceneId/overlays</code> | Bearer, project editor | <code>projectRevision</code> |
+| PATCH | <code>/api/v1/projects/:projectId/scenes/:sceneId/overlays/:overlayId</code> | Bearer, project editor | <code>projectRevision</code> |
+| DELETE | <code>/api/v1/projects/:projectId/scenes/:sceneId/overlays/:overlayId</code> | Bearer, project editor | <code>projectRevision</code> |
+| POST | <code>/api/v1/projects/:projectId/publish</code> | Bearer, project admin | <code>revision</code>, <code>Idempotency-Key</code> |
+| POST | <code>/api/v1/projects/:projectId/unpublish</code> | Bearer, project admin | Current publication |
+| GET | <code>/api/v1/projects/:projectId/publications</code> | Bearer, project viewer | None |
+| PUT | <code>/api/v1/projects/:projectId/embed-policy</code> | Bearer, project admin | None |
+| GET | <code>/api/v1/projects/:projectId/share-tokens</code> | Bearer, project admin | None |
+| POST | <code>/api/v1/projects/:projectId/share-tokens</code> | Bearer, project admin | None |
+| DELETE | <code>/api/v1/projects/:projectId/share-tokens/:shareTokenId</code> | Bearer, project admin | None |
+| GET | <code>/api/v1/projects/:projectId/access</code> | Bearer, project admin | None |
+| GET | <code>/api/v1/projects/:projectId/access/me</code> | Bearer, any project role | None |
+| POST | <code>/api/v1/projects/:projectId/access</code> | Bearer, project admin | Target user exists |
+| DELETE | <code>/api/v1/projects/:projectId/access/:grantId</code> | Bearer, project admin | None |
+| GET | <code>/api/v1/projects/:projectId/audit-log</code> | Bearer, project admin | None |
+| GET | <code>/api/v1/projects/:projectId/analytics/summary</code> | Bearer, project viewer | Bounded date range |
+| GET | <code>/api/v1/projects/:projectId/analytics/timeseries</code> | Bearer, project viewer | Bounded date range |
+| GET | <code>/api/v1/projects/:projectId/analytics/scenes</code> | Bearer, project viewer | Bounded date range |
+| GET | <code>/api/v1/projects/:projectId/analytics/interactions</code> | Bearer, project viewer | Bounded date range |
+| GET | <code>/api/v1/projects/:projectId/analytics/video</code> | Bearer, project viewer | Bounded date range |
+| GET | <code>/api/v1/projects/:projectId/analytics/reliability</code> | Bearer, project viewer | Bounded date range |
+| GET | <code>/api/v1/templates</code> | Bearer | None |
+| POST | <code>/api/v1/templates</code> | Bearer, project admin | Source project |
+| GET | <code>/api/v1/templates/:templateId</code> | Bearer, template readable | None |
+| PATCH | <code>/api/v1/templates/:templateId/status</code> | Bearer, template owner or workspace admin | None |
+| POST | <code>/api/v1/templates/:templateId/instantiate</code> | Bearer, template readable | <code>Idempotency-Key</code>, published template |
+| GET | <code>/api/v1/workspaces</code> | Bearer | None |
+| POST | <code>/api/v1/workspaces</code> | Bearer | Unique slug |
+| GET | <code>/api/v1/workspaces/:workspaceId/members</code> | Bearer, workspace viewer | None |
+| POST | <code>/api/v1/workspaces/:workspaceId/members</code> | Bearer, workspace admin | Target user exists |
+| POST | <code>/api/v1/workspaces/:workspaceId/members/accept</code> | Bearer, invited member | Pending invitation |
+| PATCH | <code>/api/v1/workspaces/:workspaceId/members/:membershipId</code> | Bearer, workspace admin | Not the workspace owner |
+| DELETE | <code>/api/v1/workspaces/:workspaceId/members/:membershipId</code> | Bearer, workspace admin | Not the workspace owner |
+| GET | <code>/api/v1/workspaces/:workspaceId/audit-log</code> | Bearer, workspace admin | None |
+| GET | <code>/api/v1/workspaces/:workspaceId/custom-domains</code> | Bearer, workspace admin | None |
+| POST | <code>/api/v1/workspaces/:workspaceId/custom-domains</code> | Bearer, workspace admin | Unique hostname |
+| PATCH | <code>/api/v1/workspaces/:workspaceId/custom-domains/:customDomainId</code> | Bearer, workspace admin | None |
+| DELETE | <code>/api/v1/workspaces/:workspaceId/custom-domains/:customDomainId</code> | Bearer, workspace admin | None |
+| GET | <code>/api/v1/extensions</code> | Bearer | None |
+| GET | <code>/api/v1/extensions/:extensionId/:version</code> | Bearer | Not draft or disabled |
+| POST | <code>/api/v1/extensions</code> | Bearer, platform admin | Unique id and version |
+| PATCH | <code>/api/v1/extensions/:extensionId/:version/status</code> | Bearer, platform admin | None |
+| GET | <code>/api/v1/platform/capabilities</code> | Bearer | None |
+| GET | <code>/api/v1/platform/viewer-integrations</code> | Bearer | None |
+| GET | <code>/api/v1/platform/reference-suite</code> | Bearer | None |
+| GET | <code>/api/v1/platform/viewer-integrations/checks</code> | Bearer, platform admin | None |
+| POST | <code>/api/v1/platform/viewer-integrations/checks</code> | Bearer, platform admin | Registered adapter version |
+| PUT | <code>/api/v1/platform/viewer-integrations/rollout</code> | Bearer, platform admin | Candidate passed the suite |
+| POST | <code>/api/v1/platform/viewer-integrations/promote</code> | Bearer, platform admin | Version passed the suite |
+| POST | <code>/api/v1/platform/viewer-integrations/rollback</code> | Bearer, platform admin | Target passed the suite |
+| GET | <code>/api/v1/platform/metrics</code> | Bearer, platform admin | None |
+| GET | <code>/view/:slug/manifest</code> | Optional bearer or share token | Visibility and embed-origin policy |
+| POST | <code>/view/:slug/playback-profile</code> | Optional bearer or share token | Visibility policy, <code>video360</code> publication |
+| GET | <code>/view/:slug/scenes/:sceneId</code> | Optional bearer or share token | Visibility policy, scene present in the current published revision |
+| GET | <code>/view/:slug/revisions/:publicationRevision/scenes/:sceneId</code> | Optional bearer or share token | Visibility policy, scene present in that revision |
+| GET | <code>/view/:slug/revisions/:publicationRevision/scene-index</code> | Optional bearer or share token | Visibility policy |
+| GET | <code>/api/v1/media/:derivativeId</code> | Optional bearer or signed <code>token</code> | Owner, project viewer, or valid media capability |
+| GET | <code>/api/v1/media/:derivativeId/tiles/:level/:x/:y</code> | Optional bearer or signed <code>token</code> | Tile present in the tiled derivative |
 | GET | <code>/api/v1/publications/:projectId/:publicationRevision/media/:derivativeId</code> | None | Exact reference in current public publication |
+| GET | <code>/api/v1/publications/:projectId/:publicationRevision/media/:derivativeId/tiles/:level/:x/:y</code> | None | Exact reference in current public publication |
 | POST | <code>/api/v1/runtime/events</code> | Ingest session token, or a creator bearer with project access | Valid event payload scoped to the authorized publication |
 
 ## Health
@@ -1204,6 +1303,513 @@ a specific published revision and renderer integration. Duplicate
 Clients must never block playback on telemetry delivery and may treat an
 accepted response as fire-and-forget.
 
+## Plans and spatial placement
+
+Plans are floor or site plans a scene can be positioned on. They exist only on
+<code>image360</code> projects; a <code>video360</code> project returns
+<code>PROJECT_TYPE_MISMATCH</code>.
+
+### GET /api/v1/projects/:projectId/plans
+
+Returns the project's plans in <code>sortOrder</code>.
+
+### POST /api/v1/projects/:projectId/plans
+
+~~~json
+{
+  "projectRevision": 4,
+  "name": "Ground floor",
+  "assetId": "optional-plan-image-asset-id",
+  "coordinateSystem": "plan_normalized",
+  "metadata": {}
+}
+~~~
+
+<code>coordinateSystem</code> is <code>plan_normalized</code> (default) or
+<code>plan_pixels</code>. <code>assetId</code> is optional: a plan can be
+created before its image exists.
+
+When <code>assetId</code> is given it must be a <code>plan_image</code> or
+<code>image</code> asset owned by the project owner and either unattached or
+attached to this project. Anything else returns HTTP 422 with
+<code>INVALID_ASSET_REFERENCE</code>. An unknown asset ID returns the same code,
+so the response cannot distinguish a foreign asset from a missing one.
+
+### POST /api/v1/projects/:projectId/plans/reorder
+
+Takes <code>projectRevision</code> and a complete <code>planIds</code> array.
+
+### PATCH /api/v1/projects/:projectId/plans/:planId
+
+Accepts <code>name</code>, <code>assetId</code>, <code>coordinateSystem</code>
+and <code>metadata</code> with a <code>projectRevision</code> precondition. The
+asset rule above applies here too.
+
+### DELETE /api/v1/projects/:projectId/plans/:planId
+
+Takes <code>projectRevision</code>. Scenes placed on the plan lose their plan
+placement rather than blocking the delete.
+
+### Scene spatial data
+
+A scene carries optional <code>spatialData</code>, set through
+<code>PATCH /api/v1/projects/:projectId/scenes/:sceneId</code>:
+
+~~~json
+{
+  "projectRevision": 7,
+  "spatialData": {
+    "coordinateSystem": "plan_normalized",
+    "planId": "plan-id",
+    "mapX": 0.25,
+    "mapY": 0.75,
+    "headingDegrees": 90
+  }
+}
+~~~
+
+World placement and plan placement are independent and neither is required:
+
+- <code>latitude</code> and <code>longitude</code> must be supplied together or
+  not at all.
+- <code>planId</code>, <code>mapX</code> and <code>mapY</code> must be supplied
+  together or not at all.
+- Plan coordinates cannot declare <code>wgs84</code>.
+- <code>plan_normalized</code> coordinates are 0–1; <code>plan_pixels</code>
+  coordinates are plan-image pixels.
+
+A floor-plan-only experience therefore never has to invent GPS data, and an
+outdoor tour never has to sit on a plan. Incomplete placement returns
+<code>SCENE_SPATIAL_DATA_INCOMPLETE</code>; a plan reference that does not
+resolve returns <code>PLAN_NOT_FOUND</code>.
+
+Map and plan navigation are enabled through <code>settings.map.enabled</code>
+and <code>settings.plan.enabled</code>. The capability resolver drops either one
+at compile time when no scene actually carries the corresponding placement, so a
+visitor never sees an empty map. That appears in validation and publish output
+as a <code>FEATURE_FALLBACK_APPLIED</code> warning, not as a publish failure.
+
+## Overlays and advanced geometry
+
+Overlays are scene-layer visual elements. They share the hotspot content, action
+and sanitization contracts; only the geometry family is richer.
+
+### GET /api/v1/projects/:projectId/scenes/:sceneId/overlays
+
+### POST /api/v1/projects/:projectId/scenes/:sceneId/overlays
+
+~~~json
+{
+  "projectRevision": 5,
+  "name": "Reception desk",
+  "geometry": {
+    "kind": "polygon",
+    "vertices": [
+      { "coordinateSystem": "spherical_degrees", "longitudeDegrees": 0, "latitudeDegrees": 0 },
+      { "coordinateSystem": "spherical_degrees", "longitudeDegrees": 10, "latitudeDegrees": 0 },
+      { "coordinateSystem": "spherical_degrees", "longitudeDegrees": 10, "latitudeDegrees": 10 }
+    ]
+  },
+  "action": { "kind": "showInformation" }
+}
+~~~
+
+The canonical geometry union is shared by hotspots and overlays:
+
+| <code>geometry.kind</code> | Shape | Rules |
+| --- | --- | --- |
+| <code>point</code> | A single position | Hotspots only; an overlay returns HTTP 422 |
+| <code>polygon</code> | <code>vertices[]</code> | At least 3 finite vertices, at most 512 |
+| <code>polyline</code> | <code>vertices[]</code> | At least 2 finite vertices, at most 512 |
+| <code>imageLayer</code> | <code>assetId</code> + <code>anchor</code> | Ready image asset the project may use |
+| <code>videoLayer</code> | <code>assetId</code> + <code>anchor</code> | Ready video asset the project may use |
+| <code>custom</code> | <code>extensionId</code>, <code>extensionVersion</code>, <code>payload</code> | Registered, enabled extension; payload validated against its schema |
+
+Positions are product degrees:
+<code>{ "coordinateSystem": "spherical_degrees", "longitudeDegrees": n, "latitudeDegrees": n }</code>.
+An <code>anchor</code> is angular — <code>widthDegrees</code>,
+<code>heightDegrees</code>, and optional <code>rotationDegrees</code>,
+<code>opacity</code> and <code>chromaKeyColor</code>. Renderer mesh, texture and
+adapter vocabulary is never accepted; a payload containing it is rejected.
+
+Degenerate or non-finite geometry returns <code>INVALID_GEOMETRY</code>. An
+unknown kind returns <code>UNSUPPORTED_GEOMETRY_KIND</code> rather than being
+stored unvalidated.
+
+### PATCH and DELETE /api/v1/projects/:projectId/scenes/:sceneId/overlays/:overlayId
+
+Both take a <code>projectRevision</code> precondition. PATCH accepts any subset
+of the create fields.
+
+## Extensions
+
+A custom interaction may only name an extension the platform has registered, and
+its payload is validated against that extension's declared schema before it is
+persisted. Publications pin the extension version they compiled against.
+
+### GET /api/v1/extensions
+
+Lists active and deprecated extensions. <code>runtimeModule</code> and
+<code>securityPolicy</code> are deliberately omitted: they are integration
+detail, not part of the creator-facing contract.
+
+~~~json
+{
+  "extensions": [
+    {
+      "extensionId": "platform.measurement-label",
+      "version": "1.0.0",
+      "name": "Measurement label",
+      "supportedExperienceTypes": ["image360"],
+      "schema": {
+        "fields": {
+          "label": { "type": "string", "required": true, "maxLength": 120 },
+          "value": { "type": "number", "required": true, "minimum": 0, "maximum": 100000 },
+          "unit": { "type": "enum", "required": true, "values": ["m", "cm", "mm", "ft", "in"] }
+        },
+        "additionalFields": false
+      },
+      "requiredCapabilities": ["hotspots"],
+      "status": "active"
+    }
+  ]
+}
+~~~
+
+### GET /api/v1/extensions/:extensionId/:version
+
+Returns one extension. A <code>draft</code> or <code>disabled</code> version is
+answered as not found.
+
+### POST /api/v1/extensions
+
+Platform admin only. Registers a versioned extension contract. The schema is
+declarative — extensions never ship executable validation — and
+<code>runtimeModule</code> is allow-listed here so a publication can never name
+arbitrary client code.
+
+### PATCH /api/v1/extensions/:extensionId/:version/status
+
+Platform admin only. Moves a version between <code>draft</code>,
+<code>active</code>, <code>deprecated</code> and <code>disabled</code>.
+Disabling a version stops new authoring against it; already-published revisions
+keep the pinned version they compiled with.
+
+## Templates
+
+A template stores a canonical Experience blueprint with blueprint-local
+identifiers. Instantiating one mints fresh IDs for every mutable entity, so two
+projects created from the same template share nothing.
+
+### GET /api/v1/templates
+
+Lists templates the caller can use: their own, their workspaces', and published
+platform templates. Accepts an optional <code>experienceType</code> filter.
+
+### GET /api/v1/templates/:templateId
+
+Returns one template plus a blueprint summary
+(<code>sceneCount</code>, <code>planCount</code>, <code>timelineCount</code>,
+<code>assetCount</code>). A private template belonging to someone else is
+answered as not found.
+
+### POST /api/v1/templates
+
+Captures a template from a project the caller administers.
+
+~~~json
+{
+  "projectId": "project-id",
+  "name": "Hotel blueprint",
+  "description": "Two scenes and a plan",
+  "visibility": "private",
+  "assetPolicy": "omit"
+}
+~~~
+
+<code>visibility</code> is <code>private</code> (default) or
+<code>workspace</code>; <code>workspace</code> requires a
+<code>workspaceId</code> the caller administers. <code>platform</code> templates
+are curated and rejected here with
+<code>TEMPLATE_VISIBILITY_NOT_ALLOWED</code>.
+
+<code>assetPolicy</code> decides what happens to media on instantiation:
+
+| Policy | Behaviour |
+| --- | --- |
+| <code>omit</code> (default) | Structure only. Asset references are dropped. |
+| <code>reference</code> | Reuses assets the instantiating user already owns; anything else is dropped. |
+| <code>copy</code> | Duplicates the source media into the new owner's library through the media pipeline. |
+
+No policy can pass another account's private asset into a new project.
+
+### POST /api/v1/templates/:templateId/instantiate
+
+Requires <code>Idempotency-Key</code>. Creates a new draft project at revision
+1 and returns it.
+
+~~~json
+{
+  "name": "Hotel copy",
+  "workspaceId": null
+}
+~~~
+
+Instantiation:
+
+- mints a fresh project ID and fresh IDs for scenes, hotspots, overlays, plans,
+  connections and timeline interactions;
+- rewrites every internal reference — scene links, plan placement,
+  <code>settings.plan.defaultPlanId</code> and preload hints — to the new
+  project's own IDs, so a copy never points back at the project it came from;
+- preserves custom geometry together with its pinned
+  <code>extensionId</code> and <code>extensionVersion</code>;
+- applies the template's asset policy;
+- returns an ordinary editable draft, never a published one.
+
+A template whose <code>schemaVersion</code> does not match the current
+Experience schema returns <code>TEMPLATE_SCHEMA_UNSUPPORTED</code>. A template
+that is not <code>published</code> returns <code>TEMPLATE_NOT_AVAILABLE</code>.
+
+### PATCH /api/v1/templates/:templateId/status
+
+Moves a template between <code>draft</code>, <code>published</code> and
+<code>archived</code>. Restricted to the template owner or a workspace admin.
+
+## Workspaces and collaboration
+
+### GET /api/v1/workspaces and POST /api/v1/workspaces
+
+Lists the caller's workspaces with their role, or creates one. The creator
+becomes both the workspace owner and an explicit <code>owner</code> member, so
+listings and role changes have one source of truth. A duplicate slug returns
+<code>WORKSPACE_SLUG_EXISTS</code>.
+
+### Workspace members
+
+| Route | Requires |
+| --- | --- |
+| <code>GET /api/v1/workspaces/:workspaceId/members</code> | workspace viewer |
+| <code>POST /api/v1/workspaces/:workspaceId/members</code> | workspace admin |
+| <code>POST /api/v1/workspaces/:workspaceId/members/accept</code> | a pending invitation for the caller |
+| <code>PATCH /api/v1/workspaces/:workspaceId/members/:membershipId</code> | workspace admin |
+| <code>DELETE /api/v1/workspaces/:workspaceId/members/:membershipId</code> | workspace admin |
+
+An invitation takes <code>{ "email": "...", "role": "editor" }</code>. Roles are
+<code>viewer</code>, <code>editor</code> and <code>admin</code>;
+<code>owner</code> is transferred, not invited, and returns
+<code>ROLE_NOT_ASSIGNABLE</code>. Inviting an address with no account returns
+<code>INVITE_NOT_DELIVERABLE</code> rather than disclosing whether the address is
+registered. The workspace owner's membership cannot be demoted or removed.
+
+Removal sets the membership to <code>revoked</code> rather than deleting it, so
+the audit trail survives.
+
+### Project access grants
+
+| Route | Requires |
+| --- | --- |
+| <code>GET /api/v1/projects/:projectId/access</code> | project admin |
+| <code>GET /api/v1/projects/:projectId/access/me</code> | any project role |
+| <code>POST /api/v1/projects/:projectId/access</code> | project admin |
+| <code>DELETE /api/v1/projects/:projectId/access/:grantId</code> | project admin |
+
+A grant takes <code>{ "email": "...", "role": "editor" }</code>.
+<code>access/me</code> returns the caller's effective role and where it came
+from (<code>owner</code>, <code>project-grant</code> or
+<code>workspace-membership</code>), which is what an editor UI needs to decide
+which controls to show.
+
+### Audit log
+
+<code>GET /api/v1/projects/:projectId/audit-log</code> (project admin) and
+<code>GET /api/v1/workspaces/:workspaceId/audit-log</code> (workspace admin)
+return privileged-change history, newest first, with an optional
+<code>limit</code>. Recorded actions include publishing and unpublishing, embed
+policy changes, access grants and revocations, member invitations, role changes
+and removals, asset and project deletion, share-token creation and revocation,
+template instantiation, extension registration and status changes, and viewer
+integration rollout changes.
+
+### Custom domains
+
+<code>GET/POST /api/v1/workspaces/:workspaceId/custom-domains</code> and
+<code>PATCH/DELETE .../custom-domains/:customDomainId</code> are workspace-admin
+routes that register a hostname and track its verification status. The backend
+stores the mapping and its verification token; it does not provision DNS or
+certificates.
+
+## Sharing and embedding
+
+### Share tokens
+
+Share tokens let a creator hand out a private experience without giving the
+recipient an account.
+
+| Route | Requires |
+| --- | --- |
+| <code>GET /api/v1/projects/:projectId/share-tokens</code> | project admin |
+| <code>POST /api/v1/projects/:projectId/share-tokens</code> | project admin |
+| <code>DELETE /api/v1/projects/:projectId/share-tokens/:shareTokenId</code> | project admin |
+
+~~~json
+{
+  "label": "Client review",
+  "expiresInHours": 72,
+  "publicationRevision": 3
+}
+~~~
+
+The secret is returned once, in the creation response only, under
+<code>Cache-Control: private, no-store</code>. Listing shows metadata and never
+the secret again. Omitting <code>publicationRevision</code> makes the link
+follow the current publication; supplying one pins it to that revision.
+
+A visitor presents the token as <code>X-Share-Token</code> (or the
+<code>shareToken</code> query parameter) on any published delivery route.
+Revoking a token takes effect immediately.
+
+### PUT /api/v1/projects/:projectId/embed-policy
+
+Project admin. Changes where a published experience may be framed without
+recompiling or republishing it. The project keeps the policy as its authored
+default and the current publication is updated so the change reaches visitors
+immediately.
+
+~~~json
+{
+  "embedPolicy": {
+    "mode": "allowlist",
+    "allowedOrigins": ["https://partner.example"],
+    "allowedApiOrigins": ["https://partner.example"]
+  }
+}
+~~~
+
+| <code>mode</code> | Effect |
+| --- | --- |
+| <code>anywhere</code> (default) | <code>frame-ancestors *</code> |
+| <code>allowlist</code> | <code>frame-ancestors 'self' &lt;allowedOrigins&gt;</code>; at least one origin required |
+| <code>disabled</code> | <code>frame-ancestors 'none'</code>, and every delivery route refuses a framed read |
+
+An entry must be a bare scheme/host/port origin. A path, wildcard or credential
+returns <code>INVALID_EMBED_ORIGIN</code>, because either would silently widen
+the policy.
+
+Enforcement applies to the manifest, progressive scene definitions, the scene
+index and media alike, so a restricted experience cannot be reached through one
+surface after being refused on another. A cross-origin read from an origin that
+is not permitted returns HTTP 403 <code>EMBED_ORIGIN_DENIED</code>. A direct
+visit sends no <code>Origin</code> and is allowed unless embedding is
+<code>disabled</code>: the allowlist restricts embedding, not the canonical
+link.
+
+<code>allowedApiOrigins</code> additionally permits an origin to read the
+manifest cross-origin. It applies on top of the deployment's own
+<code>CORS_ORIGINS</code> allowlist, which is evaluated first; an origin absent
+from that list is refused at the transport layer before any experience policy is
+consulted.
+
+### POST /api/v1/projects/:projectId/unpublish
+
+Project admin. Withdraws the current publication. Revision history and compiled
+artifacts are retained so republishing and auditing stay possible.
+
+## Creator analytics
+
+Six read-only views over the runtime telemetry stream. All require a project
+<code>viewer</code> role and share the same query parameters.
+
+| Parameter | Meaning |
+| --- | --- |
+| <code>from</code>, <code>to</code> | ISO 8601 timestamps with offset. Both optional; a bounded default is applied. |
+| <code>publicationRevision</code> | Restrict to one published revision. |
+| <code>interval</code> | <code>hour</code> or <code>day</code>, for the timeseries view only. |
+
+The window is bounded by <code>ANALYTICS_MAX_RANGE_DAYS</code> (92 by default).
+A longer range returns HTTP 422 <code>DATE_RANGE_TOO_LARGE</code> with
+<code>details.maximumDays</code>. <code>from</code> after <code>to</code> is
+rejected the same way.
+
+| Route | Returns |
+| --- | --- |
+| <code>.../analytics/summary</code> | Engagement counts, first-panorama and time-to-interactive percentiles, reliability totals, device-class and viewer-integration breakdowns |
+| <code>.../analytics/timeseries</code> | Event counts and sessions bucketed by hour or day |
+| <code>.../analytics/scenes</code> | Per-scene views and transition failures |
+| <code>.../analytics/interactions</code> | Hotspot, overlay, CTA and timeline interaction engagement |
+| <code>.../analytics/video</code> | Starts, stalls, profile selection and playback failures |
+| <code>.../analytics/reliability</code> | Asset failures, scene transition failures, viewer errors, video stalls and capability fallbacks |
+
+Every response echoes the resolved <code>range</code>. Operational failure
+metrics are reported separately from engagement so one is never read as the
+other.
+
+Queries run behind an <code>AnalyticsStore</code> boundary. It is PostgreSQL
+today, sized by the indexes on <code>runtime_events</code>; a deployment with
+heavier telemetry can implement the same interface against a dedicated analytics
+store without changing this API or its authorization rules.
+
+## Platform and viewer integration
+
+<code>GET /api/v1/platform/capabilities</code>,
+<code>GET /api/v1/platform/viewer-integrations</code> and
+<code>GET /api/v1/platform/reference-suite</code> are readable by any
+authenticated creator. Everything else on this router is platform admin.
+
+### GET /api/v1/platform/capabilities
+
+The capability registry in product terms — product feature, dependencies,
+incompatibilities, device and media requirements, whether the module is
+lazy-loadable, and the fallback. Renderer module names are not returned. It also
+reports whether the dual-fisheye ingest and live-source providers are
+<code>enabled</code> or <code>unavailable</code> on this deployment.
+
+### GET /api/v1/platform/viewer-integrations
+
+The current rollout (<code>activeVersion</code>,
+<code>candidateVersion</code>, <code>rolloutPercent</code>) and the catalog of
+adapter versions this build can emit, each with its pinned renderer version and
+status.
+
+### GET /api/v1/platform/reference-suite
+
+The reference experiences a candidate adapter must satisfy, with the
+expectations each one checks.
+
+### POST /api/v1/platform/viewer-integrations/checks
+
+Runs the reference experience suite against one adapter version and records the
+result as a gate.
+
+~~~json
+{ "viewerIntegrationVersion": "psv-5.14.3-adapter-1" }
+~~~
+
+<code>GET .../checks</code> lists the most recent runs, optionally filtered by
+version.
+
+### PUT /api/v1/platform/viewer-integrations/rollout
+
+Starts or adjusts a percentage rollout of a candidate version. Bucketing is by
+project ID, so a project compiles against a stable version for the duration of
+the rollout.
+
+### POST /api/v1/platform/viewer-integrations/promote and /rollback
+
+Promote makes a version active and ends the rollout. Rollback is an ordinary
+promotion of an earlier version.
+
+All three routes require the target to have a passing reference-suite run;
+otherwise they return HTTP 409 <code>REFERENCE_SUITE_NOT_PASSED</code>. A
+version with no registered adapter in this build returns
+<code>VIEWER_INTEGRATION_NOT_SUPPORTED</code>. Publications record the version
+they compiled with, so a rollout change never rewrites existing revisions.
+
+### GET /api/v1/platform/metrics
+
+The metric contract dashboards and alerts are written against, plus a
+process-local snapshot. Served <code>private, no-store</code>.
+
 ## HTTP status and error guidance
 
 | Status | Typical meaning |
@@ -1233,3 +1839,50 @@ Representative stable error codes include
 <code>UPLOAD_MIME_MISMATCH</code>, <code>ASSET_NOT_READY</code>,
 <code>SLUG_ALREADY_EXISTS</code>, and <code>ROUTE_NOT_FOUND</code>. Treat the
 server-provided code as authoritative.
+
+Sprint-04 surfaces add:
+
+| Code | Status | Meaning |
+| --- | --- | --- |
+| <code>PROJECT_ACCESS_DENIED</code> | 403 | The caller has a project role, but not a sufficient one. |
+| <code>WORKSPACE_ACCESS_DENIED</code> | 403 | The caller has a workspace role, but not a sufficient one. |
+| <code>PLATFORM_ADMIN_REQUIRED</code> | 403 | An operator-only surface was called by an ordinary creator. |
+| <code>ROLE_NOT_ASSIGNABLE</code> | 422 | Ownership is transferred, not invited or granted. |
+| <code>MEMBER_NOT_REMOVABLE</code> | 422 | The workspace owner cannot be removed. |
+| <code>INVITE_NOT_DELIVERABLE</code> | 422 | The invited address cannot be invited yet. |
+| <code>ACCESS_NOT_GRANTABLE</code> | 422 | The named user cannot be given access yet. |
+| <code>WORKSPACE_SLUG_EXISTS</code> | 409 | The workspace address is taken. |
+| <code>SCENE_SPATIAL_DATA_INCOMPLETE</code> | 422 | Partial world or plan placement. |
+| <code>PLAN_NOT_FOUND</code> | 422 | The scene references a plan that does not exist. |
+| <code>MAP_SCENE_MAPPING_INVALID</code> | 422 | Plan coordinates declared with a world coordinate system. |
+| <code>INVALID_ASSET_REFERENCE</code> | 422 | The referenced media is not available to this project. |
+| <code>PROJECT_TYPE_MISMATCH</code> | 422 | The feature does not exist on this experience type. |
+| <code>INVALID_GEOMETRY</code> | 422 | Degenerate, non-finite or over-large geometry. |
+| <code>UNSUPPORTED_HOTSPOT_GEOMETRY</code> | 422 | The hotspot geometry kind is not part of the canonical union. |
+| <code>UNSUPPORTED_OVERLAY_GEOMETRY</code> | 422 | The overlay geometry kind is not supported; an overlay needs an area, line or layer. |
+| <code>EXTENSION_NOT_REGISTERED</code> | 422 | The custom interaction is not on the platform registry. |
+| <code>EXTENSION_NOT_AVAILABLE</code> | 422 | The extension is disabled, draft, or not valid for this experience type. |
+| <code>EXTENSION_PAYLOAD_INVALID</code> | 422 | The payload failed the registered extension schema. |
+| <code>EXTENSION_VERSION_EXISTS</code> | 409 | That extension id and version already exist. |
+| <code>TEMPLATE_NOT_AVAILABLE</code> | 409 | The template is not published. |
+| <code>TEMPLATE_SCHEMA_UNSUPPORTED</code> | 422 | The template targets another Experience schema version. |
+| <code>TEMPLATE_VERSION_UNSUPPORTED</code> | 422 | The stored blueprint targets another blueprint version. |
+| <code>TEMPLATE_BLUEPRINT_INVALID</code> | 422 | The stored blueprint is internally inconsistent. |
+| <code>TEMPLATE_VISIBILITY_NOT_ALLOWED</code> | 403 | Platform templates are curated. |
+| <code>WORKSPACE_REQUIRED</code> | 422 | A workspace template needs a workspace. |
+| <code>INVALID_EMBED_ORIGIN</code> | 422 | An allowlist entry is not a bare origin. |
+| <code>INVALID_EMBED_POLICY</code> | 422 | The embed settings are not valid. |
+| <code>EMBED_ORIGIN_DENIED</code> | 403 | The requesting origin may not read or frame this experience. |
+| <code>PRIVATE_PUBLICATION_ACCESS_DENIED</code> | 401/403 | A private publication was reached without a sufficient grant. |
+| <code>MEDIA_ACCESS_DENIED</code> | 403 | The media token, role or publication reference does not authorize this object. |
+| <code>SHARE_TOKEN_LIMIT_REACHED</code> | 422 | The project already has the maximum number of active share links. |
+| <code>DATE_RANGE_TOO_LARGE</code> | 422 | The analytics window exceeds the configured maximum. |
+| <code>TELEMETRY_TOKEN_REQUIRED</code> | 401 | Runtime telemetry needs the manifest's ingest token. |
+| <code>TELEMETRY_TOKEN_INVALID</code> | 401 | The ingest token is invalid or expired. |
+| <code>TELEMETRY_SCOPE_MISMATCH</code> | 403 | An event does not belong to the authorized session. |
+| <code>VIEWER_INTEGRATION_NOT_SUPPORTED</code> | 422 | This build has no adapter for that version. |
+| <code>VIEWER_INTEGRATION_ALREADY_ACTIVE</code> | 422 | The candidate is already the active version. |
+| <code>REFERENCE_SUITE_NOT_PASSED</code> | 409 | The target has no passing reference-suite run. |
+| <code>LIVE_SOURCE_NOT_ALLOWED</code> | 422 | The stream address is not on the provider allowlist. |
+| <code>LIVE_SOURCE_NOT_SUPPORTED</code> | 501 | No live 360 provider is enabled on this deployment. |
+| <code>RATE_LIMITED</code> | 429 | The caller exceeded a route or global rate limit. |

@@ -255,10 +255,17 @@ compatibility, but Sprint 01 publishing exposes only <code>public</code> and
 
 ~~~text
 users
-  +-- projects
+  +-- workspaces
+  |     +-- workspace_memberships
+  |     +-- custom_domains
+  |     +-- templates (workspace scope)
+  +-- projects                     (optional workspace scope)
+  |     +-- project_access
   |     +-- scenes                 (image360)
   |     |     +-- hotspots
+  |     |     +-- overlays
   |     |     +-- scene_connections
+  |     +-- plans                  (image360)
   |     +-- timeline_interactions  (video360)
   |     +-- assets (optional project scope)
   |     |     +-- asset_derivatives
@@ -267,12 +274,22 @@ users
   |     |           +-- media_job_stages
   |     +-- publications
   |     |     +-- published_scene_definitions
+  |     |     +-- publication_share_tokens
   |     +-- runtime_events
   +-- assets
   +-- upload_sessions
   +-- idempotency_records
-storage_deletion_jobs (durable physical cleanup; no asset foreign key by design)
+  +-- templates (private scope)
+extensions                (platform-wide versioned interaction registry)
+platform_settings         (operator state, including viewer integration rollout)
+viewer_integration_checks (reference experience suite runs)
+audit_logs                (privileged changes; identifier columns, not foreign keys)
+storage_deletion_jobs     (durable physical cleanup; no asset foreign key by design)
 ~~~
+
+A scene's placement on a plan lives in <code>scenes.spatial_data</code> rather
+than in a join table, because placement is scene state, not a relationship the
+product ever queries from the plan side.
 
 ### users
 
@@ -503,6 +520,271 @@ Stores:
 Indexes support experience/revision/time and event-name/time queries. Event-ID
 uniqueness makes telemetry retries safe.
 
+### workspaces
+
+Stores UUID, owner, display name, unique slug, settings JSONB, and timestamps. A
+workspace is the optional shared scope a project and a template can belong to.
+
+Indexes:
+
+- unique slug
+- owner
+
+### workspace_memberships
+
+Stores workspace, user, role, status, inviting user, invitation and acceptance
+times, and timestamps. The workspace creator is also stored as an explicit
+<code>owner</code> member, so listings and role changes have one source of
+truth.
+
+Constraints and indexes:
+
+- unique <code>(workspace_id, user_id)</code>
+- <code>(user_id, status)</code> for a user's workspace list
+- role check: <code>owner</code>, <code>admin</code>, <code>editor</code>,
+  <code>viewer</code>
+- status check: <code>invited</code>, <code>active</code>, <code>revoked</code>
+
+Removal sets <code>revoked</code> rather than deleting the row, so the audit
+trail keeps its subject.
+
+### project_access
+
+Stores per-project grants: project, user, role, granting user, and timestamps. A
+grant is independent of workspace membership; the effective role is the most
+privileged of ownership, workspace membership, and grant.
+
+Constraints and indexes:
+
+- unique <code>(project_id, user_id)</code>
+- <code>user_id</code>, for the accessible-project filter
+- role check, excluding <code>owner</code>: ownership is transferred, not
+  granted
+
+<code>projects.workspace_id</code> was added in the same migration, with a
+<code>(workspace_id, updated_at)</code> index for workspace project lists.
+
+### plans
+
+Stores a floor or site plan: project, name, optional plan-image asset,
+coordinate system, metadata JSONB, sort order, and timestamps.
+
+Constraints and indexes:
+
+- <code>(project_id, sort_order)</code>
+- <code>asset_id</code>
+- coordinate-system check: <code>plan_normalized</code> or
+  <code>plan_pixels</code>; a plan never uses world coordinates
+- non-negative sort order
+
+Deleting a plan clears the placement of scenes positioned on it rather than
+blocking the delete. A plan image must be a <code>plan_image</code> or
+<code>image</code> asset owned by the project owner and either unattached or
+attached to this project.
+
+Scene placement lives in <code>scenes.spatial_data</code> (JSONB). World fields
+(<code>latitude</code>, <code>longitude</code>, <code>altitudeMeters</code>) and
+plan fields (<code>planId</code>, <code>mapX</code>, <code>mapY</code>) are
+independent: each family is all-or-nothing, and neither is required. A
+floor-plan-only experience never stores invented GPS data.
+
+### overlays
+
+Stores scene-layer visual elements: scene, optional name, geometry kind,
+geometry JSONB, position, appearance, content, action, visibility rules, pinned
+extension id and version, sort order, and timestamps.
+
+Constraints and indexes:
+
+- <code>(scene_id, sort_order)</code>
+- <code>(extension_id, extension_version)</code>
+- geometry-kind check restricted to the canonical union and excluding
+  <code>point</code>: a point belongs on a hotspot
+- extension pair check: <code>extension_id</code> and
+  <code>extension_version</code> are both null or both set
+- custom-geometry check: <code>geometry_kind = 'custom'</code> requires an
+  extension id
+
+### hotspots (Sprint-04 columns)
+
+<code>geometry_kind</code>, <code>extension_id</code> and
+<code>extension_version</code> were added so a hotspot carries the same
+interaction contract as an overlay. The backfill derives
+<code>geometry_kind</code> from the stored geometry JSON.
+
+Constraints and indexes:
+
+- geometry-kind check across the full canonical union, including
+  <code>point</code>
+- extension pair check, as for overlays
+- custom-geometry check: <code>geometry_kind = 'custom'</code> requires an
+  extension id
+- <code>(extension_id, extension_version)</code>
+
+The custom-geometry check is the reason every write path that creates a hotspot
+must carry the extension pair through with the geometry, template
+instantiation included.
+
+### extensions
+
+Stores the versioned custom-interaction registry: extension id, version, name,
+description, supported experience types, declarative field schema, required
+capabilities, allow-listed runtime module, security policy, status, and
+timestamps.
+
+Constraints and indexes:
+
+- unique <code>(extension_id, version)</code>
+- <code>status</code>
+- status check: <code>draft</code>, <code>active</code>,
+  <code>deprecated</code>, <code>disabled</code>
+
+The schema is declarative, so an extension never ships executable validation.
+The runtime module is allow-listed here, so a publication can never name
+arbitrary client code. Built-in reference extensions are merged in at read time;
+a stored row of the same id and version wins, which is how a built-in is
+superseded or disabled.
+
+### templates
+
+Stores a reusable canonical Experience blueprint: owner, optional workspace,
+name, description, schema version, experience type, canonical blueprint JSONB,
+asset policy, visibility, status, optional preview asset, and timestamps.
+
+Constraints and indexes:
+
+- <code>(visibility, experience_type, status)</code> for catalog listing
+- <code>workspace_id</code> and <code>owner_id</code>
+- visibility check: <code>private</code>, <code>workspace</code>,
+  <code>platform</code>
+- status check: <code>draft</code>, <code>published</code>,
+  <code>archived</code>
+- asset-policy check: <code>omit</code>, <code>reference</code>,
+  <code>copy</code>
+- a <code>workspace</code> template requires a workspace
+
+The blueprint stores blueprint-local keys (<code>scene-1</code>,
+<code>plan-2</code>, <code>asset-3</code>) rather than source IDs, for every
+mutable entity and every reference between them: scene links, plan placement,
+default plan, preload hints, and asset references. Instantiation mints fresh
+IDs and resolves those keys against the new project, so a copy never points back
+at the project it was captured from and no template can carry another account's
+asset identifiers.
+
+### publication_share_tokens
+
+Stores project, optional pinned publication revision, token hash, label,
+creating user, expiry, revocation time, and timestamps. Only the hash is
+persisted; the secret is returned once at creation.
+
+Constraints and indexes:
+
+- unique <code>token_hash</code>
+- <code>project_id</code>
+- an expiry, when present, must be after creation
+
+A token with no pinned revision follows the current publication. Revocation and
+expiry both take effect immediately on every delivery route.
+
+### custom_domains
+
+Stores workspace, hostname, verification token, status, verification time, and
+timestamps. The backend records the mapping and its verification state; it does
+not provision DNS or certificates.
+
+Constraints and indexes:
+
+- unique hostname
+- <code>workspace_id</code>
+- status check: <code>pending</code>, <code>verified</code>,
+  <code>disabled</code>
+
+### audit_logs
+
+Stores action, actor, workspace, project, entity type and id, metadata JSONB,
+and occurrence time.
+
+Actor, workspace and project are plain identifier columns rather than foreign
+keys: the trail has to outlive what it describes.
+
+Indexes:
+
+- <code>(project_id, occurred_at)</code>
+- <code>(workspace_id, occurred_at)</code>
+- <code>(actor_user_id, occurred_at)</code>
+- action check against the recorded action list
+
+### platform_settings
+
+A small key/value JSONB store for operator state, keyed by string, with the
+updating user and timestamps. The viewer-integration rollout
+(<code>activeVersion</code>, <code>candidateVersion</code>,
+<code>rolloutPercent</code>) is stored here.
+
+### viewer_integration_checks
+
+Stores one reference-experience-suite run: adapter version, status, total,
+passed and failed counts, per-experience results JSONB, start and finish times,
+the operator who ran it, and timestamps.
+
+Constraints and indexes:
+
+- <code>(viewer_integration_version, status, finished_at)</code>
+- status check: <code>running</code>, <code>passed</code>,
+  <code>failed</code>, with non-negative counts
+
+A rollout, promotion or rollback requires a <code>passed</code> row for its
+target version, which is what makes the suite a gate rather than a report.
+
+### publications (Sprint-04 columns)
+
+<code>viewer_integration_version</code>, <code>embed_policy</code> (JSONB),
+<code>pinned_extensions</code> (JSONB) and <code>scene_index</code> (JSONB) were
+added.
+
+The version is recorded at compile time, so a later rollout change never
+rewrites an existing revision and telemetry can be attributed to the exact
+adapter that produced it. Pinned extensions record the extension versions the
+revision compiled against. The scene index is the lightweight per-scene list a
+large tour pages through, kept separately from the manifest so a segmented
+manifest can carry only its first segment.
+
+Added indexes:
+
+- <code>(viewer_integration_version, status)</code>, for rollout audits
+- <code>(slug, publication_revision)</code>, for revision-pinned delivery
+- <code>(publication_id, scene_id)</code> on
+  <code>published_scene_definitions</code>, for progressive scene fetch
+
+### users (Sprint-04 column)
+
+<code>platform_role</code> was added, checked against <code>member</code> and
+<code>platform_admin</code>, with an index. It gates the extension registry and
+the viewer-integration rollout, and is read from the database on every request
+so revoking it takes effect immediately.
+
+### runtime_events (Sprint-04 indexes)
+
+Creator analytics added <code>(experience_id, event_name, occurred_at)</code>
+and <code>(experience_id, session_id)</code>. The event-name check was widened
+to the full Sprint-04 event list.
+
+Raw events stay behind the <code>AnalyticsStore</code> interface. PostgreSQL is
+the store today, and these indexes are what the bounded date-range queries are
+sized for; a deployment with heavier telemetry can implement the same interface
+against a dedicated analytics store without changing the API or its
+authorization rules.
+
+### assets and derivatives (Sprint-04 media families)
+
+The media-type check was widened to include <code>plan_image</code>, and the
+derivative-kind check to include <code>cubemap</code>,
+<code>tiledCubemap</code>, <code>normalizedPanorama</code> and
+<code>planImage</code>. These describe media families, not renderer adapters:
+the compiler's quality policy chooses among the families a logical asset
+actually has, and only the integration adapter turns that choice into renderer
+configuration.
+
 ## Content and reference integrity
 
 - Cross-entity references use stable UUIDs, never display names, signed URLs, or
@@ -540,6 +822,17 @@ Given the same canonical project revision and derivative catalog, compilation is
 deterministic.
 
 ## Migrations
+
+The applied set, in order:
+
+| Migration | Adds |
+| --- | --- |
+| <code>20260824000000-initial-schema</code> | Users, projects, scenes, hotspots, assets, derivatives, upload sessions, media jobs, publications, idempotency records, runtime events |
+| <code>20260824010000-sprint-02-tour-persistence</code> | Scene connections, published scene definitions, storage deletion jobs |
+| <code>20260824020000-sprint-03-video-timeline</code> | Timeline interactions and the video derivative/profile columns |
+| <code>20260824030000-sprint-04-spatial-analytics-scale</code> | Workspaces, memberships, project access, plans, overlays, hotspot geometry/extension columns, extensions, templates, share tokens, custom domains, audit logs, publication embed policy and pinned extensions, widened media families, analytics indexes |
+| <code>20260824040000-sprint-04-platform-operations</code> | Platform role, platform settings, viewer integration checks, publication scene index and slug/revision index |
+| <code>20260824050000-sprint-01-panorama-job-stages</code> | Per-stage panorama job records |
 
 Schema changes use ordered Umzug migrations executed through Sequelize. For
 development, execute the TypeScript migrator directly:

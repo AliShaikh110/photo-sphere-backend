@@ -92,7 +92,14 @@ The following inventory mirrors <code>.env.example</code>.
 | <code>LOG_LEVEL</code> | <code>info</code> | Pino level: fatal, error, warn, info, debug, trace, or silent. |
 | <code>TRUST_PROXY</code> | <code>false</code> | Set true only behind a trusted proxy that correctly replaces forwarding headers. |
 | <code>AUTO_MIGRATE</code> | <code>false</code> | Runs pending migrations at process startup when true. Keep false in production and migrate as a controlled release step. |
-| <code>VIEWER_INTEGRATION_VERSION</code> | <code>psv-5.14.3-adapter-1</code> | Pinned compiler/renderer adapter identity embedded in manifests and telemetry. |
+| <code>VIEWER_INTEGRATION_VERSION</code> | <code>psv-5.14.3-adapter-1</code> | Pinned compiler/renderer adapter identity embedded in manifests and telemetry. A stored rollout overrides it; a value with no registered adapter falls back to the active version. |
+| <code>ANALYTICS_MAX_RANGE_DAYS</code> | <code>92</code> | Ceiling on a creator analytics query window. A longer range is refused with <code>DATE_RANGE_TOO_LARGE</code> rather than scanned. |
+| <code>PUBLISH_MAX_SCENES</code> | <code>500</code> | Refuses to compile a tour beyond this scene count. |
+| <code>PUBLISH_MAX_MANIFEST_BYTES</code> | <code>8388608</code> | Ceiling on a compiled manifest; default 8 MiB. Progressive delivery is what keeps a large tour under it. |
+| <code>PUBLISH_MAX_SCENE_DEFINITION_BYTES</code> | <code>2097152</code> | Ceiling on one progressively fetched scene definition; default 2 MiB. |
+| <code>DUAL_FISHEYE_INGEST_ENABLED</code> | <code>false</code> | Feature flag for raw camera ingest. Has no effect until a concrete provider is installed; the shipped reference provider declines every source. |
+| <code>LIVE_SOURCE_ENABLED</code> | <code>false</code> | Feature flag for live 360 input. Same as above: the shipped reference provider performs the full validation path, then declines. |
+| <code>LIVE_SOURCE_ALLOWED_HOSTS</code> | empty | Comma-separated host allowlist for pull-based live sources. An empty list refuses every pull source, which is the safe default: this is the control that prevents server-side request forgery through an operator-supplied stream URL. |
 
 Configuration is validated at startup. The process fails fast on malformed
 values or any shipped/development JWT placeholder in production.
@@ -373,6 +380,176 @@ should include safe identities and categories where useful:
 Never log bearer tokens, passwords, JWT secrets, full private URLs, or image
 bytes. Avoid logging unrestricted authored HTML or telemetry payloads.
 
+## Viewer integration rollout
+
+Photo Sphere Viewer sits behind a versioned integration adapter. Canonical
+project data never contains renderer configuration, so a renderer upgrade is an
+adapter rollout, not a customer-data migration.
+
+~~~text
+Experience schema
+  -> Experience compiler
+  -> Viewer integration adapter version X
+  -> pinned Photo Sphere Viewer release
+~~~
+
+Every publication records the adapter version it compiled with. Changing the
+rollout never rewrites an existing revision: an already-published experience
+keeps serving the manifest it was compiled into until it is republished.
+
+All routes below require a <code>platform_admin</code> user. The role is read
+from the database on every request, so granting or revoking it takes effect
+immediately.
+
+### Inspect the current state
+
+~~~powershell
+$headers = @{ Authorization = "Bearer $env:SPHERE_ADMIN_TOKEN" }
+Invoke-RestMethod -Headers $headers `
+  -Uri "$env:SPHERE_BASE_URL/api/v1/platform/viewer-integrations"
+~~~
+
+Returns the rollout (<code>activeVersion</code>, <code>candidateVersion</code>,
+<code>rolloutPercent</code>) and every adapter version this build can emit, each
+with its pinned renderer release and status.
+
+A version that is not in that catalog cannot be rolled out. Attempting it
+returns <code>VIEWER_INTEGRATION_NOT_SUPPORTED</code>, which means the build is
+older than the version being requested — deploy first, then roll out.
+
+### 1. Run the reference experience suite
+
+The suite compiles every reference experience through a candidate adapter and
+checks its expectations. It is the promotion gate.
+
+~~~powershell
+Invoke-RestMethod -Method Post -Headers $headers -ContentType 'application/json' `
+  -Uri "$env:SPHERE_BASE_URL/api/v1/platform/viewer-integrations/checks" `
+  -Body '{"viewerIntegrationVersion":"psv-5.14.3-adapter-2"}'
+~~~
+
+The run is recorded in <code>viewer_integration_checks</code> with per-
+experience results. Review history with
+<code>GET /api/v1/platform/viewer-integrations/checks</code>, optionally
+filtered by <code>viewerIntegrationVersion</code>.
+
+The suite covers basic, cropped and high-resolution panoramas, multi-scene and
+120-scene tours, gallery, hotspots, map and plan, gyroscope/stereo fallback,
+advanced overlay geometry, image and video layers, 360 video with timed
+interactions, and a private embed. <code>GET
+/api/v1/platform/reference-suite</code> lists them and what each one checks.
+
+A failed run records which experiences failed and why. Do not proceed: a
+failing adapter cannot be rolled out, and forcing it is not possible through the
+API.
+
+### 2. Start a percentage rollout
+
+~~~powershell
+Invoke-RestMethod -Method Put -Headers $headers -ContentType 'application/json' `
+  -Uri "$env:SPHERE_BASE_URL/api/v1/platform/viewer-integrations/rollout" `
+  -Body '{"candidateVersion":"psv-5.14.3-adapter-2","rolloutPercent":10}'
+~~~
+
+Bucketing is deterministic by project ID, so a project stays on one version for
+the duration of the rollout rather than alternating between compiles. Only
+newly compiled previews and publications are affected.
+
+Without a passing suite run this returns HTTP 409
+<code>REFERENCE_SUITE_NOT_PASSED</code>. Naming the already-active version
+returns <code>VIEWER_INTEGRATION_ALREADY_ACTIVE</code>.
+
+### 3. Watch
+
+Attribute problems to the candidate before widening. Runtime telemetry and
+publication records both carry the adapter version.
+
+- <code>GET /api/v1/platform/metrics</code> for
+  <code>compile.duration</code>, <code>compile.validation_failed</code>,
+  <code>publish.failed</code> and
+  <code>viewer_integration.reference_suite_run</code>.
+- Creator analytics <code>viewerIntegrationVersions</code> breakdown in
+  <code>.../analytics/summary</code>, and the reliability view for
+  <code>viewer_error</code>, <code>asset_failed</code>,
+  <code>scene_transition_failed</code> and <code>capability_fallback</code>.
+
+Compare the candidate's error rate against the active version over the same
+window before increasing the percentage.
+
+### 4. Promote
+
+~~~powershell
+Invoke-RestMethod -Method Post -Headers $headers -ContentType 'application/json' `
+  -Uri "$env:SPHERE_BASE_URL/api/v1/platform/viewer-integrations/promote" `
+  -Body '{"viewerIntegrationVersion":"psv-5.14.3-adapter-2"}'
+~~~
+
+Promotion makes the version active and ends the rollout. The gate still applies.
+
+### Roll back
+
+Rollback is an ordinary promotion of the previous version, and is the correct
+first response to a renderer regression:
+
+~~~powershell
+Invoke-RestMethod -Method Post -Headers $headers -ContentType 'application/json' `
+  -Uri "$env:SPHERE_BASE_URL/api/v1/platform/viewer-integrations/rollback" `
+  -Body '{"viewerIntegrationVersion":"psv-5.14.3-adapter-1"}'
+~~~
+
+To abandon a rollout without promoting anything, clear the candidate:
+
+~~~powershell
+Invoke-RestMethod -Method Put -Headers $headers -ContentType 'application/json' `
+  -Uri "$env:SPHERE_BASE_URL/api/v1/platform/viewer-integrations/rollout" `
+  -Body '{"candidateVersion":null,"rolloutPercent":0}'
+~~~
+
+The rollback target must also have a passing suite run. Keep the previous
+version's run on record rather than pruning it, or rollback is blocked exactly
+when it is needed. Rollback changes what future compiles produce; publications
+already compiled against the candidate keep their manifests until republished,
+so a regression that reached publications is corrected by republishing those
+projects after the rollback.
+
+Every rollout, promotion and rollback is written to <code>audit_logs</code> as
+<code>viewer_integration.rollout_changed</code> with the previous and new state.
+
+## Extension registry operations
+
+Custom interactions are validated against a registered, versioned extension
+contract. The schema is declarative and the runtime module is allow-listed, so a
+publication can never name arbitrary client code. These routes also require
+<code>platform_admin</code>.
+
+- <code>POST /api/v1/extensions</code> registers a version.
+- <code>PATCH /api/v1/extensions/:extensionId/:version/status</code> moves it
+  between <code>draft</code>, <code>active</code>, <code>deprecated</code> and
+  <code>disabled</code>.
+
+Disabling a version stops new authoring against it and fails validation for
+drafts that still reference it, with
+<code>EXTENSION_NOT_AVAILABLE</code>. Publications pin the extension versions
+they compiled against, so an already-published revision keeps working.
+
+Before disabling a version, check what still references it:
+
+~~~sql
+SELECT h.extension_id, h.extension_version, COUNT(*) AS hotspots
+  FROM hotspots h
+ WHERE h.extension_id IS NOT NULL
+ GROUP BY 1, 2;
+
+SELECT o.extension_id, o.extension_version, COUNT(*) AS overlays
+  FROM overlays o
+ WHERE o.extension_id IS NOT NULL
+ GROUP BY 1, 2;
+~~~
+
+Prefer <code>deprecated</code> over <code>disabled</code> when drafts still use
+a version: deprecated keeps authoring and publishing working while signalling
+that a newer version exists.
+
 ## Verification
 
 ### Fast pre-commit gate
@@ -417,6 +594,22 @@ Required integration coverage includes real PostgreSQL migration compatibility,
 authorization/ownership, revision conflicts, duplicate idempotent delivery,
 durable job retry, media fixtures, compiler determinism, failed-republish
 preservation, private access, and runtime-event deduplication.
+
+Sprint-04 coverage adds project/workspace role enforcement and escalation
+refusal, private-publication bypass attempts across every delivery route,
+embed-origin enforcement, plan-image authorization, token-scope separation
+between the creator API and its signed delivery tokens, operator-surface gating,
+custom extension payload validation and allow-listing, live-source SSRF
+refusal, template instantiation including custom geometry and reference
+rewriting, a 120-scene publish and progressive delivery budget, the analytics
+date-range ceiling, and telemetry burst behaviour.
+
+Several of these assert against database CHECK constraints, so they are only
+meaningful on real PostgreSQL. The integration harness starts a disposable
+cluster when <code>initdb</code> is available and otherwise falls back to an
+in-memory adapter that does not enforce those constraints. Set
+<code>SPHERE_REQUIRE_REAL_POSTGRES=true</code> in CI so the fallback fails the
+run instead of silently weakening it.
 
 ## Incident playbooks
 
@@ -564,3 +757,14 @@ are the source of retention truth.
 - Upload byte/pixel policy and private-media authorization reviewed.
 - Database and storage clocks synchronized.
 - Sprint unit, integration, security, migration, and build gates pass.
+- <code>platform_admin</code> granted only to operators who run extension
+  registration and viewer-integration rollout.
+- The active viewer integration version has a passing reference-suite run on
+  record, and so does the version you would roll back to.
+- <code>ANALYTICS_MAX_RANGE_DAYS</code> and the <code>PUBLISH_MAX_*</code>
+  ceilings reviewed against measured production sizes rather than left at
+  defaults by accident.
+- <code>LIVE_SOURCE_ALLOWED_HOSTS</code> empty unless a live provider is
+  deliberately enabled and its hosts reviewed.
+- Share-token expiry policy and embed-origin allowlists reviewed for private
+  experiences.
