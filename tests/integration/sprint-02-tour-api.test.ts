@@ -335,4 +335,146 @@ describe.sequential('Sprint 02 — multi-scene tours, delivery strategy and capa
       })
       .expect(422);
   }, 90_000);
+
+  it('keeps a published scene definition immutable when the draft changes afterwards', async () => {
+    const { auth, projectId, assetId } = await createTourProject('tour-immutable');
+    const lobby = await addScene(auth, projectId, assetId, 'Lobby', 1);
+    const pool = await addScene(auth, projectId, assetId, 'Pool', 2);
+    for (let index = 0; index < 3; index += 1) {
+      await addScene(auth, projectId, assetId, `Filler ${index + 1}`, index + 3);
+    }
+
+    await request(context.app)
+      .post(`/api/v1/projects/${projectId}/publish`)
+      .set(auth)
+      .set('Idempotency-Key', `immutable-${randomUUID()}`)
+      .send({ revision: 6, slug: 'immutable-tour', visibility: 'public' })
+      .expect(201);
+
+    const published = await request(context.app)
+      .get(`/view/immutable-tour/scenes/${pool}`)
+      .expect(200);
+    expect(published.body.data.sceneDefinition.scene.name).toBe('Pool');
+
+    // The creator keeps editing the draft after publishing.
+    await request(context.app)
+      .patch(`/api/v1/projects/${projectId}/scenes/${pool}`)
+      .set(auth)
+      .send({ projectRevision: 6, name: 'Rooftop Pool' })
+      .expect(200);
+    await request(context.app)
+      .patch(`/api/v1/projects/${projectId}/scenes/${lobby}`)
+      .set(auth)
+      .send({ projectRevision: 7, name: 'Grand Lobby' })
+      .expect(200);
+
+    // Visitors on the published revision must not see the unpublished edit.
+    const afterEdit = await request(context.app)
+      .get(`/view/immutable-tour/scenes/${pool}`)
+      .expect(200);
+    expect(afterEdit.body.data.sceneDefinition.scene.name).toBe('Pool');
+    const manifest = await request(context.app)
+      .get('/view/immutable-tour/manifest')
+      .expect(200);
+    const indexNames = (manifest.body.data.manifest.tour.sceneIndex as { name: string }[])
+      .map((entry) => entry.name);
+    expect(indexNames).toContain('Lobby');
+    expect(indexNames).not.toContain('Grand Lobby');
+
+    // The draft itself did change; only the published revision is frozen.
+    const draft = await request(context.app)
+      .get(`/api/v1/projects/${projectId}/scenes/${pool}`)
+      .set(auth)
+      .expect(200);
+    expect(draft.body.data.scene.name).toBe('Rooftop Pool');
+
+    // Republishing produces a new revision while the old one keeps its content.
+    await request(context.app)
+      .post(`/api/v1/projects/${projectId}/publish`)
+      .set(auth)
+      .set('Idempotency-Key', `immutable-2-${randomUUID()}`)
+      .send({ revision: 8, slug: 'immutable-tour', visibility: 'public' })
+      .expect(201);
+    await request(context.app)
+      .get(`/view/immutable-tour/revisions/1/scenes/${pool}`)
+      .expect(200)
+      .expect(({ body }) => expect(body.data.sceneDefinition.scene.name).toBe('Pool'));
+    await request(context.app)
+      .get(`/view/immutable-tour/revisions/2/scenes/${pool}`)
+      .expect(200)
+      .expect(({ body }) => expect(body.data.sceneDefinition.scene.name).toBe('Rooftop Pool'));
+  }, 120_000);
+
+  it('rejects an in-place rewrite of a stored published scene definition', async () => {
+    const { auth, projectId, assetId } = await createTourProject('tour-scene-write');
+    const lobby = await addScene(auth, projectId, assetId, 'Lobby', 1);
+    await request(context.app)
+      .post(`/api/v1/projects/${projectId}/publish`)
+      .set(auth)
+      .set('Idempotency-Key', `frozen-${randomUUID()}`)
+      .send({ revision: 2, slug: 'frozen-scene-tour', visibility: 'public' })
+      .expect(201);
+
+    const { PublishedSceneDefinition } = await import('../../src/models');
+    const stored = await PublishedSceneDefinition.findOne({ where: { sceneId: lobby } });
+    expect(stored).not.toBeNull();
+
+    await expect(stored!.update({ compiledScene: { tampered: true } })).rejects.toThrow(
+      /immutable/i
+    );
+    await expect(
+      PublishedSceneDefinition.update(
+        { publicationRevision: 99 },
+        { where: { sceneId: lobby } }
+      )
+    ).rejects.toThrow(/immutable/i);
+  }, 90_000);
+
+  it('indexes scenes with the small thumbnail rather than the panorama base image', async () => {
+    const { auth, ownerId, projectId, assetId } = await createTourProject('tour-thumbnails');
+    await addScene(auth, projectId, assetId, 'Lobby', 1);
+    await addScene(auth, projectId, assetId, 'Pool', 2);
+    await request(context.app)
+      .patch(`/api/v1/projects/${projectId}`)
+      .set(auth)
+      .send({ revision: 3, settings: { gallery: { enabled: true } } })
+      .expect(200);
+    await request(context.app)
+      .post(`/api/v1/projects/${projectId}/publish`)
+      .set(auth)
+      .set('Idempotency-Key', `thumbnails-${randomUUID()}`)
+      .send({ revision: 4, slug: 'thumbnail-tour', visibility: 'public' })
+      .expect(201);
+
+    const { AssetDerivative } = await import('../../src/models');
+    const thumbnail = await AssetDerivative.findOne({
+      where: { assetId, kind: 'thumbnail' }
+    });
+    const base = await AssetDerivative.findOne({
+      where: { assetId, kind: 'lowResolutionBase' }
+    });
+    expect(thumbnail).not.toBeNull();
+    expect(ownerId).toBeTruthy();
+
+    const manifest = await request(context.app)
+      .get('/view/thumbnail-tour/manifest')
+      .expect(200);
+    const entries = manifest.body.data.manifest.tour.sceneIndex as {
+      thumbnail: { derivativeId: string };
+    }[];
+    expect(entries).toHaveLength(2);
+    for (const entry of entries) {
+      expect(entry.thumbnail.derivativeId).toBe(thumbnail!.id);
+      expect(entry.thumbnail.derivativeId).not.toBe(base!.id);
+    }
+    // The scene body still carries the larger base image for first render.
+    const scenes = manifest.body.data.manifest.scenes as {
+      panorama: { base: { derivativeId: string } };
+    }[];
+    expect(scenes[0]?.panorama.base.derivativeId).toBe(base!.id);
+
+    // The indexed thumbnail is fetchable through the publication media route.
+    const thumbnailUrl = entries[0]!.thumbnail as unknown as { url: string };
+    await request(context.app).get((thumbnailUrl as { url: string }).url).expect(200);
+  }, 120_000);
 });

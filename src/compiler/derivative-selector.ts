@@ -102,6 +102,26 @@ export function requirePanoramaDerivatives(
   return selected;
 }
 
+/**
+ * The media a gallery or scene index shows for one scene. The dedicated
+ * thumbnail derivative is preferred over the much larger low-resolution base so
+ * a 100-scene index stays light; the derivative generation of the panorama is
+ * kept intact, and a catalog without a ready thumbnail falls back to the base.
+ */
+export function selectSceneIndexThumbnail(
+  asset: Pick<CanonicalAsset, 'derivatives'>,
+  panorama: SelectedPanoramaDerivatives,
+): AssetDerivative {
+  const sameGeneration = asset.derivatives
+    .filter((candidate) => candidate.kind === 'thumbnail'
+      && candidate.version === panorama.lowResolutionBase.version
+      && isDerivativeReady(candidate))
+    .sort(compareDerivativeCandidates)[0];
+  return sameGeneration
+    ?? selectLatestReadyDerivative(asset.derivatives, 'thumbnail')
+    ?? panorama.lowResolutionBase;
+}
+
 function compareDerivativeCandidates(left: AssetDerivative, right: AssetDerivative): number {
   if (left.version !== right.version) {
     return right.version - left.version;

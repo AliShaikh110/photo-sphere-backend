@@ -133,6 +133,7 @@ returned.
 | POST | <code>/api/v1/projects/:projectId/preview-manifest</code> | Bearer, owner | <code>revision</code> |
 | GET | <code>/api/v1/projects/:projectId/scenes</code> | Bearer, owner | None |
 | POST | <code>/api/v1/projects/:projectId/scenes</code> | Bearer, owner | <code>projectRevision</code> |
+| POST | <code>/api/v1/projects/:projectId/scenes/reorder</code> | Bearer, owner | <code>projectRevision</code> |
 | GET | <code>/api/v1/projects/:projectId/scenes/:sceneId</code> | Bearer, owner | None |
 | PATCH | <code>/api/v1/projects/:projectId/scenes/:sceneId</code> | Bearer, owner | <code>projectRevision</code> |
 | DELETE | <code>/api/v1/projects/:projectId/scenes/:sceneId</code> | Bearer, owner | <code>projectRevision</code> |
@@ -155,6 +156,9 @@ returned.
 | GET | <code>/api/v1/projects/:projectId/publications</code> | Bearer, owner | None |
 | GET | <code>/view/:slug/manifest</code> | Optional bearer | Visibility policy |
 | POST | <code>/view/:slug/playback-profile</code> | Optional bearer | Visibility policy, <code>video360</code> publication |
+| GET | <code>/view/:slug/scenes/:sceneId</code> | Optional bearer | Visibility policy, scene present in the current published revision |
+| GET | <code>/view/:slug/revisions/:publicationRevision/scenes/:sceneId</code> | Optional bearer | Visibility policy, scene present in that revision |
+| GET | <code>/view/:slug/revisions/:publicationRevision/scene-index</code> | Optional bearer | Visibility policy |
 | GET | <code>/api/v1/media/:derivativeId</code> | Optional bearer or signed <code>token</code> | Owner or valid media capability |
 | GET | <code>/api/v1/publications/:projectId/:publicationRevision/media/:derivativeId</code> | None | Exact reference in current public publication |
 | POST | <code>/api/v1/runtime/events</code> | Ingest session token, or a creator bearer with project access | Valid event payload scoped to the authorized publication |
@@ -521,14 +525,23 @@ without typing an angle. A supplied <code>initialView</code> always wins. A
 captured field-of-view outside the canonical 30-120 degree range is ignored as a
 capture artefact.
 
-The referenced panorama must belong to the project owner. A project may contain
-multiple scenes, although Sprint 01's authoring workflow focuses on one primary
-scene. The service appends <code>sortOrder</code> and marks the first scene
-primary; those fields are not client-editable in Sprint 01. The persistence
-schema accepts forward-compatible <code>viewLimits</code>, overlays,
-connections, spatial data, and runtime hints, but a nonempty value for any of
-those fields returns <code>CAPABILITY_UNSUPPORTED</code> during Sprint 01
-validate/preview/publish preflight.
+The referenced panorama must belong to the project owner, and several scenes may
+reuse one logical panorama asset. The service appends <code>sortOrder</code> and
+marks the first scene primary; those fields are not set directly by the client,
+and <code>sortOrder</code> is changed through the reorder route below.
+
+<code>viewLimits</code>, <code>connections</code>, <code>spatialData</code> and
+<code>runtimeHints</code> are canonical product fields. A connection names a
+<code>targetSceneId</code> in the same project and may carry a
+<code>triggerHotspotId</code> belonging to the source scene, a
+<code>label</code>, <code>content</code>, an <code>importance</code> from 0
+through 100, and a <code>preloadHint</code> of <code>none</code>,
+<code>normal</code> or <code>high</code>. Importance and preload hints are
+product-level hints the platform's preload policy weighs; they are not cache or
+network commands. Supplying <code>connections</code> in a scene update replaces
+that scene's connection set, retaining any connection whose <code>id</code> is
+resent. A connection to a scene outside the project, or to the scene itself, is
+rejected with <code>422 INVALID_SCENE_REFERENCE</code>.
 
 ### GET /api/v1/projects/:projectId/scenes/:sceneId
 
@@ -549,6 +562,46 @@ request. IDs and <code>projectId</code> are immutable.
 
 Deletion is rejected when it would leave invalid canonical references unless
 those references are explicitly removed as part of supported behavior.
+
+A scene that is still referenced cannot be deleted silently. The response is
+<code>409 SCENE_IN_USE</code> and lists every reference the creator must resolve
+first: inbound scene connections, hotspot actions that navigate to the scene,
+and runtime hints naming it as a likely next scene.
+
+~~~json
+{
+  "error": {
+    "code": "SCENE_IN_USE",
+    "message": "Remove the listed scene references before deleting this scene.",
+    "details": {
+      "sceneId": "scene-id",
+      "references": [
+        { "type": "sceneConnection", "id": "connection-id", "sourceSceneId": "scene-id" },
+        { "type": "hotspotAction", "id": "hotspot-id", "sourceSceneId": "scene-id", "path": "action.sceneId" },
+        { "type": "runtimeHint", "sourceSceneId": "scene-id", "path": "runtimeHints.likelyNextSceneIds[0]" }
+      ]
+    }
+  }
+}
+~~~
+
+### POST /api/v1/projects/:projectId/scenes/reorder
+
+Reorders the project's scenes. The request must list every scene in the project
+exactly once; a partial or padded list is rejected with
+<code>422 INVALID_SCENE_ORDER</code> naming the missing and unknown IDs.
+
+~~~json
+{
+  "projectRevision": 9,
+  "sceneIds": ["scene-c", "scene-a", "scene-b"]
+}
+~~~
+
+Reordering rewrites <code>sortOrder</code> only. Scene IDs are stable across a
+reorder, so connections, hotspot actions, published revisions and analytics
+continue to resolve. The response returns the reordered scenes with their
+hotspots, overlays and connections, plus the new <code>projectRevision</code>.
 
 ## Hotspots
 
@@ -929,6 +982,95 @@ supplied device facts the endpoint returns
 <code>422 VIDEO_PLAYBACK_CAPABILITY_UNSUPPORTED</code> rather than offering an
 unsupported source. Responses use <code>Cache-Control: private, no-store</code>
 because the decision is caller-specific.
+
+### GET /view/:slug/scenes/:sceneId
+
+Returns one compiled, immutable scene definition from the publication a slug
+currently resolves to. It is how a large tour loads a scene the initial manifest
+did not carry inline.
+
+The route reads published data only. A draft edit made after publication is
+never visible here; it becomes visible when the project is published again,
+under a new publication revision.
+
+~~~json
+{
+  "success": true,
+  "data": {
+    "sceneDefinition": {
+      "sceneDefinitionVersion": 2,
+      "experienceId": "project-id",
+      "publicationRevision": 3,
+      "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+      "scene": { "id": "scene-id", "name": "Lobby", "panorama": {}, "hotspots": [], "preloadSceneIds": [] },
+      "viewerIntegration": { "rendererId": "photo-sphere-viewer", "config": {} }
+    }
+  }
+}
+~~~
+
+Visibility policy matches the manifest route: a private publication resolves
+only for a caller authorized on the project, so knowing a slug and a scene ID is
+not sufficient. A scene ID that is not part of the resolved publication returns
+<code>404</code>, whether or not it exists as a draft scene.
+
+Responses carry <code>Cache-Control: public, max-age=0, must-revalidate</code>
+plus a checksum <code>ETag</code>, because the slug's current revision can
+change. Private responses use <code>Cache-Control: private, no-store</code>.
+
+### GET /view/:slug/revisions/:publicationRevision/scenes/:sceneId
+
+The revision-pinned form of the route above. It resolves the named publication
+revision rather than whichever revision is current, including a retired one, and
+returns exactly the same payload.
+
+Because a published revision is immutable, public responses here use
+<code>Cache-Control: public, max-age=31536000, immutable</code> and are safe to
+cache at a CDN. The compiler emits this form in the manifest's
+<code>tour.sceneDefinitionUrlTemplate</code> for progressive tours.
+
+### GET /view/:slug/revisions/:publicationRevision/scene-index
+
+Returns the lightweight scene index of a published revision, in pages. A tour
+whose index is too large to ship inside the initial manifest carries only its
+first segment there, along with <code>tour.sceneIndexUrl</code> and
+<code>tour.sceneIndexSegmentSize</code>, and pages the rest from this route.
+
+Query parameters <code>offset</code> and <code>limit</code> are optional;
+<code>limit</code> is capped at 250 entries.
+
+~~~json
+{
+  "success": true,
+  "data": {
+    "sceneIndexVersion": "scene-index-2-3",
+    "entries": [
+      {
+        "id": "scene-id",
+        "name": "Lobby",
+        "sortOrder": 0,
+        "isPrimary": true,
+        "panoramaAssetId": "asset-id",
+        "thumbnail": { "derivativeId": "derivative-id", "url": "" },
+        "hasHotspots": true,
+        "hasOverlays": false,
+        "connectionTargetSceneIds": ["scene-id"]
+      }
+    ],
+    "page": { "offset": 0, "limit": 250, "total": 120 }
+  }
+}
+~~~
+
+An index entry carries only what a gallery or scene list needs to draw itself:
+no hotspots, no overlays and no panorama body. Its <code>thumbnail</code> is the
+asset's small thumbnail derivative, not the larger low-resolution base the scene
+itself renders from, so a 100-scene index stays inexpensive. An asset whose
+catalog has no ready thumbnail falls back to that base image.
+
+Because the route is revision-pinned it is immutable, and public responses use
+<code>Cache-Control: public, max-age=31536000, immutable</code>. It applies the
+same visibility policy as the manifest and scene-definition routes.
 
 ### GET /api/v1/media/:derivativeId
 

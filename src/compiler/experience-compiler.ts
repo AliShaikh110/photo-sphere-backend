@@ -41,6 +41,7 @@ import {
   requirePanoramaDerivatives,
   selectPanoramaFamilyDerivatives,
   selectPreferredReadyDerivative,
+  selectSceneIndexThumbnail,
 } from './derivative-selector';
 import { preflightExperience } from './preflight';
 import {
@@ -200,6 +201,9 @@ export class ExperienceCompiler {
     ));
 
     const scenes: CompiledScene[] = [];
+    // Scene-index thumbnails are kept beside the compiled scenes rather than
+    // inside them: only the index and gallery need them.
+    const sceneIndexThumbnails = new Map<string, CompiledMediaReference>();
     for (const [sceneIndex, scene] of input.project.scenes.entries()) {
       const panoramaAsset = assetsById.get(scene.panoramaAssetId!)!;
       const derivatives = requirePanoramaDerivatives(panoramaAsset);
@@ -223,6 +227,16 @@ export class ExperienceCompiler {
           path: `scenes[${sceneIndex}].panoramaAssetId`,
         },
       );
+      sceneIndexThumbnails.set(scene.id, await this.resolveDerivative(
+        panoramaAsset,
+        selectSceneIndexThumbnail(panoramaAsset, derivatives),
+        context,
+        {
+          entityType: 'scene',
+          entityId: scene.id,
+          path: `scenes[${sceneIndex}].panoramaAssetId`,
+        },
+      ));
       const qualityPreference = scene.runtimeHints?.qualityPreference
         ?? input.project.settings.quality?.preference
         ?? 'automatic';
@@ -396,7 +410,7 @@ export class ExperienceCompiler {
       sortOrder: scene.sortOrder,
       isPrimary: scene.isPrimary,
       panoramaAssetId: scene.panorama.assetId,
-      thumbnail: scene.panorama.base,
+      thumbnail: sceneIndexThumbnails.get(scene.id) ?? scene.panorama.base,
       hasHotspots: scene.hotspots.length > 0,
       hasOverlays: scene.overlays.length > 0,
       ...(Object.keys(scene.spatialData).length === 0

@@ -1165,7 +1165,7 @@ export async function authorizePublishedDerivative(options: {
       visibility: 'public',
       status: { [Op.in]: ['published', 'retired'] }
     },
-    attributes: ['id', 'compiledManifest', 'embedPolicy']
+    attributes: ['id', 'compiledManifest', 'embedPolicy', 'sceneIndex']
   });
   if (!publication) {
     throw new AppError('MEDIA_ACCESS_DENIED', 'You do not have access to this media.', { status: 403 });
@@ -1188,6 +1188,11 @@ export async function authorizePublishedDerivative(options: {
   }
   let referenced = publication.compiledManifest !== null
     && manifestReferencesDerivative(publication.compiledManifest, options.derivativeId);
+  // A segmented large-tour manifest carries only the first index segment, so a
+  // scene-index thumbnail beyond it is reachable only through the stored index.
+  if (!referenced) {
+    referenced = manifestReferencesDerivative(publication.sceneIndex, options.derivativeId);
+  }
   if (!referenced) {
     const definitions = await PublishedSceneDefinition.findAll({
       where: {

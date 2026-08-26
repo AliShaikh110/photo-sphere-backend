@@ -4,6 +4,7 @@ import { sha256 } from '../helpers/image-fixture';
 
 export type SeededPanorama = {
   assetId: string;
+  thumbnailDerivativeId: string;
   lowResolutionDerivativeId: string;
   standardWebDerivativeId: string;
 };
@@ -39,10 +40,13 @@ export async function seedReadyPanorama(options: {
     processingError: null
   });
 
+  // The same derivative set the panorama pipeline produces, so a compiled
+  // scene index can select the small thumbnail rather than the base image.
   const derivatives = await Promise.all([
-    { kind: 'lowResolutionBase' as const, suffix: 'low' },
-    { kind: 'standardWeb' as const, suffix: 'standard' }
-  ].map(async ({ kind, suffix }) => {
+    { kind: 'thumbnail' as const, suffix: 'thumb', width: 64, height: 32 },
+    { kind: 'lowResolutionBase' as const, suffix: 'low', width: 256, height: 128 },
+    { kind: 'standardWeb' as const, suffix: 'standard', width: 256, height: 128 }
+  ].map(async ({ kind, suffix, width, height }) => {
     const storageKey = `test-fixtures/${assetId}/${suffix}.jpg`;
     await storage.put(storageKey, options.bytes, {
       contentType: 'image/jpeg',
@@ -55,8 +59,8 @@ export async function seedReadyPanorama(options: {
       version: 1,
       storageKey,
       mimeType: 'image/jpeg',
-      width: 256,
-      height: 128,
+      width,
+      height,
       sizeBytes: String(options.bytes.length),
       metadata: { checksumSha256: checksum }
     });
@@ -64,7 +68,8 @@ export async function seedReadyPanorama(options: {
 
   return {
     assetId,
-    lowResolutionDerivativeId: derivatives[0]!.id,
-    standardWebDerivativeId: derivatives[1]!.id
+    thumbnailDerivativeId: derivatives[0]!.id,
+    lowResolutionDerivativeId: derivatives[1]!.id,
+    standardWebDerivativeId: derivatives[2]!.id
   };
 }
