@@ -579,33 +579,71 @@ Claude Code must:
 5. Add foreign keys/reference integrity where the current architecture supports them.
 6. Keep migrations reversible when repository policy requires reversible migrations.
 
+## 18. Test Plan
+
+### Unit tests
+- Experience schema validation.
+- Revision conflict detection.
+- State machine transition validation.
+- URL validator.
+- Rich-content sanitizer.
+- Derivative selection.
+- Compiler validation.
+- Publication revision generation.
+- Error mapping.
+
+### Integration tests
+- Create project → read/update.
+- Unauthorized project access denied.
+- Upload session → complete → processing status.
+- Duplicate upload-complete idempotency.
+- Failed media job → reprocess.
+- Point hotspot CRUD.
+- Preview compile.
+- Successful publish.
+- Failed republish keeps previous published revision.
+- Private publication authorization.
+- Runtime event ingestion.
+
+### Media fixtures
+Include:
+
+- valid full equirectangular panorama,
+- cropped/XMP panorama,
+- invalid image payload,
+- mismatched extension/MIME,
+- oversized/unsupported fixture according to configured policy.
+
+### Security tests
+- stored XSS payload rejected/sanitized.
+- dangerous URL scheme rejected.
+- private manifest unauthorized request denied.
+- private asset bypass attempt denied.
+
 ## 19. Acceptance Criteria / Sprint Gate
 
 Sprint 01 is complete only when all are true:
 
-- [x] Authenticated creator can create an `image360` project.
-- [x] Project includes `schemaVersion` and revision/version.
-- [x] Upload creates a logical asset.
-- [x] Asset status progresses through the explicit processing state machine.
-- [x] Thumbnail + low-resolution + standard-web derivative are generated for a supported panorama.
-- [x] Failed processing is retryable without replacing the asset ID.
-- [x] One or more scenes can be represented canonically.
-- [x] Point hotspots can be saved without exposing renderer coordinates as the domain contract.
-- [x] Information content, appearance, branding, and base settings persist.
-- [x] Validation returns field/entity-path errors.
-- [x] Preview compiles through the production compiler path.
-- [x] Publish creates an immutable successful revision.
-- [x] Failed republish leaves previous publication active.
-- [x] Public/private access rules are enforced server-side.
-- [x] Share response includes canonical URL/embed/QR target data.
-- [x] Rich authored content and external URLs are server-validated.
-- [x] Baseline runtime telemetry can be ingested.
-- [x] No canonical table/document requires raw PSV adapter/plugin configuration.
-- [x] API and schema documentation is updated.
-
-Verification on 2026-08-24: `npm run test:all` completed lint, typecheck,
-59 tests across 15 test files, and the production build; `npm audit` reported
-zero known vulnerabilities.
+- [ ] Authenticated creator can create an `image360` project.
+- [ ] Project includes `schemaVersion` and revision/version.
+- [ ] Upload creates a logical asset.
+- [ ] Asset status progresses through the explicit processing state machine.
+- [ ] Thumbnail + low-resolution + standard-web derivative are generated for a supported panorama.
+- [ ] Failed processing is retryable without replacing the asset ID.
+- [ ] One or more scenes can be represented canonically.
+- [ ] Point hotspots can be saved without exposing renderer coordinates as the domain contract.
+- [ ] Information content, appearance, branding, and base settings persist.
+- [ ] Validation returns field/entity-path errors.
+- [ ] Preview compiles through the production compiler path.
+- [ ] Publish creates an immutable successful revision.
+- [ ] Failed republish leaves previous publication active.
+- [ ] Public/private access rules are enforced server-side.
+- [ ] Share response includes canonical URL/embed/QR target data.
+- [ ] Rich authored content and external URLs are server-validated.
+- [ ] Baseline runtime telemetry can be ingested.
+- [ ] No canonical table/document requires raw PSV adapter/plugin configuration.
+- [ ] Unit/integration/security tests pass.
+- [ ] API and schema documentation is updated.
 
 ## 20. Claude Code Execution Order
 

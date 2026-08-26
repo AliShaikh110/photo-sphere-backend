@@ -393,11 +393,21 @@ job after another worker has recovered it.
 
 ### media_job_stages
 
-Per-stage progress inside one logical media job: <code>inspect</code>,
-<code>poster</code>, <code>transcodeDesktop</code>, <code>transcodeMobile</code>,
-<code>derivatives</code>, <code>finalize</code>. Each row carries a status, the
-derivative kind it produces, the derivative version, the attempt number, whether
-the stage is required, a machine-readable error, and safe diagnostics.
+Per-stage progress inside one logical media job. The image pipeline reports
+<code>inspect</code>, <code>derivatives</code>, then one stage per generated
+derivative (<code>thumbnail</code>, <code>lowResolutionBase</code>,
+<code>standardWeb</code>, <code>tiledLevels</code>), then
+<code>finalize</code>. The video pipeline reports <code>inspect</code>,
+<code>poster</code>, <code>transcodeDesktop</code>,
+<code>transcodeMobile</code> and <code>finalize</code>. Each row carries a
+status, the derivative kind it produces, the derivative version, the attempt
+number, whether the stage is required, a machine-readable error, and safe
+diagnostics.
+
+Rows accumulate across every job an asset has run, so the asset API reports only
+the stages of the most recent job: a successful reprocess must not leave a
+<code>ready</code> asset advertising a stage that its replacement already
+superseded.
 
 Indexes:
 

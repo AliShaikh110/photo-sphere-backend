@@ -295,8 +295,15 @@ describe.sequential('Sprint 02 — multi-scene tours, delivery strategy and capa
       occurredAt: new Date().toISOString()
     };
 
+    // The player reports with the ingest token issued alongside its manifest.
+    const published = await request(context.app)
+      .get('/view/tour-telemetry-experience/manifest')
+      .expect(200);
+    const ingestToken = published.body.data.manifest.telemetry.ingestToken as string;
+
     await request(context.app)
       .post('/api/v1/runtime/events')
+      .set('x-telemetry-token', ingestToken)
       .send({
         events: [
           { ...base, eventId: randomUUID(), eventName: 'scene_changed', payload: { sceneId: pool } },
@@ -319,6 +326,7 @@ describe.sequential('Sprint 02 — multi-scene tours, delivery strategy and capa
     // because the event exists to make the failure diagnosable.
     await request(context.app)
       .post('/api/v1/runtime/events')
+      .set('x-telemetry-token', ingestToken)
       .send({
         ...base,
         eventId: randomUUID(),

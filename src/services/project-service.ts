@@ -1,4 +1,5 @@
 import { Op, type Transaction } from 'sequelize';
+import { readPanoramaInitialView } from '../compiler/panorama-metadata';
 import { sequelize } from '../database';
 import { AppError, conflict, notFound } from '../errors/app-error';
 import {
@@ -363,8 +364,8 @@ async function assertPanoramaAsset(
   projectId: string,
   ownerId: string,
   transaction: Transaction
-): Promise<void> {
-  if (!assetId) return;
+): Promise<Asset | undefined> {
+  if (!assetId) return undefined;
   const asset = await Asset.findOne({
     where: {
       id: assetId,
@@ -382,6 +383,22 @@ async function assertPanoramaAsset(
       path: 'panoramaAssetId'
     });
   }
+  return asset;
+}
+
+/**
+ * Seeds a new scene's framing from the panorama's own capture metadata when the
+ * creator has not chosen one. The editor stays visual: a photographer's
+ * recorded initial view becomes the default without anyone typing an angle.
+ */
+function seedInitialView(
+  authored: Record<string, unknown> | undefined,
+  panorama: Asset | undefined
+): JsonObject {
+  if (authored !== undefined && Object.keys(authored).length > 0) return authored as JsonObject;
+  if (!panorama) return {};
+  const captured = readPanoramaInitialView({ metadata: panorama.metadata });
+  return (captured ?? {}) as unknown as JsonObject;
 }
 
 async function assertDisplayAsset(
@@ -766,7 +783,12 @@ export async function createScene(
   return sequelize.transaction(async (transaction) => {
     const project = await getAccessibleProject(projectId, ownerId, 'editor', transaction);
     assertSceneCapableProject(project);
-    await assertPanoramaAsset(input.panoramaAssetId, projectId, project.ownerId, transaction);
+    const panorama = await assertPanoramaAsset(
+      input.panoramaAssetId,
+      projectId,
+      project.ownerId,
+      transaction
+    );
     const existingScenes = await Scene.findAll({
       where: { projectId },
       order: [['sortOrder', 'ASC'], ['createdAt', 'ASC'], ['id', 'ASC']],
@@ -785,7 +807,7 @@ export async function createScene(
         panoramaAssetId: input.panoramaAssetId ?? null,
         sortOrder: existingScenes.length,
         isPrimary: existingScenes.length === 0,
-        initialView: (input.initialView ?? {}) as JsonObject,
+        initialView: seedInitialView(input.initialView, panorama),
         viewLimits: (input.viewLimits ?? {}) as JsonObject,
         spatialData: (input.spatialData ?? {}) as JsonObject,
         runtimeHints: (input.runtimeHints ?? {}) as JsonObject

@@ -166,6 +166,82 @@ describe('Experience compiler', () => {
     }));
   });
 
+  it('turns a tilted capture pose into a straighten correction the renderer applies', async () => {
+    const tilted = panoramaAsset({
+      metadata: {
+        width: 4096,
+        height: 2048,
+        xmp: {
+          poseHeadingDegrees: 30,
+          posePitchDegrees: -4.5,
+          poseRollDegrees: 2,
+        },
+      },
+    });
+    const manifest = expectImageManifest(
+      await createCompiler().compile(compilerInput({ assets: [tilted] })),
+    );
+
+    expect(manifest.scenes[0]!.panorama.sphereCorrection).toEqual({
+      headingDegrees: 30,
+      pitchDegrees: -4.5,
+      rollDegrees: 2,
+    });
+    // The renderer receives the inverse, in radians: applying it puts the
+    // horizon back where a visitor expects it.
+    const startup = (manifest.viewerIntegration.config as {
+      startup: { sphereCorrection: { pan: number; tilt: number; roll: number } };
+    }).startup;
+    expect(startup.sphereCorrection.pan).toBeCloseTo(-Math.PI / 6, 10);
+    expect(startup.sphereCorrection.tilt).toBeCloseTo((4.5 * Math.PI) / 180, 10);
+    expect(startup.sphereCorrection.roll).toBeCloseTo((-2 * Math.PI) / 180, 10);
+  });
+
+  it('omits a correction for a level panorama and normalises an equivalent pose', async () => {
+    const level = panoramaAsset({
+      metadata: { xmp: { poseHeadingDegrees: 360, posePitchDegrees: 0 } },
+    });
+    const manifest = expectImageManifest(
+      await createCompiler().compile(compilerInput({ assets: [level] })),
+    );
+    expect(manifest.scenes[0]!.panorama.sphereCorrection).toBeUndefined();
+    expect(manifest.viewerIntegration.config).not.toHaveProperty('startup.sphereCorrection');
+  });
+
+  it('falls back to the captured initial view only when the scene has no framing', async () => {
+    const framed = panoramaAsset({
+      metadata: {
+        xmp: {
+          initialViewHeadingDegrees: 210,
+          initialViewPitchDegrees: 12,
+          initialViewFovDegrees: 65,
+        },
+      },
+    });
+    const unframedScene = canonicalProject({
+      scenes: [{ ...canonicalProject().scenes[0]!, initialView: {} }],
+    });
+    const captured = expectImageManifest(await createCompiler().compile(compilerInput({
+      project: unframedScene,
+      assets: [framed],
+    })));
+    expect(captured.scenes[0]!.initialView).toEqual({
+      headingDegrees: -150,
+      pitchDegrees: 12,
+      horizontalFovDegrees: 65,
+    });
+
+    // An authored framing is the creator's decision and always wins.
+    const authored = expectImageManifest(await createCompiler().compile(compilerInput({
+      assets: [framed],
+    })));
+    expect(authored.scenes[0]!.initialView).toEqual({
+      headingDegrees: 90,
+      pitchDegrees: -15,
+      horizontalFovDegrees: 80,
+    });
+  });
+
   it('carries cropped GPano geometry through the product manifest and renderer adapter', async () => {
     const croppedAsset = panoramaAsset({
       projection: 'cropped_equirectangular',

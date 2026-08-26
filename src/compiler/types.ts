@@ -30,9 +30,9 @@ import type {
   VideoProfileCandidate,
 } from '../runtime';
 import type { ExtensionRegistrySnapshot } from '../extensions/types';
-import type { CompiledPanoramaCrop } from './panorama-metadata';
+import type { CompiledPanoramaCrop, CompiledSphereCorrection } from './panorama-metadata';
 
-export type { CompiledPanoramaCrop } from './panorama-metadata';
+export type { CompiledPanoramaCrop, CompiledSphereCorrection } from './panorama-metadata';
 
 export const COMPILED_MANIFEST_VERSION = 4 as const;
 export const COMPILED_SCENE_VERSION = 2 as const;
@@ -93,6 +93,8 @@ export interface CompiledPanoramaMedia {
   readonly family: PanoramaDerivativeFamily;
   readonly fallbackFamilies: readonly PanoramaDerivativeFamily[];
   readonly crop?: CompiledPanoramaCrop;
+  /** Product-level "straighten" correction derived from the capture pose. */
+  readonly sphereCorrection?: CompiledSphereCorrection;
   readonly base: CompiledMediaReference;
   readonly primary: CompiledMediaReference;
   readonly tiles?: CompiledTiledPanoramaMedia;

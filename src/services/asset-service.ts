@@ -49,6 +49,20 @@ const DERIVATIVE_KIND_BY_TARGET: Readonly<Record<ReprocessTarget, AssetDerivativ
   mobile: 'mobileVideoProfile'
 };
 
+/**
+ * The stage report describes the asset's most recent media job only.
+ *
+ * Rows accumulate across every job an asset has ever run, so without this a
+ * `ready` asset would keep advertising a stage that failed in a job its
+ * successful reprocess already replaced.
+ */
+function latestJobStages(stages: readonly MediaJobStage[]): MediaJobStage[] {
+  if (stages.length === 0) return [];
+  // Rows are loaded in creation order, so the last one belongs to the newest job.
+  const latestMediaJobId = stages[stages.length - 1]!.mediaJobId;
+  return stages.filter((stage) => stage.mediaJobId === latestMediaJobId);
+}
+
 export function serializeAsset(asset: Asset): Record<string, unknown> {
   return {
     id: asset.id,
@@ -65,7 +79,7 @@ export function serializeAsset(asset: Asset): Record<string, unknown> {
     ...(asset.mediaJobStages === undefined
       ? {}
       : {
-        processingStages: asset.mediaJobStages.map((stage) => ({
+        processingStages: latestJobStages(asset.mediaJobStages).map((stage) => ({
           stage: stage.stage,
           status: stage.status,
           derivativeKind: stage.derivativeKind,

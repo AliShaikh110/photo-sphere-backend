@@ -399,8 +399,10 @@ describe.sequential('Sprint 03 — 360 video, timeline and device-aware playback
 
     // Playback telemetry, including the mandatory start and stall events.
     const sessionId = `session-${randomUUID()}`;
+    const ingestToken = videoManifest.telemetry.ingestToken as string;
     const telemetry = await request(context.app)
       .post('/api/v1/runtime/events')
+      .set('x-telemetry-token', ingestToken)
       .send({
         events: [
           {
@@ -465,6 +467,7 @@ describe.sequential('Sprint 03 — 360 video, timeline and device-aware playback
 
     await request(context.app)
       .post('/api/v1/runtime/events')
+      .set('x-telemetry-token', ingestToken)
       .send({
         eventId: randomUUID(),
         eventName: 'video_playback_failed',

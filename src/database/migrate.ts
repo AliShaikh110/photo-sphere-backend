@@ -12,7 +12,7 @@ interface MigrationModule {
   down?: MigrationFn<QueryInterface>;
 }
 
-export const REQUIRED_MIGRATION_NAME = '20260824040000-sprint-04-platform-operations';
+export const REQUIRED_MIGRATION_NAME = '20260824050000-sprint-01-panorama-job-stages';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;

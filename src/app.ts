@@ -47,7 +47,14 @@ export function createApp(): Express {
         else callback(new AppError('CORS_ORIGIN_DENIED', 'This origin is not allowed.', { status: 403 }));
       },
       credentials: false,
-      allowedHeaders: ['Authorization', 'Content-Type', 'Idempotency-Key', 'X-Request-ID'],
+      allowedHeaders: [
+        'Authorization',
+        'Content-Type',
+        'Idempotency-Key',
+        'X-Request-ID',
+        'X-Share-Token',
+        'X-Telemetry-Token'
+      ],
       exposedHeaders: ['X-Request-ID', 'Idempotency-Replayed'],
       methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS']
     })

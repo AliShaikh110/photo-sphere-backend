@@ -85,6 +85,7 @@ The following inventory mirrors <code>.env.example</code>.
 | <code>VIDEO_AUDIO_CODEC</code> | <code>aac</code> | Encoder audio codec passed to the transcoder integration. |
 | <code>UPLOAD_SESSION_TTL_SECONDS</code> | <code>3600</code> | Time allowed to PUT an upload before session expiry. |
 | <code>SIGNED_MEDIA_TTL_SECONDS</code> | <code>900</code> | Lifetime of signed preview/private-publication derivative URLs. |
+| <code>TELEMETRY_TOKEN_TTL_SECONDS</code> | <code>21600</code> | Lifetime of the runtime-telemetry ingest token issued with a published manifest. Must outlast a viewing session, since <code>experience_exited</code> is reported against the token served at load. |
 | <code>MEDIA_WORKER_MODE</code> | <code>embedded</code> | <code>embedded</code>, <code>external</code>, or <code>disabled</code>. |
 | <code>MEDIA_WORKER_POLL_MS</code> | <code>1000</code> | Delay between durable queue polls when no immediate job is available. |
 | <code>MEDIA_JOB_LEASE_SECONDS</code> | <code>900</code> | Running-job lease; stale work is recovered after this interval. |

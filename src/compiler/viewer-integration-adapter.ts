@@ -389,6 +389,9 @@ function buildSceneConfiguration(scene: CompiledScene): JsonObject {
     ...(scene.panorama.crop === undefined
       ? {}
       : { panoData: buildPanoData(scene) }),
+    ...(scene.panorama.sphereCorrection === undefined
+      ? {}
+      : { sphereCorrection: buildSphereCorrection(scene) }),
     defaultYaw: degreesToRadians(initialView.headingDegrees ?? 0),
     defaultPitch: degreesToRadians(initialView.pitchDegrees ?? 0),
     defaultZoomLvl: fieldOfViewToZoomLevel(initialView.horizontalFovDegrees),
@@ -421,6 +424,19 @@ function buildVisibleRange(scene: CompiledScene): JsonObject {
       degreesToRadians(limits.minPitchDegrees ?? -90),
       degreesToRadians(limits.maxPitchDegrees ?? 90),
     ],
+  };
+}
+
+/**
+ * The renderer applies the inverse of the capture pose, so a panorama shot with
+ * the camera rolled 5 degrees right is rendered 5 degrees back to level.
+ */
+function buildSphereCorrection(scene: CompiledScene): JsonObject {
+  const correction = scene.panorama.sphereCorrection!;
+  return {
+    pan: degreesToRadians(-correction.headingDegrees),
+    tilt: degreesToRadians(-correction.pitchDegrees),
+    roll: degreesToRadians(-correction.rollDegrees),
   };
 }
 

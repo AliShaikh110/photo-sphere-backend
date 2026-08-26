@@ -1,4 +1,5 @@
 import { Op } from 'sequelize';
+import { verifyTelemetryToken } from '../auth/tokens';
 import { AppError } from '../errors/app-error';
 import { Publication, RuntimeEvent } from '../models';
 import type { JsonObject, RuntimeEventName } from '../models/model.types';
@@ -17,7 +18,69 @@ export type RuntimeEventInput = {
   occurredAt: string;
 };
 
-export async function ingestRuntimeEvents(events: RuntimeEventInput[]): Promise<Record<string, unknown>> {
+/**
+ * How the caller proved it may report against a publication: with the ingest
+ * token issued alongside a manifest, or as a signed-in creator with access to
+ * the project (which is how preview and diagnostic replay report).
+ */
+export type TelemetryAuthorization =
+  | { readonly kind: 'sessionToken'; readonly token: string }
+  | {
+    readonly kind: 'creator';
+    readonly authorizeProject: (experienceId: string) => Promise<void>;
+  };
+
+function telemetryUnauthorized(): AppError {
+  incrementMetric('runtime.event.rejected', { errorCode: 'TELEMETRY_TOKEN_REQUIRED' });
+  return new AppError(
+    'TELEMETRY_TOKEN_REQUIRED',
+    'Runtime telemetry requires the session token issued with the experience manifest.',
+    { status: 401, path: 'headers.X-Telemetry-Token' }
+  );
+}
+
+/**
+ * Rejects a batch whose events do not all belong to the authorized session.
+ *
+ * The scope is checked per event rather than per batch: one valid token must
+ * not become a way to write events against a different experience or revision.
+ */
+async function authorizeRuntimeEvents(
+  events: readonly RuntimeEventInput[],
+  authorization: TelemetryAuthorization | undefined
+): Promise<void> {
+  if (authorization === undefined) throw telemetryUnauthorized();
+  if (authorization.kind === 'creator') {
+    for (const experienceId of new Set(events.map((event) => event.experienceId))) {
+      await authorization.authorizeProject(experienceId);
+    }
+    return;
+  }
+  const session = verifyTelemetryToken(authorization.token);
+  const mismatched = events.find((event) => (
+    event.experienceId !== session.experienceId
+    || event.publicationRevision !== session.publicationRevision
+    || event.viewerIntegrationVersion !== session.viewerIntegrationVersion
+  ));
+  if (mismatched) {
+    incrementMetric('runtime.event.rejected', { errorCode: 'TELEMETRY_SCOPE_MISMATCH' });
+    throw new AppError(
+      'TELEMETRY_SCOPE_MISMATCH',
+      'The telemetry event does not belong to the authorized session.',
+      {
+        status: 403,
+        entityId: mismatched.experienceId,
+        path: 'events.experienceId'
+      }
+    );
+  }
+}
+
+export async function ingestRuntimeEvents(
+  events: RuntimeEventInput[],
+  authorization?: TelemetryAuthorization
+): Promise<Record<string, unknown>> {
+  await authorizeRuntimeEvents(events, authorization);
   const uniqueEvents = [...new Map(events.map((event) => [event.eventId, event])).values()];
   const publicationKeys = new Map<string, { experienceId: string; publicationRevision: number }>();
   for (const event of uniqueEvents) {

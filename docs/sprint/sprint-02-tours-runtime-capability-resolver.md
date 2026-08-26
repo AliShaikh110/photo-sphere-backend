@@ -465,43 +465,64 @@ Add/update indexes for:
 
 If scene definitions are materialized as compiled publication artifacts rather than relational records, document that design.
 
-## 19. Acceptance Criteria / Sprint Gate
+## 19. Tests
 
-- [x] Multi-scene projects persist with stable scene IDs.
-- [x] Scene connections are validated and broken references cannot publish.
-- [x] Scene reorder and delete rules are deterministic.
-- [x] Gallery/navigation/autorotation/compass/view-limits exist as product-level settings.
-- [x] Capability registry exists as a shared backend contract.
-- [x] Validation resolves dependencies/incompatibilities before publish.
-- [x] Small-tour and large-tour compiler strategies both exist.
-- [x] Large-tour initial manifest contains lightweight scene index rather than every heavy scene payload.
-- [x] Published scene-definition route resolves immutable publication data.
-- [x] Private large-tour scene fetch is authorization-protected.
-- [x] Preload policy selects likely adjacent scenes only.
-- [x] Runtime cache policy is bounded and platform-controlled.
+### Domain / API
+- create multiple scenes,
+- reorder scenes,
+- connect scenes,
+- reject invalid/deleted target,
+- block unsafe deletion with inbound references,
+- reuse one logical asset where allowed,
+- validate view limits.
+
+### Compiler
+- small tour compiles inline scenes,
+- large tour compiles lightweight index,
+- large-tour scene fetch returns published immutable definition,
+- draft changes after publish do not mutate published scene output,
+- tiled derivative selected when policy requires,
+- fallback to standard derivative when tiled set unavailable and allowed.
+
+### Resolver
+- dependency satisfied,
+- missing dependency rejected/fallback,
+- media requirement enforcement,
+- known incompatible feature combination handled,
+- unused heavy module omitted.
+
+### Performance behavior
+- manifest size does not scale linearly with full scene detail in large-tour mode,
+- no "preload all scenes" manifest output,
+- cache/preload hints are bounded.
+
+### Authorization
+- private progressive scene route protected,
+- unauthorized project scene CRUD denied.
+
+## 20. Acceptance Criteria / Sprint Gate
+
+- [ ] Multi-scene projects persist with stable scene IDs.
+- [ ] Scene connections are validated and broken references cannot publish.
+- [ ] Scene reorder and delete rules are deterministic.
+- [ ] Gallery/navigation/autorotation/compass/view-limits exist as product-level settings.
+- [ ] Capability registry exists as a shared backend contract.
+- [ ] Validation resolves dependencies/incompatibilities before publish.
+- [ ] Small-tour and large-tour compiler strategies both exist.
+- [ ] Large-tour initial manifest contains lightweight scene index rather than every heavy scene payload.
+- [ ] Published scene-definition route resolves immutable publication data.
+- [ ] Private large-tour scene fetch is authorization-protected.
+- [ ] Preload policy selects likely adjacent scenes only.
+- [ ] Runtime cache policy is bounded and platform-controlled.
 - [ ] Tiled/high-resolution derivative generation is policy-driven and retry-safe.
-- [x] Compiler can select low-res/base + high-detail tiled delivery.
-- [x] Optional runtime modules are declared only when needed.
-- [x] `scene_changed` and `scene_transition_failed` telemetry is supported.
-- [x] Full regression suite from Sprint 01 still passes.
+- [ ] Compiler can select low-res/base + high-detail tiled delivery.
+- [ ] Optional runtime modules are declared only when needed.
+- [ ] `scene_changed` and `scene_transition_failed` telemetry is supported.
+- [ ] Full regression suite from Sprint 01 still passes.
 
-Verification on 2026-08-25: `npm run test:all` passed lint, typecheck, 135 tests
-across 26 files, and the production build. Tour behaviour is covered by
-`tests/integration/sprint-02-tour-api.test.ts` (scene IDs across reorder,
-inbound-reference delete refusal, embedded vs progressive delivery, private
-progressive-scene authorization, compiled tour settings, bounded preload/cache,
-scene telemetry) and by `tests/unit/reference/reference-experience-suite.test.ts`
-(`multi-scene-tour`, `large-tour` at 120 scenes, `high-resolution-panorama`
-asserting the tiled family is selected).
+## 21. Claude Code Execution Order
 
-Remaining gap: tiled derivative **generation** is implemented in
-`src/media/image-processor.ts` and `src/services/media-worker-service.ts` and its
-selection is proven, but the generation job itself has no test asserting the
-policy trigger or retry-safety. Everything downstream of it is covered.
-
-## 20. Claude Code Execution Order
-
-1. Read Sprint-01 implementation.
+1. Read Sprint-01 implementation and existing tests.
 2. Extend scene/connection domain model and migrations.
 3. Implement full scene CRUD/reorder/reference integrity.
 4. Extend project validation.
@@ -517,7 +538,7 @@ policy trigger or retry-safety. Everything downstream of it is covered.
 14. Run all prior + new tests.
 15. Update architecture/API/runbook docs.
 
-## 21. Claude Code Guardrails
+## 22. Claude Code Guardrails
 
 - Do not make PSV virtual-tour node config canonical.
 - Do not preload all scenes.

@@ -66,6 +66,9 @@ const envSchema = z
     TOUR_INLINE_MAX_AVERAGE_CONNECTIONS: z.coerce.number().nonnegative().default(5),
     UPLOAD_SESSION_TTL_SECONDS: z.coerce.number().int().positive().default(3600),
     SIGNED_MEDIA_TTL_SECONDS: z.coerce.number().int().positive().default(900),
+    // Long enough to cover one viewing session, since a visitor reports
+    // experience_exited against the token they were served at load.
+    TELEMETRY_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(6 * 60 * 60),
     MEDIA_WORKER_MODE: z.enum(['embedded', 'external', 'disabled']).default('embedded'),
     MEDIA_WORKER_POLL_MS: z.coerce.number().int().positive().default(1000),
     MEDIA_JOB_LEASE_SECONDS: z.coerce.number().int().positive().default(900),
@@ -127,6 +130,7 @@ export type AppConfig = {
   tourStrategyPolicy: TourStrategyPolicyConfig;
   uploadSessionTtlSeconds: number;
   signedMediaTtlSeconds: number;
+  telemetryTokenTtlSeconds: number;
   mediaWorkerMode: 'embedded' | 'external' | 'disabled';
   mediaWorkerPollMs: number;
   mediaJobLeaseSeconds: number;
@@ -200,6 +204,7 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
     },
     uploadSessionTtlSeconds: value.UPLOAD_SESSION_TTL_SECONDS,
     signedMediaTtlSeconds: value.SIGNED_MEDIA_TTL_SECONDS,
+    telemetryTokenTtlSeconds: value.TELEMETRY_TOKEN_TTL_SECONDS,
     mediaWorkerMode: value.MEDIA_WORKER_MODE,
     mediaWorkerPollMs: value.MEDIA_WORKER_POLL_MS,
     mediaJobLeaseSeconds: value.MEDIA_JOB_LEASE_SECONDS,

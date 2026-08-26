@@ -43,7 +43,11 @@ import {
   selectPreferredReadyDerivative,
 } from './derivative-selector';
 import { preflightExperience } from './preflight';
-import { readPanoramaCrop } from './panorama-metadata';
+import {
+  readPanoramaCrop,
+  readPanoramaInitialView,
+  readPanoramaSphereCorrection,
+} from './panorama-metadata';
 import { readTiledPanoramaMetadata } from './tiled-panorama';
 import { VIDEO_PLAYBACK_FAILURE_CATEGORIES } from '../models/model.types';
 import {
@@ -292,11 +296,22 @@ export class ExperienceCompiler {
           entityId: scene.id,
           path: `scenes[${sceneIndex}].panoramaAssetId`,
         });
-      const initialView = scene.initialView ?? {
-        headingDegrees: 0,
-        pitchDegrees: 0,
-        horizontalFovDegrees: 90,
+      // A scene's own framing wins; otherwise the capture device's recorded
+      // initial view is a better first impression than due north at 90 degrees.
+      const capturedInitialView = readPanoramaInitialView(panoramaAsset) ?? {};
+      const authoredInitialView = scene.initialView ?? {};
+      const initialView = {
+        headingDegrees: authoredInitialView.headingDegrees
+          ?? capturedInitialView.headingDegrees
+          ?? 0,
+        pitchDegrees: authoredInitialView.pitchDegrees
+          ?? capturedInitialView.pitchDegrees
+          ?? 0,
+        horizontalFovDegrees: authoredInitialView.horizontalFovDegrees
+          ?? capturedInitialView.horizontalFovDegrees
+          ?? 90,
       };
+      const sphereCorrection = readPanoramaSphereCorrection(panoramaAsset);
       scenes.push({
         id: scene.id,
         name: sanitizePlainText(scene.name),
@@ -310,6 +325,7 @@ export class ExperienceCompiler {
           ...(projection === 'cropped_equirectangular'
             ? { crop: readPanoramaCrop(panoramaAsset)! }
             : {}),
+          ...(sphereCorrection === undefined ? {} : { sphereCorrection }),
           base,
           primary,
           ...(tiles === undefined ? {} : { tiles }),

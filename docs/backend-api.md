@@ -157,7 +157,7 @@ returned.
 | POST | <code>/view/:slug/playback-profile</code> | Optional bearer | Visibility policy, <code>video360</code> publication |
 | GET | <code>/api/v1/media/:derivativeId</code> | Optional bearer or signed <code>token</code> | Owner or valid media capability |
 | GET | <code>/api/v1/publications/:projectId/:publicationRevision/media/:derivativeId</code> | None | Exact reference in current public publication |
-| POST | <code>/api/v1/runtime/events</code> | No creator bearer required | Valid event payload |
+| POST | <code>/api/v1/runtime/events</code> | Ingest session token, or a creator bearer with project access | Valid event payload scoped to the authorized publication |
 
 ## Health
 
@@ -512,6 +512,15 @@ Returns the owner's scenes ordered by <code>sortOrder</code>.
 }
 ~~~
 
+<code>initialView</code> is optional. When it is omitted or empty and the
+panorama's XMP records the framing its camera captured
+(<code>GPano:InitialViewHeadingDegrees</code>,
+<code>InitialViewPitchDegrees</code>, <code>InitialHorizontalFOVDegrees</code>),
+the scene is created with that framing, so a creator gets a sensible first view
+without typing an angle. A supplied <code>initialView</code> always wins. A
+captured field-of-view outside the canonical 30-120 degree range is ignored as a
+capture artefact.
+
 The referenced panorama must belong to the project owner. A project may contain
 multiple scenes, although Sprint 01's authoring workflow focuses on one primary
 scene. The service appends <code>sortOrder</code> and marks the first scene
@@ -718,10 +727,18 @@ Ready image assets include the <code>thumbnail</code>,
 include a <code>videoPoster</code> and at least one playback profile:
 <code>desktopVideoProfile</code>, <code>mobileVideoProfile</code>, or both.
 
-A video asset also exposes <code>processingStages</code>, the per-stage record of
-its last media job (<code>inspect</code>, <code>poster</code>,
-<code>transcodeDesktop</code>, <code>transcodeMobile</code>,
-<code>finalize</code>). One playback profile can fail without discarding the
+Every asset exposes <code>processingStages</code>, the per-stage record of its
+last media job. A panorama or image reports <code>inspect</code>,
+<code>derivatives</code>, then one stage per generated derivative
+(<code>thumbnail</code>, <code>lowResolutionBase</code>,
+<code>standardWeb</code>, and <code>tiledLevels</code> when the tiling policy
+applies), then <code>finalize</code>. A video reports <code>inspect</code>,
+<code>poster</code>, <code>transcodeDesktop</code>,
+<code>transcodeMobile</code> and <code>finalize</code>. A stage that failed
+names its stable failure category, so one derivative that could not be produced
+is diagnosable without inferring it from the job's overall status. Only the most
+recent job is reported: a successful reprocess replaces the stage record of the
+job it supersedes. One playback profile can fail without discarding the
 others: the asset still becomes <code>ready</code> as long as at least one
 publishable profile exists, and <code>metadata.unavailablePlaybackProfiles</code>
 names what could not be produced and why. If no publishable profile exists the
@@ -853,7 +870,16 @@ contain revision-scoped URLs of the form
 <code>/api/v1/publications/:projectId/:publicationRevision/media/:derivativeId</code>.
 Private manifests are hydrated at read time with short-lived signed
 <code>/api/v1/media/:derivativeId?token=...</code> URLs; the persisted immutable
-manifest does not store expiring credentials.
+manifest does not store expiring credentials. <code>telemetry.ingestToken</code>
+is issued the same way, for the same reason.
+
+A scene whose panorama recorded a tilted capture pose
+(<code>GPano:PoseHeadingDegrees</code>, <code>PosePitchDegrees</code>,
+<code>PoseRollDegrees</code>) carries
+<code>panorama.sphereCorrection</code>, stated in product degrees. A level
+panorama carries no correction at all. The renderer receives the inverse of
+that pose, in radians, only through the viewer integration adapter output; the
+canonical scene and the manifest scene never speak renderer vocabulary.
 Preview and publish use the same compiler and viewer adapter path. The response
 data contains both <code>manifest</code> and safe current
 <code>publication</code> metadata.
@@ -937,6 +963,33 @@ revocation interval.
 ## Runtime telemetry
 
 ### POST /api/v1/runtime/events
+
+Requires authorization. A visitor presents the ingest token issued alongside the
+experience manifest in the <code>X-Telemetry-Token</code> header:
+
+~~~http
+POST /api/v1/runtime/events
+X-Telemetry-Token: <manifest.telemetry.ingestToken>
+~~~
+
+The token is scoped to one experience, publication revision and viewer
+integration version. Every event in the batch must match that scope; one event
+outside it rejects the whole batch with
+<code>403 TELEMETRY_SCOPE_MISMATCH</code>. A missing token returns
+<code>401 TELEMETRY_TOKEN_REQUIRED</code> and an invalid or expired one returns
+<code>401 TELEMETRY_TOKEN_INVALID</code>.
+
+A published manifest hands every visitor its experience ID, publication revision
+and viewer integration version, so those fields alone cannot establish that an
+event came from a real playback session. The token is what ingestion trusts.
+It is minted per manifest read rather than stored in the immutable manifest, so
+it expires on its own schedule (<code>TELEMETRY_TOKEN_TTL_SECONDS</code>, six
+hours by default) and its expiry is returned as
+<code>telemetry.ingestTokenExpiresAt</code>.
+
+A signed-in creator with at least viewer access to the project may report
+without a session token, using the normal <code>Authorization</code> bearer.
+That path covers preview sessions and replaying a diagnostic session.
 
 The canonical form is a batch:
 

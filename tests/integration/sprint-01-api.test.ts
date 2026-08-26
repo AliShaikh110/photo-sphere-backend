@@ -4,7 +4,11 @@ import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { bearer, registerIdentity } from '../helpers/api-client';
-import { generatedEquirectangularJpeg, sha256 } from '../helpers/image-fixture';
+import {
+  generatedEquirectangularJpeg,
+  posedEquirectangularJpeg,
+  sha256
+} from '../helpers/image-fixture';
 import {
   startIntegrationTestContext,
   truncateApplicationData,
@@ -295,6 +299,12 @@ describe.sequential('Sprint 01 HTTP integration', () => {
       projection: string;
       metadata: { width: number; height: number; is360: boolean };
       derivatives: Array<{ id: string; kind: string; width: number; height: number }>;
+      processingStages: Array<{
+        stage: string;
+        status: string;
+        derivativeKind: string | null;
+        error: unknown;
+      }>;
     };
     expect(readyAsset).toMatchObject({
       processingStatus: 'ready',
@@ -306,6 +316,24 @@ describe.sequential('Sprint 01 HTTP integration', () => {
       'standardWeb',
       'thumbnail'
     ]);
+
+    // Every stage of the panorama pipeline is individually diagnosable, so a
+    // single derivative that fails can be told apart from a job that never ran.
+    expect(readyAsset.processingStages.map((stage) => stage.stage)).toEqual([
+      'inspect',
+      'derivatives',
+      'thumbnail',
+      'lowResolutionBase',
+      'standardWeb',
+      'finalize'
+    ]);
+    expect(readyAsset.processingStages.every((stage) => stage.status === 'succeeded')).toBe(true);
+    expect(readyAsset.processingStages.every((stage) => stage.error === null)).toBe(true);
+    expect(
+      readyAsset.processingStages
+        .filter((stage) => stage.derivativeKind !== null)
+        .map((stage) => stage.derivativeKind)
+    ).toEqual(['thumbnail', 'lowResolutionBase', 'standardWeb']);
     const standardWeb = readyAsset.derivatives.find((item) => item.kind === 'standardWeb')!;
 
     const sceneResponse = await request(context.app)
@@ -671,30 +699,78 @@ describe.sequential('Sprint 01 HTTP integration', () => {
       payload: { elapsedMs: 123 },
       occurredAt: new Date().toISOString()
     };
+
+    // A visitor reports with the ingest token the manifest handed them; the
+    // manifest's public identifiers are not on their own a licence to write.
+    const ingestToken = privateManifest.body.data.manifest.telemetry.ingestToken as string;
+    expect(ingestToken).toEqual(expect.any(String));
+    expect(privateManifest.body.data.manifest.telemetry.ingestTokenExpiresAt)
+      .toEqual(expect.any(String));
+    const telemetry = (): request.Test => request(context.app)
+      .post('/api/v1/runtime/events')
+      .set('x-telemetry-token', ingestToken);
+
     await request(context.app)
       .post('/api/v1/runtime/events')
+      .send(telemetryEvent)
+      .expect(401)
+      .expect(({ body }) => expect(body.error.code).toBe('TELEMETRY_TOKEN_REQUIRED'));
+    // The retired public revision's token cannot report against a later one.
+    const retiredRevisionToken = publicManifest.body.data.manifest.telemetry.ingestToken as string;
+    await request(context.app)
+      .post('/api/v1/runtime/events')
+      .set('x-telemetry-token', retiredRevisionToken)
+      .send(telemetryEvent)
+      .expect(403)
+      .expect(({ body }) => expect(body.error.code).toBe('TELEMETRY_SCOPE_MISMATCH'));
+    await request(context.app)
+      .post('/api/v1/runtime/events')
+      .set('x-telemetry-token', 'not-a-token')
+      .send(telemetryEvent)
+      .expect(401)
+      .expect(({ body }) => expect(body.error.code).toBe('TELEMETRY_TOKEN_INVALID'));
+    // A signed-in creator may report against their own experience without a
+    // session token, which is how preview and diagnostic replay report.
+    await request(context.app)
+      .post('/api/v1/runtime/events')
+      .set(auth)
       .send({ ...telemetryEvent, eventId: randomUUID(), viewerIntegrationVersion: 'wrong-adapter' })
       .expect(422)
       .expect(({ body }) => expect(body.error.code).toBe('VIEWER_INTEGRATION_VERSION_MISMATCH'));
     await request(context.app)
       .post('/api/v1/runtime/events')
+      .set(bearer(other.accessToken))
+      .send({ ...telemetryEvent, eventId: randomUUID() })
+      .expect(404);
+
+    await telemetry()
       .send(telemetryEvent)
       .expect(202)
       .expect(({ body }) => expect(body.data).toEqual({ accepted: 1, duplicates: 0 }));
-    await request(context.app)
-      .post('/api/v1/runtime/events')
+    await telemetry()
       .send({ events: [telemetryEvent] })
       .expect(202)
       .expect(({ body }) => expect(body.data).toEqual({ accepted: 0, duplicates: 1 }));
     expect(await RuntimeEvent.count({ where: { eventId } })).toBe(1);
 
     const sameBatchEvent = { ...telemetryEvent, eventId: randomUUID(), eventName: 'experience_exited' };
-    await request(context.app)
-      .post('/api/v1/runtime/events')
+    await telemetry()
       .send({ events: [sameBatchEvent, sameBatchEvent] })
       .expect(202)
       .expect(({ body }) => expect(body.data).toEqual({ accepted: 1, duplicates: 1 }));
     expect(await RuntimeEvent.count({ where: { eventId: sameBatchEvent.eventId } })).toBe(1);
+
+    // One event outside the session's scope rejects the whole batch, so a valid
+    // token never becomes a way to write against a neighbouring revision.
+    await telemetry()
+      .send({
+        events: [
+          { ...telemetryEvent, eventId: randomUUID() },
+          { ...telemetryEvent, eventId: randomUUID(), publicationRevision: 1 }
+        ]
+      })
+      .expect(403)
+      .expect(({ body }) => expect(body.error.code).toBe('TELEMETRY_SCOPE_MISMATCH'));
 
     const concurrentEvent = {
       ...telemetryEvent,
@@ -702,8 +778,8 @@ describe.sequential('Sprint 01 HTTP integration', () => {
       eventName: 'hotspot_clicked'
     };
     const concurrentResponses = await Promise.all([
-      request(context.app).post('/api/v1/runtime/events').send(concurrentEvent).expect(202),
-      request(context.app).post('/api/v1/runtime/events').send(concurrentEvent).expect(202)
+      telemetry().send(concurrentEvent).expect(202),
+      telemetry().send(concurrentEvent).expect(202)
     ]);
     expect(concurrentResponses.reduce(
       (total, response) => total + Number(response.body.data.accepted),
@@ -714,6 +790,205 @@ describe.sequential('Sprint 01 HTTP integration', () => {
       0
     )).toBe(1);
     expect(await RuntimeEvent.count({ where: { eventId: concurrentEvent.eventId } })).toBe(1);
+  }, 60_000);
+
+  it('carries a panorama capture pose into the scene default view and published manifest', async ({ skip }) => {
+    if (context.databaseKind !== 'postgres') {
+      skip('The media pipeline requires real PostgreSQL row locks.');
+    }
+
+    const owner = await registerIdentity(context.app, 'pose-owner');
+    const auth = bearer(owner.accessToken);
+    const posed = await posedEquirectangularJpeg();
+
+    const project = await request(context.app)
+      .post('/api/v1/projects')
+      .set(auth)
+      .send({ name: 'Tilted Capture', type: 'image360' })
+      .expect(201);
+    const projectId = project.body.data.project.id as string;
+
+    const session = await request(context.app)
+      .post('/api/v1/assets/uploads')
+      .set(auth)
+      .send({
+        projectId,
+        filename: 'posed.jpg',
+        mimeType: 'image/jpeg',
+        sizeBytes: posed.length
+      })
+      .expect(201);
+    const assetId = session.body.data.asset.id as string;
+    await request(context.app)
+      .put(session.body.data.upload.url as string)
+      .set(auth)
+      .set('Content-Type', 'image/jpeg')
+      .send(posed)
+      .expect(200);
+    await request(context.app)
+      .post(`/api/v1/assets/${assetId}/complete`)
+      .set(auth)
+      .set('Idempotency-Key', `complete-${randomUUID()}`)
+      .send({ uploadSessionId: session.body.data.upload.sessionId })
+      .expect(202);
+    const { drainMediaJobs } = await import('../../src/services/media-worker-service');
+    await expect(drainMediaJobs()).resolves.toBe(1);
+
+    // The pose and framing the camera recorded are inspected and kept, not
+    // discarded, so the platform can act on them later.
+    const asset = await request(context.app)
+      .get(`/api/v1/assets/${assetId}`)
+      .set(auth)
+      .expect(200);
+    expect(asset.body.data.asset.metadata.xmp).toMatchObject({
+      poseHeadingDegrees: 30,
+      posePitchDegrees: -4.5,
+      poseRollDegrees: 2,
+      initialViewHeadingDegrees: 210,
+      initialViewPitchDegrees: 12,
+      initialViewFovDegrees: 65
+    });
+
+    // A scene created without a framing inherits the photographer's, so the
+    // creator never has to type an angle to get a sensible first view.
+    const scene = await request(context.app)
+      .post(`/api/v1/projects/${projectId}/scenes`)
+      .set(auth)
+      .send({ projectRevision: 1, name: 'Quayside', panoramaAssetId: assetId })
+      .expect(201);
+    expect(scene.body.data.scene.initialView).toEqual({
+      headingDegrees: -150,
+      pitchDegrees: 12,
+      horizontalFovDegrees: 65
+    });
+
+    await request(context.app)
+      .post(`/api/v1/projects/${projectId}/publish`)
+      .set(auth)
+      .set('Idempotency-Key', `publish-${randomUUID()}`)
+      .send({ revision: 2, slug: 'tilted-capture', visibility: 'public' })
+      .expect(201);
+
+    const manifest = await request(context.app)
+      .get('/view/tilted-capture/manifest')
+      .expect(200);
+    const panoramaScene = manifest.body.data.manifest.scenes[0];
+    expect(panoramaScene.initialView).toEqual({
+      headingDegrees: -150,
+      pitchDegrees: 12,
+      horizontalFovDegrees: 65
+    });
+    expect(panoramaScene.panorama.sphereCorrection).toEqual({
+      headingDegrees: 30,
+      pitchDegrees: -4.5,
+      rollDegrees: 2
+    });
+    // The correction reaches the renderer only through the integration adapter.
+    const startup = manifest.body.data.manifest.viewerIntegration.config.startup;
+    expect(startup.sphereCorrection.roll).toBeCloseTo((-2 * Math.PI) / 180, 10);
+    // The scene states the correction in product degrees; radian pan/tilt/roll
+    // is renderer vocabulary and stays inside the adapter output.
+    expect(Object.keys(panoramaScene.panorama.sphereCorrection).sort())
+      .toEqual(['headingDegrees', 'pitchDegrees', 'rollDegrees']);
+  }, 60_000);
+
+  it('names the panorama stage that failed and clears it on a successful retry', async ({ skip }) => {
+    if (context.databaseKind !== 'postgres') {
+      skip('The media pipeline requires real PostgreSQL row locks.');
+    }
+
+    const owner = await registerIdentity(context.app, 'stage-failure-owner');
+    const auth = bearer(owner.accessToken);
+
+    const project = await request(context.app)
+      .post('/api/v1/projects')
+      .set(auth)
+      .send({ name: 'Stage Diagnostics', type: 'image360' })
+      .expect(201);
+    const projectId = project.body.data.project.id as string;
+
+    const session = await request(context.app)
+      .post('/api/v1/assets/uploads')
+      .set(auth)
+      .send({
+        projectId,
+        filename: 'panorama.jpg',
+        mimeType: 'image/jpeg',
+        sizeBytes: panorama.length
+      })
+      .expect(201);
+    const assetId = session.body.data.asset.id as string;
+    await request(context.app)
+      .put(session.body.data.upload.url as string)
+      .set(auth)
+      .set('Content-Type', 'image/jpeg')
+      .send(panorama)
+      .expect(200);
+    await request(context.app)
+      .post(`/api/v1/assets/${assetId}/complete`)
+      .set(auth)
+      .set('Idempotency-Key', `complete-${randomUUID()}`)
+      .send({ uploadSessionId: session.body.data.upload.sessionId })
+      .expect(202);
+
+    // A source whose bytes no longer decode fails inside inspection. The stage
+    // that failed has to be nameable, not inferred from a whole-job status.
+    const { storage } = await import('../../src/integrations/storage');
+    const { Asset } = await import('../../src/models');
+    const corruptingStorage = {
+      ...storage,
+      get: async (key: string) => {
+        const stored = await storage.get(key);
+        return key.startsWith('originals/')
+          ? { ...stored, body: Buffer.from('not-an-image') }
+          : stored;
+      }
+    } as typeof storage;
+    const { drainMediaJobs } = await import('../../src/services/media-worker-service');
+    await expect(drainMediaJobs({ storage: corruptingStorage, maxJobs: 1 })).resolves.toBe(1);
+
+    const failed = await request(context.app)
+      .get(`/api/v1/assets/${assetId}`)
+      .set(auth)
+      .expect(200);
+    expect(failed.body.data.asset.processingStatus).toBe('failed');
+    const failedStages = failed.body.data.asset.processingStages as Array<{
+      stage: string;
+      status: string;
+      error: { category?: string; retryable?: boolean } | null;
+    }>;
+    expect(failedStages.map((stage) => stage.stage)).toEqual(['inspect']);
+    expect(failedStages[0]).toMatchObject({
+      status: 'failed',
+      error: { category: 'UNSUPPORTED_MEDIA_TYPE', retryable: false }
+    });
+    // No derivative stage claims to have run, so nothing implies output exists.
+    expect(failed.body.data.asset.derivatives).toEqual([]);
+
+    // A reprocess against the real source clears the stage record it replaces.
+    await request(context.app)
+      .post(`/api/v1/assets/${assetId}/reprocess`)
+      .set(auth)
+      .set('Idempotency-Key', `reprocess-${randomUUID()}`)
+      .expect(202);
+    await expect(drainMediaJobs({ maxJobs: 1 })).resolves.toBe(1);
+
+    const recovered = await request(context.app)
+      .get(`/api/v1/assets/${assetId}`)
+      .set(auth)
+      .expect(200);
+    expect(recovered.body.data.asset.processingStatus).toBe('ready');
+    // The logical asset never changed identity across the failure and retry.
+    expect(recovered.body.data.asset.id).toBe(assetId);
+    expect(await Asset.count({ where: { id: assetId } })).toBe(1);
+    const recoveredStages = recovered.body.data.asset.processingStages as Array<{
+      stage: string;
+      status: string;
+    }>;
+    expect(recoveredStages.filter((stage) => stage.status === 'failed')).toEqual([]);
+    expect(recoveredStages.map((stage) => stage.stage)).toEqual(
+      expect.arrayContaining(['inspect', 'thumbnail', 'lowResolutionBase', 'standardWeb', 'finalize'])
+    );
   }, 60_000);
 
   it('applies the production migration constraints on real PostgreSQL', async ({ skip }) => {
@@ -733,5 +1008,39 @@ describe.sequential('Sprint 01 HTTP integration', () => {
       'publications',
       'runtime_events'
     ]));
+
+    // Migrations carry their own snapshot of each vocabulary, so the applied
+    // constraint has to be checked against the constant the code writes with.
+    // Otherwise a name the worker emits is rejected only in production.
+    const { MEDIA_JOB_STAGE_NAMES } = await import('../../src/models/model.types');
+    const [constraints] = await context.database.sequelize.query(
+      `SELECT pg_get_constraintdef(oid) AS "definition"
+       FROM pg_constraint WHERE conname = 'media_job_stages_stage_check'`
+    );
+    const stageCheck = async (): Promise<string> => {
+      const [rows] = await context.database.sequelize.query(
+        `SELECT pg_get_constraintdef(oid) AS "definition"
+         FROM pg_constraint WHERE conname = 'media_job_stages_stage_check'`
+      );
+      return (rows as Array<{ definition: string }>)[0]?.definition ?? '';
+    };
+    const definition = (constraints as Array<{ definition: string }>)[0]?.definition ?? '';
+    expect(definition).not.toBe('');
+    for (const stage of MEDIA_JOB_STAGE_NAMES) {
+      expect(definition).toContain(`'${stage}'`);
+    }
+
+    // Repository policy requires reversible migrations, so the newest one is
+    // rolled back and reapplied against the same cluster the suite uses.
+    const { createMigrator } = await import('../../src/database/migrate');
+    const migrator = createMigrator(context.database.sequelize);
+    await migrator.down();
+    const reverted = await stageCheck();
+    expect(reverted).not.toBe('');
+    expect(reverted).not.toContain("'tiledLevels'");
+    expect(reverted).toContain("'transcodeMobile'");
+
+    await migrator.up();
+    expect(await stageCheck()).toBe(definition);
   });
 });

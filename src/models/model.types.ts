@@ -88,6 +88,12 @@ export type MediaJobStatus = (typeof MEDIA_JOB_STATUSES)[number];
  */
 export const MEDIA_JOB_STAGE_NAMES = [
   'inspect',
+  // Panorama pipeline stages, one per generated image derivative.
+  'thumbnail',
+  'lowResolutionBase',
+  'standardWeb',
+  'tiledLevels',
+  // Video pipeline stages.
   'poster',
   'transcodeDesktop',
   'transcodeMobile',

@@ -410,6 +410,61 @@ function isVideoAsset(asset: Asset): boolean {
   return asset.mediaType === 'video360' || asset.mediaType === 'video';
 }
 
+/** Derivative kinds the image pipeline reports as their own job stage. */
+const IMAGE_STAGE_BY_DERIVATIVE_KIND = {
+  thumbnail: 'thumbnail',
+  lowResolutionBase: 'lowResolutionBase',
+  standardWeb: 'standardWeb',
+  tiledLevels: 'tiledLevels'
+} as const satisfies Partial<Record<AssetDerivativeKind, MediaJobStageName>>;
+
+function imageStageForKind(kind: AssetDerivativeKind): MediaJobStageName | undefined {
+  return (IMAGE_STAGE_BY_DERIVATIVE_KIND as Record<string, MediaJobStageName | undefined>)[kind];
+}
+
+/**
+ * Runs one stage of the image pipeline, recording its start, outcome and safe
+ * diagnostics. A stage that throws stays marked `failed`, so the reason one
+ * derivative never appeared survives the job's own retry bookkeeping.
+ */
+async function runImageStage<T>(
+  job: MediaJob,
+  assetId: string,
+  stage: MediaJobStageName,
+  options: { derivativeKind?: AssetDerivativeKind; diagnostics?: JsonObject },
+  work: () => Promise<T>
+): Promise<T> {
+  await recordStage(job, assetId, stage, {
+    status: 'running',
+    startedAt: new Date(),
+    ...(options.derivativeKind === undefined ? {} : { derivativeKind: options.derivativeKind })
+  });
+  try {
+    const result = await work();
+    await recordStage(job, assetId, stage, {
+      status: 'succeeded',
+      finishedAt: new Date(),
+      error: null,
+      ...(options.derivativeKind === undefined ? {} : { derivativeKind: options.derivativeKind }),
+      ...(options.diagnostics === undefined ? {} : { diagnostics: options.diagnostics })
+    });
+    return result;
+  } catch (error) {
+    await recordStage(job, assetId, stage, {
+      status: 'failed',
+      finishedAt: new Date(),
+      error: {
+        category: failureCategory(error),
+        stage: failureStage(error),
+        message: error instanceof AppError ? error.message : 'Media processing failed.',
+        retryable: error instanceof AppError ? error.retryable : false
+      },
+      ...(options.derivativeKind === undefined ? {} : { derivativeKind: options.derivativeKind })
+    });
+    throw error;
+  }
+}
+
 async function processImageAsset(
   asset: Asset,
   job: MediaJob,
@@ -421,34 +476,45 @@ async function processImageAsset(
     }
     await updateLeasedJob(job, { stage: 'inspection', progress: 10, lockedAt: new Date() });
     const source = await storage.get(asset.sourceStorageKey);
-    const validated = validateImageUpload({
-      bytes: source.body,
-      filename: asset.sourceFilename,
-      claimedMimeType: asset.sourceMimeType,
-      maxBytes: config.maxImageUploadBytes
-    });
-    const inspection = await (asset.mediaType === 'panorama_image' ? inspectPanorama : inspectImage)({
-      bytes: source.body,
-      mimeType: validated.mimeType,
-      maxPixels: config.maxImagePixels
-    });
-    await updateLeasedJob(job, { lockedAt: new Date(), progress: 25 });
-    await asset.update({
-      projection: inspection.projection,
-      metadata: {
-        width: inspection.width,
-        height: inspection.height,
-        aspectRatio: inspection.aspectRatio,
-        format: inspection.format,
-        mimeType: inspection.mimeType,
-        sizeBytes: inspection.sizeBytes,
-        hasAlpha: inspection.hasAlpha,
-        is360: inspection.is360,
-        isFullSphere: inspection.isFullSphere,
-        ...(inspection.orientation === undefined ? {} : { orientation: inspection.orientation }),
-        ...(inspection.xmp === undefined ? {} : { xmp: inspection.xmp })
-      } as unknown as JsonObject
-    });
+    const { validated, inspection } = await runImageStage(
+      job,
+      asset.id,
+      'inspect',
+      {},
+      async () => {
+        const validatedSource = validateImageUpload({
+          bytes: source.body,
+          filename: asset.sourceFilename,
+          claimedMimeType: asset.sourceMimeType,
+          maxBytes: config.maxImageUploadBytes
+        });
+        const inspected = await (
+          asset.mediaType === 'panorama_image' ? inspectPanorama : inspectImage
+        )({
+          bytes: source.body,
+          mimeType: validatedSource.mimeType,
+          maxPixels: config.maxImagePixels
+        });
+        await updateLeasedJob(job, { lockedAt: new Date(), progress: 25 });
+        await asset.update({
+          projection: inspected.projection,
+          metadata: {
+            width: inspected.width,
+            height: inspected.height,
+            aspectRatio: inspected.aspectRatio,
+            format: inspected.format,
+            mimeType: inspected.mimeType,
+            sizeBytes: inspected.sizeBytes,
+            hasAlpha: inspected.hasAlpha,
+            is360: inspected.is360,
+            isFullSphere: inspected.isFullSphere,
+            ...(inspected.orientation === undefined ? {} : { orientation: inspected.orientation }),
+            ...(inspected.xmp === undefined ? {} : { xmp: inspected.xmp })
+          } as unknown as JsonObject
+        });
+        return { validated: validatedSource, inspection: inspected };
+      }
+    );
     if (asset.processingStatus !== 'processing') {
       await setAssetStatus(asset, 'processing');
     }
@@ -459,21 +525,43 @@ async function processImageAsset(
       bytes: source.body,
       maxPixels: config.maxImagePixels
     };
-    const derivatives = asset.mediaType === 'panorama_image'
-      ? await generatePanoramaDerivatives({
-        ...derivativeOptions,
-        inspection: inspection as PanoramaInspection,
-        tilingPolicy: config.panoramaTilingPolicy
-      })
-      : await generateDisplayImageDerivatives({
-        ...derivativeOptions,
-        mimeType: validated.mimeType
-      });
+    const derivatives = await runImageStage(job, asset.id, 'derivatives', {}, () => (
+      asset.mediaType === 'panorama_image'
+        ? generatePanoramaDerivatives({
+          ...derivativeOptions,
+          inspection: inspection as PanoramaInspection,
+          tilingPolicy: config.panoramaTilingPolicy
+        })
+        : generateDisplayImageDerivatives({
+          ...derivativeOptions,
+          mimeType: validated.mimeType
+        })
+    ));
     for (const derivative of derivatives) {
       await updateLeasedJob(job, { lockedAt: new Date() });
-      await persistDerivative(asset.id, derivative, storage);
+      const stage = imageStageForKind(derivative.kind);
+      if (stage === undefined) {
+        await persistDerivative(asset.id, derivative, storage);
+        continue;
+      }
+      await runImageStage(
+        job,
+        asset.id,
+        stage,
+        {
+          derivativeKind: derivative.kind,
+          diagnostics: {
+            derivativeVersion: derivative.version,
+            mimeType: derivative.mimeType,
+            width: derivative.width,
+            height: derivative.height,
+            sizeBytes: derivative.sizeBytes
+          }
+        },
+        () => persistDerivative(asset.id, derivative, storage)
+      );
     }
-    await sequelize.transaction(async (transaction) => {
+    await runImageStage(job, asset.id, 'finalize', {}, () => sequelize.transaction(async (transaction) => {
       const lockedJob = await MediaJob.findOne({
         where: { id: job.id, status: 'running', leaseToken: job.leaseToken },
         transaction,
@@ -499,7 +587,7 @@ async function processImageAsset(
         lockedAt: null,
         leaseToken: null
       }, { transaction });
-    });
+    }));
   }
 }
 

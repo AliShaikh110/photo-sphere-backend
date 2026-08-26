@@ -1,5 +1,5 @@
 import { Op, type Transaction } from 'sequelize';
-import { createMediaToken, verifyMediaToken } from '../auth/tokens';
+import { createMediaToken, createTelemetryToken, verifyMediaToken } from '../auth/tokens';
 import { config } from '../config';
 import {
   ExperienceCompilationError,
@@ -924,7 +924,38 @@ export async function resolveManifest(
   const manifest = publication.visibility === 'private'
     ? hydrateProtectedMediaUrls(publication.compiledManifest, publication.id)
     : publication.compiledManifest;
-  return { manifest, publication: serializePublication(publication), access };
+  return {
+    manifest: withTelemetrySession(manifest, publication),
+    publication: serializePublication(publication),
+    access
+  };
+}
+
+/**
+ * Issues the ingest credential alongside the manifest.
+ *
+ * The stored manifest is immutable, so the credential cannot be baked in at
+ * publish time without expiring in place. It is minted per manifest read, which
+ * also means revoking a publication stops new sessions from reporting against
+ * it once outstanding tokens age out.
+ */
+function withTelemetrySession(manifest: JsonObject, publication: Publication): JsonObject {
+  const telemetry = record(manifest.telemetry);
+  if (telemetry === undefined) return manifest;
+  return {
+    ...manifest,
+    telemetry: {
+      ...telemetry,
+      ingestToken: createTelemetryToken({
+        experienceId: publication.projectId,
+        publicationRevision: publication.publicationRevision,
+        viewerIntegrationVersion: publication.viewerIntegrationVersion
+      }),
+      ingestTokenExpiresAt: new Date(
+        Date.now() + config.telemetryTokenTtlSeconds * 1000
+      ).toISOString()
+    }
+  };
 }
 
 async function publishedScenePublication(options: {
