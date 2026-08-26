@@ -872,7 +872,7 @@ The response includes publication metadata and stable share targets:
     "slug": "museum-lobby",
     "visibility": "public",
     "status": "published",
-    "manifestVersion": "1",
+    "manifestVersion": "4",
     "publishedAt": "2026-08-24T12:00:00.000Z"
   },
   "share": {
@@ -887,8 +887,8 @@ The response includes publication metadata and stable share targets:
 The backend returns a QR target, not a QR bitmap.
 
 The compiled manifest's <code>manifestVersion</code> is the numeric compiler
-schema version <code>1</code>. Publication metadata serializes its persisted
-version column as the string <code>"1"</code>.
+schema version <code>4</code>. Publication metadata serializes its persisted
+version column as the string <code>"4"</code>.
 
 <code>/view/:slug</code> is the player/runtime-shell target owned by the
 frontend or deployment reverse proxy. This backend supplies its bootstrap JSON
