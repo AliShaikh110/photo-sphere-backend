@@ -11,19 +11,19 @@ import {
 import { sendData } from '../utils/http-response';
 import { routeParam } from '../utils/route-param';
 
-function ownerId(request: Request): string {
+function userId(request: Request): string {
   return request.auth!.userId;
 }
 
 export async function readTimeline(request: Request, response: Response): Promise<void> {
-  const timeline = await listTimeline(routeParam(request, 'projectId'), ownerId(request));
+  const timeline = await listTimeline(routeParam(request, 'projectId'), userId(request));
   sendData(response, { timeline });
 }
 
 export async function addInteraction(request: Request, response: Response): Promise<void> {
   const result = await createTimelineInteraction(
     routeParam(request, 'projectId'),
-    ownerId(request),
+    userId(request),
     request.body
   );
   sendData(response, result, { status: 201, message: 'Interaction created.' });
@@ -33,7 +33,7 @@ export async function patchInteraction(request: Request, response: Response): Pr
   const result = await updateTimelineInteraction(
     routeParam(request, 'projectId'),
     routeParam(request, 'interactionId'),
-    ownerId(request),
+    userId(request),
     request.body
   );
   sendData(response, result, { message: 'Interaction saved.' });
@@ -43,7 +43,7 @@ export async function removeInteraction(request: Request, response: Response): P
   const result = await deleteTimelineInteraction(
     routeParam(request, 'projectId'),
     routeParam(request, 'interactionId'),
-    ownerId(request),
+    userId(request),
     request.body.projectRevision as number
   );
   sendData(response, result, { message: 'Interaction deleted.' });
@@ -53,7 +53,7 @@ export async function duplicateInteraction(request: Request, response: Response)
   const result = await duplicateTimelineInteraction(
     routeParam(request, 'projectId'),
     routeParam(request, 'interactionId'),
-    ownerId(request),
+    userId(request),
     request.body
   );
   sendData(response, result, { status: 201, message: 'Interaction duplicated.' });
@@ -62,7 +62,7 @@ export async function duplicateInteraction(request: Request, response: Response)
 export async function patchTimeline(request: Request, response: Response): Promise<void> {
   const result = await bulkUpdateTimeline(
     routeParam(request, 'projectId'),
-    ownerId(request),
+    userId(request),
     request.body
   );
   sendData(response, result, { message: 'Timeline saved.' });

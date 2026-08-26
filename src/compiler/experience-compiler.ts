@@ -855,6 +855,7 @@ export class ExperienceCompiler {
       kind: interaction.kind,
       timeMs: interaction.timeMs,
       endTimeMs: interaction.endTimeMs ?? null,
+      sortOrder: interaction.sortOrder ?? 0,
       ...(interaction.geometry?.kind === 'point' ? { geometry: { kind: 'point' as const } } : {}),
       ...(interaction.position === undefined ? {} : { position: { ...interaction.position } }),
       ...(interaction.viewpoint === undefined
@@ -1753,13 +1754,21 @@ function compileViewpoint(viewpoint: CanonicalViewpoint): CanonicalViewpoint {
   };
 }
 
-/** Total, deterministic ordering even when interactions share a timestamp. */
+/**
+ * Total, deterministic ordering even when interactions share a timestamp.
+ *
+ * The tie-break is the canonical `sortOrder` the editor assigns, so the
+ * published order matches the order the creator sees; `id` only settles the
+ * remaining tie between two interactions that also share a sort order.
+ */
 function sortTimeline(
   timeline: readonly CompiledTimelineInteraction[],
 ): CompiledTimelineInteraction[] {
-  return [...timeline].sort((left, right) => (
-    left.timeMs === right.timeMs ? left.id.localeCompare(right.id) : left.timeMs - right.timeMs
-  ));
+  return [...timeline].sort((left, right) => {
+    if (left.timeMs !== right.timeMs) return left.timeMs - right.timeMs;
+    if (left.sortOrder !== right.sortOrder) return left.sortOrder - right.sortOrder;
+    return left.id.localeCompare(right.id);
+  });
 }
 
 function readCompiledNumber(value: JsonValue | undefined): number | undefined {

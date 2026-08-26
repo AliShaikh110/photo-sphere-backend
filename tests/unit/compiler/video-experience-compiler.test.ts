@@ -364,4 +364,83 @@ describe('Experience compiler — 360 video', () => {
         })])
       });
   });
+  it('breaks a shared timestamp with the canonical sortOrder, not the interaction ID', async () => {
+    // The IDs are deliberately in the opposite order to sortOrder: sorting by
+    // ID would reverse the order the creator authored in the editor.
+    const project = videoProject({
+      timeline: [
+        {
+          id: 'zz-authored-first',
+          projectId: 'project-1',
+          kind: 'information',
+          timeMs: 10_000,
+          sortOrder: 0,
+          content: { title: 'Authored first' },
+          action: { kind: 'showInformation' }
+        },
+        {
+          id: 'aa-authored-second',
+          projectId: 'project-1',
+          kind: 'information',
+          timeMs: 10_000,
+          sortOrder: 1,
+          content: { title: 'Authored second' },
+          action: { kind: 'showInformation' }
+        },
+        {
+          id: 'mm-earlier',
+          projectId: 'project-1',
+          kind: 'information',
+          timeMs: 5_000,
+          sortOrder: 2,
+          content: { title: 'Earlier' },
+          action: { kind: 'showInformation' }
+        }
+      ]
+    });
+
+    const preview = await compileVideo(compilerInput({ project }));
+    expect(preview.timeline.map((entry) => entry.id)).toEqual([
+      'mm-earlier',
+      'zz-authored-first',
+      'aa-authored-second'
+    ]);
+    expect(preview.timeline.map((entry) => entry.sortOrder)).toEqual([2, 0, 1]);
+
+    // Publication compiles through the same path, so the order must match.
+    const published = await compileVideo(compilerInput({
+      project,
+      target: 'publication',
+      publicationRevision: 1,
+      publicationSlug: 'harbour-tour'
+    }));
+    expect(published.timeline.map((entry) => entry.id))
+      .toEqual(preview.timeline.map((entry) => entry.id));
+  });
+
+  it('falls back to the interaction ID only when time and sortOrder both tie', async () => {
+    const project = videoProject({
+      timeline: [
+        {
+          id: 'bbb',
+          projectId: 'project-1',
+          kind: 'information',
+          timeMs: 1_000,
+          sortOrder: 4,
+          action: { kind: 'showInformation' }
+        },
+        {
+          id: 'aaa',
+          projectId: 'project-1',
+          kind: 'information',
+          timeMs: 1_000,
+          sortOrder: 4,
+          action: { kind: 'showInformation' }
+        }
+      ]
+    });
+
+    const manifest = await compileVideo(compilerInput({ project }));
+    expect(manifest.timeline.map((entry) => entry.id)).toEqual(['aaa', 'bbb']);
+  });
 });

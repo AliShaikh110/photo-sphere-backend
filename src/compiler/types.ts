@@ -493,6 +493,11 @@ export interface CompiledTimelineInteraction {
   readonly kind: CanonicalTimelineInteractionKind;
   readonly timeMs: number;
   readonly endTimeMs: number | null;
+  /**
+   * The canonical tie-break for interactions that share a timestamp, carried
+   * through so the published order matches the order the creator authored.
+   */
+  readonly sortOrder: number;
   readonly geometry?: { readonly kind: 'point' };
   readonly position?: SphericalPosition;
   readonly viewpoint?: CanonicalViewpoint;

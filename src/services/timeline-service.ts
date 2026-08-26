@@ -1,14 +1,15 @@
 import { Op, type Transaction } from 'sequelize';
 
 import { sequelize } from '../database';
-import { AppError, conflict, notFound } from '../errors/app-error';
-import { Asset, Project, TimelineInteraction, User } from '../models';
+import { AppError, notFound } from '../errors/app-error';
+import { Asset, TimelineInteraction, type Project } from '../models';
 import type { JsonObject, TimelineInteractionKind } from '../models/model.types';
 import {
   sanitizeHotspotAppearance,
   sanitizeTimelineAction,
   sanitizeTimelineContent
 } from './content-service';
+import { bumpProjectRevision, getAccessibleProject } from './project-service';
 
 export type TimelineInteractionInput = {
   kind: TimelineInteractionKind;
@@ -50,27 +51,34 @@ export function timelineInteractionPayload(
   };
 }
 
-async function getOwnedVideoProject(
-  projectId: string,
-  ownerId: string,
-  transaction?: Transaction
-): Promise<Project> {
-  if (transaction) {
-    await User.findByPk(ownerId, { transaction, lock: transaction.LOCK.UPDATE });
-  }
-  const project = await Project.findOne({
-    where: { id: projectId, ownerId },
-    ...(transaction === undefined ? {} : { transaction, lock: transaction.LOCK.UPDATE })
-  });
-  if (!project) throw notFound('project', projectId);
+function assertVideoProject(project: Project): Project {
   if (project.type !== 'video360') {
     throw new AppError('TIMELINE_NOT_AVAILABLE', 'Timelines are only available on 360 video experiences.', {
       status: 422,
-      entityId: projectId,
+      entityId: project.id,
       path: 'type'
     });
   }
   return project;
+}
+
+/**
+ * Timelines are a project-scoped resource, so they use the same access
+ * decision as scenes, hotspots, overlays and plans: ownership, workspace
+ * membership and per-project grants all resolve through the shared service.
+ */
+async function getEditableVideoProject(
+  projectId: string,
+  userId: string,
+  transaction: Transaction
+): Promise<Project> {
+  return assertVideoProject(
+    await getAccessibleProject(projectId, userId, 'editor', transaction)
+  );
+}
+
+async function getReadableVideoProject(projectId: string, userId: string): Promise<Project> {
+  return assertVideoProject(await getAccessibleProject(projectId, userId, 'viewer'));
 }
 
 export interface VideoTimelineBounds {
@@ -198,6 +206,10 @@ function payloadError(message: string, path: string): AppError {
  * Enforces the product meaning of each interaction kind. Changing a kind must
  * never leave incompatible fields behind, so unrelated payload sections are
  * cleared rather than carried over.
+ *
+ * `timeMs` and `endTimeMs` are timeline placement rather than kind payload, so
+ * callers resolve them against the existing row before calling in and they
+ * survive a kind change.
  */
 function normalizeInteraction(
   kind: TimelineInteractionKind,
@@ -231,10 +243,8 @@ function normalizeInteraction(
       ?? (current === undefined ? undefined : current.geometry)
       ?? { kind: 'point' }
     : undefined) as JsonObject | undefined;
-  const viewpoint = (kind === 'viewpoint'
-    ? input.viewpoint ?? (current === undefined ? undefined : current.viewpoint)
-    : input.viewpoint ?? (current === undefined ? undefined : current.viewpoint)) as
-      JsonObject | undefined;
+  const viewpoint = (input.viewpoint
+    ?? (current === undefined ? undefined : current.viewpoint)) as JsonObject | undefined;
 
   if (POSITIONED_KINDS.has(kind)) {
     if (position === undefined || position.coordinateSystem !== 'spherical_degrees') {
@@ -272,7 +282,7 @@ function normalizeInteraction(
     endTimeMs,
     geometry: geometry ?? {},
     position: position ?? {},
-    viewpoint: kind === 'viewpoint' || viewpoint !== undefined ? viewpoint ?? {} : {},
+    viewpoint: viewpoint ?? {},
     appearance,
     content,
     action,
@@ -292,6 +302,10 @@ function defaultActionForKind(kind: TimelineInteractionKind): JsonObject {
   }
 }
 
+/**
+ * Referenced media is resolved against the project owner's library, not the
+ * editor's, so a collaborator sees exactly the assets the project can use.
+ */
 async function assertInteractionReferences(
   normalized: NormalizedInteraction,
   projectId: string,
@@ -343,38 +357,6 @@ async function assertInteractionReferences(
   }
 }
 
-async function bumpProjectRevision(options: {
-  projectId: string;
-  ownerId: string;
-  expectedRevision: number;
-  transaction: Transaction;
-}): Promise<number> {
-  const nextRevision = options.expectedRevision + 1;
-  const [affected] = await Project.update(
-    { revision: nextRevision },
-    {
-      where: {
-        id: options.projectId,
-        ownerId: options.ownerId,
-        revision: options.expectedRevision
-      },
-      transaction: options.transaction
-    }
-  );
-  if (affected !== 1) {
-    const project = await Project.findOne({
-      where: { id: options.projectId, ownerId: options.ownerId },
-      attributes: ['id', 'revision']
-    });
-    if (!project) throw notFound('project', options.projectId);
-    throw conflict('REVISION_CONFLICT', 'The project was changed by another editor.', {
-      expectedRevision: options.expectedRevision,
-      currentRevision: project.revision
-    });
-  }
-  return nextRevision;
-}
-
 async function nextSortOrder(projectId: string, transaction: Transaction): Promise<number> {
   const maximum = await TimelineInteraction.max('sortOrder', {
     where: { projectId },
@@ -396,9 +378,9 @@ async function loadTimeline(
 
 export async function listTimeline(
   projectId: string,
-  ownerId: string
+  userId: string
 ): Promise<Record<string, unknown>> {
-  const project = await getOwnedVideoProject(projectId, ownerId);
+  const project = await getReadableVideoProject(projectId, userId);
   const interactions = await loadTimeline(projectId);
   let durationMs: number | null = null;
   try {
@@ -419,18 +401,17 @@ export async function listTimeline(
 
 export async function createTimelineInteraction(
   projectId: string,
-  ownerId: string,
+  userId: string,
   input: TimelineInteractionInput & { projectRevision: number }
 ): Promise<Record<string, unknown>> {
   return sequelize.transaction(async (transaction) => {
-    const project = await getOwnedVideoProject(projectId, ownerId, transaction);
+    const project = await getEditableVideoProject(projectId, userId, transaction);
     const bounds = await resolveTimelineBounds(project, transaction);
     const normalized = normalizeInteraction(input.kind, input);
     assertTimeWithinDuration(normalized.timeMs, normalized.endTimeMs, bounds, 'timeMs');
-    await assertInteractionReferences(normalized, projectId, ownerId, transaction);
+    await assertInteractionReferences(normalized, projectId, project.ownerId, transaction);
     const revision = await bumpProjectRevision({
       projectId,
-      ownerId,
       expectedRevision: input.projectRevision,
       transaction
     });
@@ -452,11 +433,11 @@ export async function createTimelineInteraction(
 export async function updateTimelineInteraction(
   projectId: string,
   interactionId: string,
-  ownerId: string,
+  userId: string,
   input: TimelineInteractionPatch & { projectRevision: number }
 ): Promise<Record<string, unknown>> {
   return sequelize.transaction(async (transaction) => {
-    const project = await getOwnedVideoProject(projectId, ownerId, transaction);
+    const project = await getEditableVideoProject(projectId, userId, transaction);
     const bounds = await resolveTimelineBounds(project, transaction);
     const interaction = await TimelineInteraction.findOne({
       where: { id: interactionId, projectId },
@@ -467,15 +448,20 @@ export async function updateTimelineInteraction(
     const kind = input.kind ?? interaction.kind;
     const normalized = normalizeInteraction(
       kind,
-      { ...input, timeMs: input.timeMs ?? interaction.timeMs },
+      {
+        ...input,
+        // Placement on the timeline is not kind payload: it is resolved here so
+        // it survives a kind change, which resets the payload sections below.
+        timeMs: input.timeMs ?? interaction.timeMs,
+        endTimeMs: input.endTimeMs === undefined ? interaction.endTimeMs : input.endTimeMs
+      },
       // Changing kind must not inherit the previous kind's payload.
       kind === interaction.kind ? interaction : undefined
     );
     assertTimeWithinDuration(normalized.timeMs, normalized.endTimeMs, bounds, 'timeMs');
-    await assertInteractionReferences(normalized, projectId, ownerId, transaction);
+    await assertInteractionReferences(normalized, projectId, project.ownerId, transaction);
     const revision = await bumpProjectRevision({
       projectId,
-      ownerId,
       expectedRevision: input.projectRevision,
       transaction
     });
@@ -490,11 +476,11 @@ export async function updateTimelineInteraction(
 export async function duplicateTimelineInteraction(
   projectId: string,
   interactionId: string,
-  ownerId: string,
+  userId: string,
   input: { projectRevision: number; timeMs?: number }
 ): Promise<Record<string, unknown>> {
   return sequelize.transaction(async (transaction) => {
-    const project = await getOwnedVideoProject(projectId, ownerId, transaction);
+    const project = await getEditableVideoProject(projectId, userId, transaction);
     const bounds = await resolveTimelineBounds(project, transaction);
     const source = await TimelineInteraction.findOne({
       where: { id: interactionId, projectId },
@@ -509,7 +495,6 @@ export async function duplicateTimelineInteraction(
     assertTimeWithinDuration(timeMs, endTimeMs, bounds, 'timeMs');
     const revision = await bumpProjectRevision({
       projectId,
-      ownerId,
       expectedRevision: input.projectRevision,
       transaction
     });
@@ -542,11 +527,11 @@ export async function duplicateTimelineInteraction(
 export async function deleteTimelineInteraction(
   projectId: string,
   interactionId: string,
-  ownerId: string,
+  userId: string,
   projectRevision: number
 ): Promise<Record<string, unknown>> {
   return sequelize.transaction(async (transaction) => {
-    await getOwnedVideoProject(projectId, ownerId, transaction);
+    await getEditableVideoProject(projectId, userId, transaction);
     const interaction = await TimelineInteraction.findOne({
       where: { id: interactionId, projectId },
       transaction,
@@ -555,7 +540,6 @@ export async function deleteTimelineInteraction(
     if (!interaction) throw notFound('timeline interaction', interactionId);
     const revision = await bumpProjectRevision({
       projectId,
-      ownerId,
       expectedRevision: projectRevision,
       transaction
     });
@@ -570,14 +554,14 @@ export async function deleteTimelineInteraction(
  */
 export async function bulkUpdateTimeline(
   projectId: string,
-  ownerId: string,
+  userId: string,
   input: {
     projectRevision: number;
     interactions: { id: string; timeMs: number; endTimeMs?: number | null }[];
   }
 ): Promise<Record<string, unknown>> {
   return sequelize.transaction(async (transaction) => {
-    const project = await getOwnedVideoProject(projectId, ownerId, transaction);
+    const project = await getEditableVideoProject(projectId, userId, transaction);
     const bounds = await resolveTimelineBounds(project, transaction);
     const rows = await TimelineInteraction.findAll({
       where: { projectId, id: { [Op.in]: input.interactions.map((entry) => entry.id) } },
@@ -600,7 +584,6 @@ export async function bulkUpdateTimeline(
     }
     const revision = await bumpProjectRevision({
       projectId,
-      ownerId,
       expectedRevision: input.projectRevision,
       transaction
     });

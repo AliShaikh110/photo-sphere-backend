@@ -383,6 +383,13 @@ Timelines exist only on <code>video360</code> projects. A request against an
 and scene routes on a <code>video360</code> project return
 <code>422 PROJECT_TYPE_MISMATCH</code>.
 
+Timeline routes use the same project access decision as every other
+project-scoped resource: ownership, workspace membership and per-project grants
+all resolve through the shared role model. Reads require <code>viewer</code> and
+writes require <code>editor</code>; an insufficient role returns
+<code>403 PROJECT_ACCESS_DENIED</code>, while a caller with no access at all
+returns <code>404</code> so the route is not a project-discovery oracle.
+
 Timed interactions are product entities. Timestamps are plain milliseconds on
 the media timeline and are validated against the inspected duration of the
 project's video asset, so the project must already reference a ready video:
@@ -398,8 +405,10 @@ project's video asset, so the project must already reference a ready video:
 
 ### GET /api/v1/projects/:projectId/timeline
 
-Returns the timeline in a total, deterministic order (time, then a stable
-ordering key, then ID) together with the media duration:
+Returns the timeline in a total, deterministic order (time, then the canonical
+<code>sortOrder</code>, then ID) together with the media duration. Preview and
+published manifests carry <code>sortOrder</code> and apply the same ordering, so
+the sequence a creator sees in the editor is the sequence visitors get:
 
 ~~~json
 {
