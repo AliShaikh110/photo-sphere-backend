@@ -6,6 +6,7 @@ coverage/
 /storage/
 .sphere-pg-*/
 .env
+.env.local
 *.log
 .DS_Store
 .idea/
