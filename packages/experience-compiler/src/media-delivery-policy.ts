@@ -1,4 +1,4 @@
-import type { MediaAccess } from '@sphere/experience-schema';
+import type { MediaAccess } from '@alishaikh110/experience-schema';
 
 /**
  * Where a compiled media reference points.

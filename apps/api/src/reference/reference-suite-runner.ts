@@ -5,7 +5,7 @@ import {
   createViewerIntegrationAdapter,
   jsonByteLength,
   type CompileExperienceInput
-} from '@sphere/experience-compiler';
+} from '@alishaikh110/experience-compiler';
 import { config } from '../config';
 import { referenceExperiences, type ReferenceExperience } from './reference-experiences';
 

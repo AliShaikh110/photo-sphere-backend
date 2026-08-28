@@ -3,7 +3,9 @@
     "target": "ES2022",
     "module": "CommonJS",
     "moduleResolution": "Node",
-    "lib": ["ES2022"],
+    "lib": [
+      "ES2022"
+    ],
     "rootDir": ".",
     "noEmit": true,
     "strict": true,
@@ -14,26 +16,51 @@
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
     "skipLibCheck": true,
-    "types": ["node", "vitest/globals"],
+    "types": [
+      "node",
+      "vitest/globals"
+    ],
     "baseUrl": ".",
     "paths": {
-      "@sphere/api": ["apps/api/src/index.ts"],
-      "@sphere/capability-registry": ["packages/capability-registry/src/index.ts"],
-      "@sphere/experience-compiler": ["packages/experience-compiler/src/index.ts"],
-      "@sphere/experience-schema": ["packages/experience-schema/src/index.ts"],
-      "@sphere/live-patch": ["packages/live-patch/src/index.ts"],
-      "@sphere/telemetry-contract": ["packages/telemetry-contract/src/index.ts"],
-      "@sphere/viewer-integration": ["packages/viewer-integration/src/index.ts"]
-    }
+      "@alishaikh110/api": [
+        "apps/api/src/index.ts"
+      ],
+      "@alishaikh110/capability-registry": [
+        "packages/capability-registry/src/index.ts"
+      ],
+      "@alishaikh110/experience-compiler": [
+        "packages/experience-compiler/src/index.ts"
+      ],
+      "@alishaikh110/experience-schema": [
+        "packages/experience-schema/src/index.ts"
+      ],
+      "@alishaikh110/live-patch": [
+        "packages/live-patch/src/index.ts"
+      ],
+      "@alishaikh110/telemetry-contract": [
+        "packages/telemetry-contract/src/index.ts"
+      ],
+      "@alishaikh110/viewer-integration": [
+        "packages/viewer-integration/src/index.ts"
+      ]
+    },
+    "allowJs": true,
+    "checkJs": false
   },
   "include": [
     "apps/*/src/**/*.ts",
     "packages/*/src/**/*.ts",
     "migrations/**/*.ts",
     "scripts/**/*.ts",
+    "scripts/**/*.mjs",
     "tests/**/*.ts",
     "vitest.config.ts",
     "eslint.config.mjs"
   ],
-  "exclude": ["dist", "node_modules", "storage", "**/dist/**"]
+  "exclude": [
+    "dist",
+    "node_modules",
+    "storage",
+    "**/dist/**"
+  ]
 }

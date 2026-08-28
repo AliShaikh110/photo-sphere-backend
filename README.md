@@ -37,6 +37,12 @@ built-in, read the environment or read a clock. That boundary is enforced by
 project references, lint and a test, not by convention — it is what keeps one
 compiler rather than two.
 
+All six are published privately to GitHub Packages as
+<code>@alishaikh110/*</code>, in lockstep at one version, because the frontend
+lives in a separate repository and must run the same compiler and the same
+live-patch classification table as this backend. See
+[shared-packages.md](docs/shared-packages.md).
+
 ## Stack
 
 - Node.js 22 and TypeScript
@@ -205,7 +211,7 @@ server-side when a deployment prefers the decision to be observable centrally.
 | --- | --- |
 | <code>npm run dev</code> | Run the API with TypeScript watch mode. |
 | <code>npm run dev:worker</code> | Run an external worker with TypeScript watch mode. |
-| <code>npm run build</code> | Compile every package and app through TypeScript project references. |
+| <code>npm run build</code> | Declarations through TypeScript project references, then the publishable ESM and CommonJS bundles. |
 | <code>npm start</code> | Run the compiled API. |
 | <code>npm run worker</code> | Run the compiled external media worker. |
 | <code>npm run db:migrate</code> | Apply migrations from compiled output; run <code>npm run build</code> first. |
@@ -221,7 +227,12 @@ server-side when a deployment prefers the decision to be observable centrally.
 | <code>npm run test:golden</code> | Check compiled output byte for byte against the behaviour freeze. |
 | <code>npm run golden:record</code> | Re-record the behaviour freeze. Only for an intended, reviewed output change. |
 | <code>npm run test:coverage</code> | Run tests with V8 coverage. |
-| <code>npm run test:all</code> | Run lint, typecheck, tests, and build. |
+| <code>npm run test:all</code> | Run lint, typecheck, tests, build, and the package checks. |
+| <code>npm run packages:check</code> | Check the shared package set is releasable: metadata, lockstep, dependency allowlist, changelog. |
+| <code>npm run packages:pack</code> | Write the exact tarballs <code>npm publish</code> would upload to <code>.package-tarballs/</code>. |
+| <code>npm run packages:verify</code> | Install those tarballs into a project outside this repository and run the release gate against them. |
+| <code>npm run packages:version -- &lt;level&gt;</code> | Move all six packages to one version and repoint every sibling pin. |
+| <code>npm run packages:publish -- --dry-run</code> | Run every release gate and a publish dry run, without publishing. |
 
 Integration tests must use a dedicated PostgreSQL test database. Do not point
 test or migration-undo commands at a database containing valuable data.
@@ -265,6 +276,7 @@ Internal stack traces, database details, and storage keys are not returned.
 - [API contract](docs/backend-api.md)
 - [Canonical and persistence schema](docs/backend-schema.md)
 - [Operations runbook](docs/runbook.md)
+- [Shared packages: registry, versioning, release](docs/shared-packages.md)
 - [Product requirements](docs/prd.md)
 - [Product architecture](docs/product_architecture.md)
 - [Backend TRD](docs/trd.md)
@@ -273,6 +285,7 @@ Internal stack traces, database details, and storage keys are not returned.
 - [Sprint 03 execution plan](docs/sprint/sprint-03-360-video-timeline-playback.md)
 - [Sprint 04 execution plan](docs/sprint/sprint-04-advanced-spatial-analytics-scale.md)
 - [Sprint 05 execution plan](docs/sprint/sprint-05-compiler-extraction-frontend-enablement.md)
+- [Sprint 05B execution plan](docs/sprint/sprint-05b-package-publishing-and-versioning.md)
 
 ## Current boundaries
 

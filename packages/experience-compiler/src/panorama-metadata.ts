@@ -3,7 +3,7 @@ import type {
   CompiledPanoramaCrop,
   CompiledSphereCorrection,
   JsonObject,
-} from '@sphere/experience-schema';
+} from '@alishaikh110/experience-schema';
 
 
 

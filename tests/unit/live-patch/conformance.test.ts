@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { compile, type CompilerInput } from '@sphere/experience-compiler';
+import { compile, type CompilerInput } from '@alishaikh110/experience-compiler';
 import type {
   CanonicalHotspot,
   CanonicalOverlay,
   CanonicalProject,
   CanonicalScene
-} from '@sphere/experience-schema';
+} from '@alishaikh110/experience-schema';
 import {
   LIVE_MUTATION_NAMES,
   LIVE_PATCH_CLASSIFICATIONS,
@@ -16,7 +16,7 @@ import {
   liveMutationName,
   liveProperties,
   type LiveMutation
-} from '@sphere/live-patch';
+} from '@alishaikh110/live-patch';
 
 import { goldenCompileInput } from '../../golden/record';
 import { goldenScenarios } from '../../golden/scenarios';

@@ -12,8 +12,8 @@ import type {
   TourStrategyPolicyConfig,
   ValidationIssue,
   ViewerIntegrationOutput,
-} from '@sphere/experience-schema';
-import type { CapabilityRegistry } from '@sphere/capability-registry';
+} from '@alishaikh110/experience-schema';
+import type { CapabilityRegistry } from '@alishaikh110/capability-registry';
 import type { MediaDeliveryPolicy } from './media-delivery-policy';
 
 /**
@@ -21,7 +21,7 @@ import type { MediaDeliveryPolicy } from './media-delivery-policy';
  * re-exported here so a caller needs one import to compile and to read the
  * result.
  */
-export * from '@sphere/experience-schema';
+export * from '@alishaikh110/experience-schema';
 export * from './media-delivery-policy';
 
 /**

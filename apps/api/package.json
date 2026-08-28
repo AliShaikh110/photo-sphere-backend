@@ -1,16 +1,16 @@
 {
-  "name": "@sphere/api",
+  "name": "@alishaikh110/api",
   "version": "1.0.0",
   "private": true,
   "description": "HTTP API for the No-Code 360 Experience Platform",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "dependencies": {
-    "@sphere/capability-registry": "1.0.0",
-    "@sphere/experience-compiler": "1.0.0",
-    "@sphere/experience-schema": "1.0.0",
-    "@sphere/live-patch": "1.0.0",
-    "@sphere/telemetry-contract": "1.0.0",
-    "@sphere/viewer-integration": "1.0.0"
+    "@alishaikh110/capability-registry": "1.0.0",
+    "@alishaikh110/experience-compiler": "1.0.0",
+    "@alishaikh110/experience-schema": "1.0.0",
+    "@alishaikh110/live-patch": "1.0.0",
+    "@alishaikh110/telemetry-contract": "1.0.0",
+    "@alishaikh110/viewer-integration": "1.0.0"
   }
 }

@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import { ExperienceCompiler } from '@sphere/experience-compiler';
-import { PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION } from '@sphere/viewer-integration';
-import { isImageExperienceManifest } from '@sphere/experience-compiler';
+import { ExperienceCompiler } from '@alishaikh110/experience-compiler';
+import { PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION } from '@alishaikh110/viewer-integration';
+import { isImageExperienceManifest } from '@alishaikh110/experience-compiler';
 import type {
   CompiledExperienceBundle,
   CompiledImageExperienceManifest,
   CompileExperienceInput,
-} from '@sphere/experience-compiler';
-import { createTourStrategyPolicy } from '@sphere/experience-schema';
-import type { CanonicalProject } from '@sphere/experience-schema';
+} from '@alishaikh110/experience-compiler';
+import { createTourStrategyPolicy } from '@alishaikh110/experience-schema';
+import type { CanonicalProject } from '@alishaikh110/experience-schema';
 import {
   derivative,
   panoramaAsset,

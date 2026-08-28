@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { compile, contentHash, tryCompile } from '@sphere/experience-compiler';
+import { compile, contentHash, tryCompile } from '@alishaikh110/experience-compiler';
 import { goldenCompileInput } from '../../golden/record';
 import { goldenScenarios } from '../../golden/scenarios';
 

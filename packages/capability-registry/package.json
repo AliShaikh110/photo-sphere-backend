@@ -1,9 +1,44 @@
 {
-  "name": "@sphere/capability-registry",
+  "name": "@alishaikh110/capability-registry",
   "version": "1.0.0",
-  "private": true,
   "description": "Capability definitions, dependencies, incompatibilities and fallbacks",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "sideEffects": false
+  "license": "UNLICENSED",
+  "type": "commonjs",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18.17.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AliShaikh110/photo-sphere-backend.git",
+    "directory": "packages/capability-registry"
+  },
+  "homepage": "https://github.com/AliShaikh110/photo-sphere-backend/tree/main/packages/capability-registry#readme",
+  "bugs": {
+    "url": "https://github.com/AliShaikh110/photo-sphere-backend/issues"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "restricted"
+  }
 }

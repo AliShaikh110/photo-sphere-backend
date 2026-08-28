@@ -2,7 +2,7 @@ import {
   PhotoSphereViewerIntegrationAdapter,
   PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION
 } from './photo-sphere-viewer-adapter';
-import type { ViewerIntegrationAdapter } from '@sphere/experience-schema';
+import type { ViewerIntegrationAdapter } from '@alishaikh110/experience-schema';
 
 export type ViewerIntegrationStatus = 'active' | 'candidate' | 'retired';
 

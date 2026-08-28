@@ -1,4 +1,4 @@
-import { ExperienceCompilationError } from '@sphere/experience-compiler';
+import { ExperienceCompilationError } from '@alishaikh110/experience-compiler';
 
 /**
  * Compilation is synchronous and pure, so a refusal to compile is a thrown

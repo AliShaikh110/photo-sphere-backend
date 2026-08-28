@@ -5,7 +5,7 @@ import {
   isSupportedViewerIntegrationVersion,
   listViewerIntegrationVersions,
   viewerIntegrationRegistration
-} from '@sphere/experience-compiler';
+} from '@alishaikh110/experience-compiler';
 import { config } from '../config';
 import { AppError, notFound } from '../errors/app-error';
 import { PlatformSetting, ViewerIntegrationCheck } from '../models';

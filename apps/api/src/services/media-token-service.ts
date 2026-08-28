@@ -1,7 +1,7 @@
 import {
   DEFAULT_MEDIA_DELIVERY_POLICY,
   formatMediaLocation
-} from '@sphere/experience-compiler';
+} from '@alishaikh110/experience-compiler';
 
 import { createMediaToken } from '../auth/tokens';
 import { config } from '../config';

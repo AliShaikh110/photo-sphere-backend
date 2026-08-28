@@ -859,7 +859,7 @@ export {
   sceneTransitionFailurePayloadSchema,
   videoPlaybackFailurePayloadSchema,
   videoProfileSelectedPayloadSchema
-} from '@sphere/telemetry-contract';
+} from '@alishaikh110/telemetry-contract';
 
 export const projectIdParams = z.object({ projectId: id });
 export const assetIdParams = z.object({ assetId: id });

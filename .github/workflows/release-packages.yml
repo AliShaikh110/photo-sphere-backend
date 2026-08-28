@@ -1,0 +1,98 @@
+name: release-shared-packages
+
+# The only path to the registry.
+#
+# Publishing from a developer machine skips whichever gate that machine happened
+# not to run, and the gate that gets skipped is the golden fixtures — the one
+# that proves compiled output has not changed. So the trigger is a tag, the job
+# runs the gates, and `scripts/publish-packages.mjs` refuses to publish anywhere
+# but here.
+#
+# To release:
+#   npm run packages:version -- <major|minor|patch|x.y.z>
+#   # add the "## <version>" entry to packages/CHANGELOG.md
+#   npm run build && npm run packages:check
+#   git commit -am "Release shared packages <version>"
+#   git tag packages-v<version> && git push origin main --tags
+
+on:
+  push:
+    tags:
+      - 'packages-v*'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run every gate and a publish dry run, without publishing'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      NODE_ENV: test
+      LOG_LEVEL: silent
+      VIEWER_INTEGRATION_VERSION: psv-5.14.3-adapter-1
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          # Writes the .npmrc that NODE_AUTH_TOKEN authenticates against.
+          registry-url: https://npm.pkg.github.com
+          scope: '@alishaikh110'
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Build declarations and publishable bundles
+        run: npm run build
+
+      - name: Lint and dependency boundaries
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      # scripts/publish-packages.mjs runs packages:check, the golden fixtures
+      # and packages:verify again before it uploads anything. The duplication is
+      # deliberate: the guarantee must not depend on the order of the steps in
+      # this file.
+      - name: Release the shared package set
+        if: github.event_name == 'push'
+        run: npm run packages:publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Dry run the release
+        if: github.event_name == 'workflow_dispatch'
+        run: npm run packages:publish -- --dry-run
+
+      - name: Summarise
+        if: always()
+        run: |
+          {
+            echo "### Shared package release"
+            echo
+            echo "| Package | Version |"
+            echo "| --- | --- |"
+            for manifest in packages/*/package.json; do
+              node -e "const p=require('./$manifest');console.log('| '+p.name+' | '+p.version+' |')"
+            done
+            echo
+            echo "Ref: \`${{ github.ref }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

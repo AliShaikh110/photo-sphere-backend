@@ -1,5 +1,5 @@
 import type { CanonicalProjectType, JsonObject } from '../types';
-import type { CapabilityId } from '@sphere/capability-registry';
+import type { CapabilityId } from '@alishaikh110/capability-registry';
 
 export const EXTENSION_STATUSES = ['draft', 'active', 'deprecated', 'disabled'] as const;
 export type ExtensionStatus = (typeof EXTENSION_STATUSES)[number];

@@ -2,7 +2,7 @@ import type {
   AssetDerivative,
   CanonicalAsset,
   CanonicalProject,
-} from '@sphere/experience-schema';
+} from '@alishaikh110/experience-schema';
 
 export function derivative(
   assetId: string,

@@ -5,7 +5,7 @@ import {
   requirePanoramaDerivatives,
   selectLatestReadyDerivative,
   selectPreferredReadyDerivative,
-} from '@sphere/experience-compiler';
+} from '@alishaikh110/experience-compiler';
 import { derivative, panoramaAsset } from './fixtures';
 
 describe('deterministic derivative selection', () => {

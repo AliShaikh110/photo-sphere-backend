@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { ExperienceCompiler } from '@sphere/experience-compiler';
+import { ExperienceCompiler } from '@alishaikh110/experience-compiler';
 import {
   isVideoExperienceManifest,
   type CompileExperienceInput,
   type CompiledVideoExperienceManifest
-} from '@sphere/experience-compiler';
-import type { AssetDerivative, CanonicalAsset, CanonicalProject } from '@sphere/experience-schema';
-import { PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION } from '@sphere/viewer-integration';
-import { COMPILED_MANIFEST_VERSION } from '@sphere/experience-compiler';
+} from '@alishaikh110/experience-compiler';
+import type { AssetDerivative, CanonicalAsset, CanonicalProject } from '@alishaikh110/experience-schema';
+import { PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION } from '@alishaikh110/viewer-integration';
+import { COMPILED_MANIFEST_VERSION } from '@alishaikh110/experience-compiler';
 import { compileFailure } from './compile-failure';
 
 function videoDerivative(

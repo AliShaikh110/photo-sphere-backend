@@ -6,6 +6,11 @@ import sharp from 'sharp';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import {
+  SHARED_PACKAGE_NAMES,
+  assertSharedPackageCompatibility
+} from '@alishaikh110/experience-schema';
+
 import { seedReadyPanorama } from '../fixtures/ready-panorama';
 import { bearer, registerIdentity, type TestIdentity } from '../helpers/api-client';
 import { generatedEquirectangularJpeg, sha256 } from '../helpers/image-fixture';
@@ -31,6 +36,12 @@ type Bootstrap = {
   viewerIntegrationVersion: string;
   livePatchContractVersion: string;
   compilerVersion: string;
+  packageCompatibility: {
+    registry: string;
+    scope: string;
+    minimumCompatibleVersion: string;
+    backendPackageVersions: Record<string, string>;
+  };
   editorPolicy: {
     role: string;
     canEdit: boolean;
@@ -159,6 +170,25 @@ describe.sequential('Sprint 05 live authoring session', () => {
     expect(bootstrap.viewerIntegrationVersion).toBeTruthy();
     expect(bootstrap.livePatchContractVersion).toBe('live-patch-1');
     expect(bootstrap.compilerVersion).toBe('experience-compiler-1');
+
+    // The four contract strings above say what this backend speaks. This says
+    // which releases of the shared packages can speak it, which is what a
+    // frontend checks before it renders: a build on an older classification
+    // table would show a preview that quietly disagrees with what publishes.
+    const compatibility = bootstrap.packageCompatibility;
+    expect(compatibility.registry).toBe('https://npm.pkg.github.com');
+    expect(compatibility.scope).toBe('@alishaikh110');
+    expect(compatibility.minimumCompatibleVersion).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(Object.keys(compatibility.backendPackageVersions).sort())
+      .toEqual([...SHARED_PACKAGE_NAMES].sort());
+    for (const [name, version] of Object.entries(compatibility.backendPackageVersions)) {
+      expect({ name, version }).toMatchObject({ version: expect.stringMatching(/^\d+\.\d+\.\d+$/) });
+    }
+    // The set the backend runs must itself satisfy the floor it publishes.
+    expect(
+      assertSharedPackageCompatibility(compatibility, compatibility.backendPackageVersions).compatible
+    ).toBe(true);
+
     expect(bootstrap.editorPolicy).toMatchObject({ role: 'owner', canEdit: true });
     expect(bootstrap.editorPolicy.tools.some((tool) => tool.state === 'available')).toBe(true);
     expect(bootstrap.editorSession.token.length).toBeGreaterThan(20);

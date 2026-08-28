@@ -8,7 +8,7 @@ import {
   createAssetProcessingFailure,
   type AssetProcessingFailureCategory,
   type AssetProcessingStage
-} from '@sphere/experience-schema';
+} from '@alishaikh110/experience-schema';
 import { AppError } from '../errors/app-error';
 import { storage as defaultStorage } from '../integrations/storage';
 import type { StorageProvider } from '../integrations/storage';

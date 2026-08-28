@@ -3,14 +3,14 @@ import type {
   CapabilityId,
   CapabilityResolutionInput,
   MediaRequirement,
-} from '@sphere/capability-registry';
+} from '@alishaikh110/capability-registry';
 import type {
   CanonicalAsset,
   CanonicalInteractionGeometry,
   CanonicalOverlay,
   CanonicalProject,
   CanonicalScene,
-} from '@sphere/experience-schema';
+} from '@alishaikh110/experience-schema';
 import { selectPanoramaDerivatives, selectPanoramaFamilyDerivatives } from './derivative-selector';
 import { hasPublishableVideoProfile } from './video-derivative-selector';
 

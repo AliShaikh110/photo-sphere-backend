@@ -90,3 +90,9 @@ jobs:
 
       - name: Security tests
         run: npm run test:security
+
+      - name: Shared package metadata, lockstep and dependency allowlist
+        run: npm run packages:check
+
+      - name: Published packages install and behave in a project outside this repository
+        run: npm run packages:verify

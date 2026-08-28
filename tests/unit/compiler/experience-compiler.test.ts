@@ -3,17 +3,17 @@ import { describe, expect, it } from 'vitest';
 import {
   ExperienceCompilationError,
   ExperienceCompiler,
-} from '@sphere/experience-compiler';
+} from '@alishaikh110/experience-compiler';
 import type {
   CompiledImageExperienceManifest,
   CompileExperienceInput,
-} from '@sphere/experience-compiler';
-import { isImageExperienceManifest } from '@sphere/experience-compiler';
-import type { CanonicalOverlay } from '@sphere/experience-schema';
+} from '@alishaikh110/experience-compiler';
+import { isImageExperienceManifest } from '@alishaikh110/experience-compiler';
+import type { CanonicalOverlay } from '@alishaikh110/experience-schema';
 import { compileFailure } from './compile-failure';
 import { derivative, canonicalProject, panoramaAsset } from './fixtures';
-import { PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION } from '@sphere/viewer-integration';
-import { COMPILED_MANIFEST_VERSION } from '@sphere/experience-compiler';
+import { PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION } from '@alishaikh110/viewer-integration';
+import { COMPILED_MANIFEST_VERSION } from '@alishaikh110/experience-compiler';
 
 function compilerInput(
   overrides: Partial<CompileExperienceInput> = {},

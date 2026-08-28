@@ -1,0 +1,6 @@
+# The recorded compiler output is compared byte for byte, so its line endings
+# are part of the fixture. Without this, a checkout on a machine with
+# core.autocrlf=true rewrites them as CRLF and the behaviour freeze fails on a
+# clean clone — which would also block every release, since the freeze gates
+# publishing.
+tests/golden/expected/*.json text eol=lf

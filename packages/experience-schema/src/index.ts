@@ -10,3 +10,5 @@ export * from './security/url-validator';
 export * from './extensions/types';
 export * from './extensions/registry';
 export * from './extensions/payload-validator';
+export * from './package-compatibility';
+export * from './package-version';

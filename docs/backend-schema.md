@@ -811,12 +811,12 @@ is deliberately nowhere to put a second implementation.
 
 | Package | Owns |
 | --- | --- |
-| <code>@sphere/telemetry-contract</code> | Runtime event names, event sets, failure categories and the ingest payload schemas. |
-| <code>@sphere/capability-registry</code> | Capability definitions, dependencies, incompatibilities and fallbacks. |
-| <code>@sphere/experience-schema</code> | Canonical Experience types, validation, sanitization, the runtime policy contract and the compiled manifest contract. |
-| <code>@sphere/viewer-integration</code> | Versioned adapters turning a compiled manifest into renderer configuration. |
-| <code>@sphere/experience-compiler</code> | <code>compile(input)</code>, preflight, derivative selection and the delivery policy. |
-| <code>@sphere/live-patch</code> | The property classification table and its enumerated mutations. |
+| <code>@alishaikh110/telemetry-contract</code> | Runtime event names, event sets, failure categories and the ingest payload schemas. |
+| <code>@alishaikh110/capability-registry</code> | Capability definitions, dependencies, incompatibilities and fallbacks. |
+| <code>@alishaikh110/experience-schema</code> | Canonical Experience types, validation, sanitization, the runtime policy contract and the compiled manifest contract. |
+| <code>@alishaikh110/viewer-integration</code> | Versioned adapters turning a compiled manifest into renderer configuration. |
+| <code>@alishaikh110/experience-compiler</code> | <code>compile(input)</code>, preflight, derivative selection and the delivery policy. |
+| <code>@alishaikh110/live-patch</code> | The property classification table and its enumerated mutations. |
 
 Dependency boundaries are enforced, not agreed: package projects compile with no
 ambient Node types, and lint forbids <code>packages/*</code> from importing an

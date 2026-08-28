@@ -43,7 +43,7 @@ export default tseslint.config(
         {
           patterns: [
             {
-              group: ['**/apps/**', '@sphere/api', '@sphere/worker'],
+              group: ['**/apps/**', '@alishaikh110/api', '@alishaikh110/worker'],
               message: 'packages/* may not import from apps/*.'
             },
             {
@@ -86,5 +86,15 @@ export default tseslint.config(
     files: ['tests/**/*.ts', 'scripts/**/*.ts'],
     languageOptions: { globals: { ...globals.node } },
     rules: { '@typescript-eslint/no-non-null-assertion': 'off' }
+  },
+  {
+    // The release tooling is plain ES modules run by Node, not part of any
+    // TypeScript project, so it is parsed without the type-aware service.
+    files: ['scripts/**/*.mjs'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: { ...globals.node }
+    }
   }
 );

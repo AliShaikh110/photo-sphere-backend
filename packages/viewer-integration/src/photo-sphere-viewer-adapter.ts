@@ -1,5 +1,5 @@
-import { sanitizeRichHtml } from '@sphere/experience-schema';
-import type { JsonObject, JsonValue } from '@sphere/experience-schema';
+import { sanitizeRichHtml } from '@alishaikh110/experience-schema';
+import type { JsonObject, JsonValue } from '@alishaikh110/experience-schema';
 import type {
   CompiledHotspot,
   CompiledInteractionGeometry,
@@ -13,7 +13,7 @@ import type {
   ViewerIntegrationOutput,
   ViewerSceneIntegrationOutput,
   ViewerVideoIntegrationInput,
-} from '@sphere/experience-schema';
+} from '@alishaikh110/experience-schema';
 
 export const PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION = 'psv-5.14.3-adapter-2' as const;
 

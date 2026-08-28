@@ -2,8 +2,8 @@ import type {
   CanonicalAsset,
   CanonicalProject,
   JsonObject
-} from '@sphere/experience-schema';
-import type { CompileTarget, PublicationVisibility } from '@sphere/experience-compiler';
+} from '@alishaikh110/experience-schema';
+import type { CompileTarget, PublicationVisibility } from '@alishaikh110/experience-compiler';
 import {
   referenceCroppedPanoramaAsset,
   referenceHighResolutionPanoramaAsset,

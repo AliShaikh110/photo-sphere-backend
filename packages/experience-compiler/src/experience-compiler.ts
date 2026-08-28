@@ -14,13 +14,13 @@ import type {
   CanonicalViewpoint,
   JsonObject,
   JsonValue,
-} from '@sphere/experience-schema';
-import { jsonByteLength } from '@sphere/experience-schema';
+} from '@alishaikh110/experience-schema';
+import { jsonByteLength } from '@alishaikh110/experience-schema';
 import { resolvePanoramaQuality } from './quality-policy';
-import { CAPABILITY_REGISTRY } from '@sphere/capability-registry';
-import type { ValidationIssue } from '@sphere/experience-schema';
-import { sanitizePlainText, sanitizeRichHtml } from '@sphere/experience-schema';
-import { validateSafeUrl } from '@sphere/experience-schema';
+import { CAPABILITY_REGISTRY } from '@alishaikh110/capability-registry';
+import type { ValidationIssue } from '@alishaikh110/experience-schema';
+import { sanitizePlainText, sanitizeRichHtml } from '@alishaikh110/experience-schema';
+import { validateSafeUrl } from '@alishaikh110/experience-schema';
 import {
   DEFAULT_ADJACENT_SCENE_PRELOAD_POLICY,
   DEFAULT_RUNTIME_CACHE_POLICY,
@@ -32,12 +32,12 @@ import {
   resolveRuntimeCachePolicy,
   selectAdjacentScenePreloads,
   selectTourRuntimeStrategy,
-} from '@sphere/experience-schema';
+} from '@alishaikh110/experience-schema';
 import type {
   AdjacentScenePreloadPolicyConfig,
   RuntimeCachePolicyConfig,
   TourStrategyPolicyConfig,
-} from '@sphere/experience-schema';
+} from '@alishaikh110/experience-schema';
 import {
   requirePanoramaDerivatives,
   selectPanoramaFamilyDerivatives,
@@ -51,7 +51,7 @@ import {
   readPanoramaSphereCorrection,
 } from './panorama-metadata';
 import { readTiledPanoramaMetadata } from './tiled-panorama';
-import { VIDEO_PLAYBACK_FAILURE_CATEGORIES } from '@sphere/telemetry-contract';
+import { VIDEO_PLAYBACK_FAILURE_CATEGORIES } from '@alishaikh110/telemetry-contract';
 import {
   isHandheldSafeProfile,
   selectVideoDerivatives,
@@ -60,7 +60,7 @@ import {
   BASELINE_TELEMETRY_EVENTS,
   SPATIAL_TELEMETRY_EVENTS,
   VIDEO_TELEMETRY_EVENTS,
-} from '@sphere/telemetry-contract';
+} from '@alishaikh110/telemetry-contract';
 import {
   COMPILED_MANIFEST_VERSION,
   COMPILED_SCENE_VERSION,
@@ -98,7 +98,7 @@ import type {
   RuntimeDeclarations,
   ViewerIntegrationAdapter,
 } from './types';
-import { PhotoSphereViewerIntegrationAdapter } from '@sphere/viewer-integration';
+import { PhotoSphereViewerIntegrationAdapter } from '@alishaikh110/viewer-integration';
 import {
   DEFAULT_MEDIA_DELIVERY_POLICY,
   formatMediaLocation,

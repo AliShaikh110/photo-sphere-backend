@@ -5,7 +5,7 @@ import {
   defaultCandidateOrder,
   selectVideoPlaybackProfile,
   type VideoProfileCandidate
-} from '@sphere/experience-schema';
+} from '@alishaikh110/experience-schema';
 
 const desktop: VideoProfileCandidate = {
   profileId: 'desktop',

@@ -3,7 +3,7 @@ import {
   VIDEO_CAPABILITY_IDS,
   type CapabilityId,
   type CapabilityResolutionResult
-} from '@sphere/capability-registry';
+} from '@alishaikh110/capability-registry';
 import {
   DEFAULT_MEDIA_DELIVERY_POLICY,
   COMPILER_VERSION,
@@ -12,12 +12,13 @@ import {
   tryCompile,
   type CanonicalAsset,
   type CompilerInput
-} from '@sphere/experience-compiler';
-import { CANONICAL_SCHEMA_VERSION } from '@sphere/experience-schema';
-import { LIVE_PATCH_CONTRACT_VERSION, LIVE_PATCH_CLASSIFICATIONS } from '@sphere/live-patch';
+} from '@alishaikh110/experience-compiler';
+import { CANONICAL_SCHEMA_VERSION } from '@alishaikh110/experience-schema';
+import { LIVE_PATCH_CONTRACT_VERSION, LIVE_PATCH_CLASSIFICATIONS } from '@alishaikh110/live-patch';
 
 import { createEditorSessionToken, createMediaToken } from '../auth/tokens';
 import { config } from '../config';
+import { sharedPackageContract } from '../contracts/shared-packages';
 import type { JsonObject } from '../models/model.types';
 import { incrementMetric, observeMetric } from '../observability';
 import { requireProjectRole } from './access-service';
@@ -316,6 +317,10 @@ export async function editorBootstrap(
     livePatchContractVersion: LIVE_PATCH_CONTRACT_VERSION,
     livePatchClassifications: LIVE_PATCH_CLASSIFICATIONS,
     compilerVersion: COMPILER_VERSION,
+    // The version floor a frontend must clear before it renders anything. The
+    // four contract strings above say what this backend speaks; this says
+    // which releases of the shared packages can speak it.
+    packageCompatibility: sharedPackageContract(),
     editorPolicy: {
       role: access.role,
       canEdit,

@@ -6,13 +6,13 @@ import { defineConfig } from 'vitest/config';
  * the code under review rather than a previously built artifact.
  */
 const workspaceAliases = {
-  '@sphere/api': path.resolve(__dirname, 'apps/api/src/index.ts'),
-  '@sphere/capability-registry': path.resolve(__dirname, 'packages/capability-registry/src/index.ts'),
-  '@sphere/experience-compiler': path.resolve(__dirname, 'packages/experience-compiler/src/index.ts'),
-  '@sphere/experience-schema': path.resolve(__dirname, 'packages/experience-schema/src/index.ts'),
-  '@sphere/live-patch': path.resolve(__dirname, 'packages/live-patch/src/index.ts'),
-  '@sphere/telemetry-contract': path.resolve(__dirname, 'packages/telemetry-contract/src/index.ts'),
-  '@sphere/viewer-integration': path.resolve(__dirname, 'packages/viewer-integration/src/index.ts')
+  '@alishaikh110/api': path.resolve(__dirname, 'apps/api/src/index.ts'),
+  '@alishaikh110/capability-registry': path.resolve(__dirname, 'packages/capability-registry/src/index.ts'),
+  '@alishaikh110/experience-compiler': path.resolve(__dirname, 'packages/experience-compiler/src/index.ts'),
+  '@alishaikh110/experience-schema': path.resolve(__dirname, 'packages/experience-schema/src/index.ts'),
+  '@alishaikh110/live-patch': path.resolve(__dirname, 'packages/live-patch/src/index.ts'),
+  '@alishaikh110/telemetry-contract': path.resolve(__dirname, 'packages/telemetry-contract/src/index.ts'),
+  '@alishaikh110/viewer-integration': path.resolve(__dirname, 'packages/viewer-integration/src/index.ts')
 };
 
 export default defineConfig({

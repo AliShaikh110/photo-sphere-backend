@@ -27,14 +27,14 @@ import type {
   DeferredDeviceCapability,
   DeviceRequirement,
   RuntimeModuleDeclaration,
-} from '@sphere/capability-registry';
+} from '@alishaikh110/capability-registry';
 import type {
   CompiledRuntimeCachePolicy,
   SceneTransitionFailureCategory,
   VideoPlaybackProfileId,
   VideoProfileCandidate,
 } from './runtime';
-import type { CompiledTelemetryEvent } from '@sphere/telemetry-contract';
+import type { CompiledTelemetryEvent } from '@alishaikh110/telemetry-contract';
 
 /**
  * Crop geometry carried by a panorama captured with a partial sphere. The
@@ -359,8 +359,8 @@ export {
   BASELINE_TELEMETRY_EVENTS,
   SPATIAL_TELEMETRY_EVENTS,
   VIDEO_TELEMETRY_EVENTS,
-} from '@sphere/telemetry-contract';
-export type { CompiledTelemetryEvent } from '@sphere/telemetry-contract';
+} from '@alishaikh110/telemetry-contract';
+export type { CompiledTelemetryEvent } from '@alishaikh110/telemetry-contract';
 
 export interface CompiledTelemetryMetadata {
   readonly enabled: true;

@@ -15,5 +15,5 @@ export type RuntimeNetworkClass = (typeof RUNTIME_NETWORK_CLASSES)[number];
  */
 export {
   SCENE_TRANSITION_FAILURE_CATEGORIES,
-} from '@sphere/telemetry-contract';
-export type { SceneTransitionFailureCategory } from '@sphere/telemetry-contract';
+} from '@alishaikh110/telemetry-contract';
+export type { SceneTransitionFailureCategory } from '@alishaikh110/telemetry-contract';

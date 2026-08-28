@@ -2,7 +2,7 @@ import { Op, type Transaction } from 'sequelize';
 import { createMediaToken, createTelemetryToken, verifyMediaToken } from '../auth/tokens';
 import { config } from '../config';
 import { logger } from '../config/logger';
-import { LIVE_PATCH_CONTRACT_VERSION } from '@sphere/live-patch';
+import { LIVE_PATCH_CONTRACT_VERSION } from '@alishaikh110/live-patch';
 import {
   COMPILER_VERSION,
   DEFAULT_MEDIA_DELIVERY_POLICY,
@@ -15,7 +15,7 @@ import {
   type CompiledExperienceBundle,
   type CompilerPreflightResult,
   type PublicationVisibility
-} from '@sphere/experience-compiler';
+} from '@alishaikh110/experience-compiler';
 import type {
   CanonicalAsset,
   CanonicalBranding,
@@ -43,7 +43,7 @@ import type {
   CanonicalVisibilityRules,
   JsonObject as CanonicalJsonObject,
   SphericalPosition
-} from '@sphere/experience-schema';
+} from '@alishaikh110/experience-schema';
 import { sequelize } from '../database';
 import { AppError, conflict, notFound } from '../errors/app-error';
 import {
@@ -84,7 +84,7 @@ import {
   selectVideoPlaybackProfile,
   type VideoDeviceCapabilities,
   type VideoProfileCandidate
-} from '@sphere/experience-schema';
+} from '@alishaikh110/experience-schema';
 import { sha256, stableJson } from '../utils/hash';
 import {
   completeIdempotencyLease,

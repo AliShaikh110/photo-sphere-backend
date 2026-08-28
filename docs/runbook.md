@@ -661,6 +661,147 @@ Re-recording to make a failing test pass destroys the thing being protected.
 Review the diff as a change to what customers' published experiences look like,
 because that is what it is.
 
+## Shared packages
+
+The six `@alishaikh110/*` packages are the compiler, the schema, the
+classification table and their supporting contracts, published privately to
+GitHub Packages so the frontend repository can consume them. The backend
+consumes the same sources through npm workspaces.
+
+[shared-packages.md](shared-packages.md) is the consumer-facing guide: registry
+authentication, the startup compatibility check, and the local linking path.
+This section is the operational half.
+
+### Shared package versioning
+
+The set is versioned in **lockstep**. All six always carry the same version, and
+every sibling dependency is pinned to the exact version rather than a range.
+Independent versions would let a resolver assemble a combination nobody has
+tested, and the compiler and the classification table must never be mismatched.
+
+| Change | Level |
+| --- | --- |
+| Compiled output changes for any existing input | **major** |
+| A property's live-patch classification changes | **major** |
+| <code>schemaVersion</code> increments | **major** |
+| A viewer integration version is retired | **major** |
+| New optional field, new capability, new classified property | minor |
+| Internal fix with byte-identical compiled output | patch |
+
+The two middle rows are the ones that get missed, because neither changes a
+signature and neither looks like a breaking change in review.
+
+A classification moving from <code>live</code> to <code>recompile</code> — the
+autorotation case found in Sprint 05 — is breaking for the frontend even though
+nothing about the API changed. A frontend that picks it up as a routine minor
+keeps mutating the running viewer, its live mutations no longer match the table,
+and the preview quietly diverges from what publishes. Nothing fails; a customer
+finds out.
+
+**Every major raises the floor.** After publishing a major, raise
+<code>MINIMUM_COMPATIBLE_PACKAGE_VERSION</code> in
+<code>apps/api/src/contracts/shared-packages.ts</code> to the released version
+and deploy the backend. Leaving it behind is what lets an outdated frontend keep
+running against a compiler it no longer agrees with; the suite fails if the
+floor's major falls behind the packages'.
+
+### Shared package release
+
+Publishing runs from CI on a tag. It never runs from a developer machine:
+a laptop skips whichever gate that laptop happened not to run, and the gate that
+gets skipped is the behaviour freeze.
+
+~~~powershell
+npm run packages:version -- minor     # or major, patch, or an exact x.y.z
+~~~
+
+Then, in order:
+
+1. Add a <code>## &lt;version&gt;</code> entry to
+   <code>packages/CHANGELOG.md</code>, naming any live-patch classification
+   change explicitly. The release fails without one.
+2. Rehearse the whole thing locally:
+
+   ~~~powershell
+   npm run build
+   npm run packages:check
+   npm run packages:publish -- --dry-run
+   ~~~
+
+   The dry run executes every gate the real release does and stops short of
+   uploading.
+3. Commit, tag, push:
+
+   ~~~powershell
+   git commit -am "Release shared packages <version>"
+   git tag packages-v<version>
+   git push origin main --tags
+   ~~~
+
+The <code>release-shared-packages</code> workflow takes it from there. Before
+anything is uploaded, <code>scripts/publish-packages.mjs</code> requires:
+
+- <code>CI=true</code> and a workflow ref of
+  <code>refs/tags/packages-v&lt;version&gt;</code> matching the version in
+  <code>packages/*/package.json</code>;
+- a clean working tree;
+- <code>packages:check</code> — metadata, lockstep, sibling pinning, dependency
+  allowlist, generated version constants, changelog entry;
+- <code>test:golden</code> — the compiler behaviour freeze;
+- <code>packages:verify</code> — the tarballs installed into a project outside
+  the repository, loading in both module systems, typed at the call site, and
+  reproducing the golden fixtures byte for byte.
+
+Those gates run inside the publish script rather than as workflow steps, so the
+guarantee does not depend on the order of the steps in the workflow file.
+
+Packages upload in dependency order, so an interrupted release always leaves the
+registry in a state where every published package's dependencies are already
+there.
+
+### Rolling back a release
+
+**A published version is immutable and cannot be replaced.** GitHub Packages
+does not allow re-uploading a version, and it should not: a consumer may already
+have installed it.
+
+Roll forward instead.
+
+~~~powershell
+npm run packages:version -- patch     # or major, if behaviour is changing back
+~~~
+
+Fix the cause, add the changelog entry, and release again. Consumers move by
+updating; nothing they have installed changes underneath them.
+
+If a bad version must be made uninstallable, deprecate it so the reason reaches
+anyone who tries:
+
+~~~powershell
+npm deprecate "@alishaikh110/experience-compiler@1.2.0" `
+  "Compiled output regression; use 1.2.1 or later."
+~~~
+
+Repeat for all six, so the set stays consistent. Deleting a package version from
+GitHub Packages breaks every lockfile that references it; deprecate rather than
+delete unless a secret was published, in which case rotate the secret first and
+treat deletion as damage limitation rather than a fix.
+
+### A frontend reports an incompatible package set
+
+The message names the problem and the command that fixes it, so start there. The
+question worth asking is which side is wrong:
+
+- **The frontend is behind.** Expected after a major. It installs the versions
+  the message names.
+- **The backend is behind.** A newer package set was published and the deployed
+  backend has not been redeployed against it. The frontend reports
+  <code>ahead-of-backend</code>. Deploy the backend; do not lower the frontend.
+- **The floor was never raised.** A major was published and
+  <code>MINIMUM_COMPATIBLE_PACKAGE_VERSION</code> still names an older release,
+  so an outdated frontend is being accepted. Raise it and deploy. Then check
+  whether any preview divergence has already been reported.
+
 ## Verification
 
 ### Fast pre-commit gate
@@ -700,6 +841,8 @@ npm run test:unit
 npm run test:integration
 npm run test:security
 npm run test:coverage
+npm run packages:check
+npm run packages:verify
 ~~~
 
 This matches CI's build-then-migrate order. Substitute
@@ -873,6 +1016,8 @@ are the source of retention truth.
 - Upload byte/pixel policy and private-media authorization reviewed.
 - Database and storage clocks synchronized.
 - Sprint unit, integration, security, migration, and build gates pass.
+- <code>MINIMUM_COMPATIBLE_PACKAGE_VERSION</code> names the current major of the
+  published shared packages, and the deployed backend runs that release.
 - <code>platform_admin</code> granted only to operators who run extension
   registration and viewer-integration rollout.
 - The active viewer integration version has a passing reference-suite run on

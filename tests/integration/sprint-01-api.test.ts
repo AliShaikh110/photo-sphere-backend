@@ -14,7 +14,7 @@ import {
   truncateApplicationData,
   type IntegrationTestContext
 } from '../helpers/postgres-test-context';
-import { PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION } from '@sphere/viewer-integration';
+import { PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION } from '@alishaikh110/viewer-integration';
 
 describe.sequential('Sprint 01 HTTP integration', () => {
   let context: IntegrationTestContext;

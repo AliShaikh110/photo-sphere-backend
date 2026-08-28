@@ -1,5 +1,5 @@
 import { Op, type Transaction } from 'sequelize';
-import { readPanoramaInitialView } from '@sphere/experience-compiler';
+import { readPanoramaInitialView } from '@alishaikh110/experience-compiler';
 import { sequelize } from '../database';
 import { AppError, conflict, notFound } from '../errors/app-error';
 import {
@@ -14,7 +14,7 @@ import {
   User
 } from '../models';
 import type { AccessRole, JsonObject } from '../models/model.types';
-import { sanitizePlainText } from '@sphere/experience-schema';
+import { sanitizePlainText } from '@alishaikh110/experience-schema';
 import { accessibleProjectFilter, requireProjectRole } from './access-service';
 import {
   overlayPayload,

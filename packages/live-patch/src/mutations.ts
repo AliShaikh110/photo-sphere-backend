@@ -12,8 +12,8 @@ import {
   type CompiledOverlay,
   type CompiledScene,
   type SphericalPosition,
-} from '@sphere/experience-compiler';
-import { createViewerIntegrationAdapter } from '@sphere/viewer-integration';
+} from '@alishaikh110/experience-compiler';
+import { createViewerIntegrationAdapter } from '@alishaikh110/viewer-integration';
 
 import type { LiveMutationName } from './classification';
 

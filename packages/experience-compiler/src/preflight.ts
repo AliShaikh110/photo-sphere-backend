@@ -2,15 +2,15 @@ import {
   CAPABILITY_REGISTRY,
   resolveCapabilities,
   type CapabilityResolutionResult,
-} from '@sphere/capability-registry';
-import { validateCanonicalProject } from '@sphere/experience-schema';
-import { validateSafeUrl } from '@sphere/experience-schema';
-import type { ValidationIssue } from '@sphere/experience-schema';
+} from '@alishaikh110/capability-registry';
+import { validateCanonicalProject } from '@alishaikh110/experience-schema';
+import { validateSafeUrl } from '@alishaikh110/experience-schema';
+import type { ValidationIssue } from '@alishaikh110/experience-schema';
 import type {
   CanonicalAsset,
   CanonicalInteractionGeometry,
   CanonicalProject,
-} from '@sphere/experience-schema';
+} from '@alishaikh110/experience-schema';
 import {
   selectPanoramaDerivatives,
   selectPreferredReadyDerivative,

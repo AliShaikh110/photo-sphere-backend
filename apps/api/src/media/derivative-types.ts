@@ -1,4 +1,4 @@
-import type { AssetDerivativeKind } from '@sphere/experience-schema';
+import type { AssetDerivativeKind } from '@alishaikh110/experience-schema';
 
 export type GeneratedStorageObject = {
   storageKey: string;

@@ -4,8 +4,8 @@ import {
   compile,
   contentHash,
   type CompilerInput
-} from '@sphere/experience-compiler';
-import { DEFAULT_TOUR_STRATEGY_POLICY } from '@sphere/experience-schema';
+} from '@alishaikh110/experience-compiler';
+import { DEFAULT_TOUR_STRATEGY_POLICY } from '@alishaikh110/experience-schema';
 import { sha256, stableJson } from '../../apps/api/src/utils/hash';
 import type { GoldenScenario } from './scenarios';
 

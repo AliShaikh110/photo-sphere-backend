@@ -1,4 +1,4 @@
-import { createViewerIntegrationAdapter } from '@sphere/viewer-integration';
+import { createViewerIntegrationAdapter } from '@alishaikh110/viewer-integration';
 
 import { contentHash } from './content-hash';
 import { ExperienceCompilationError, ExperienceCompiler } from './experience-compiler';

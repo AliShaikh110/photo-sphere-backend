@@ -1,14 +1,49 @@
 {
-  "name": "@sphere/live-patch",
+  "name": "@alishaikh110/live-patch",
   "version": "1.0.0",
-  "private": true,
   "description": "Canonical property classification: live, recompile or remount",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "license": "UNLICENSED",
+  "type": "commonjs",
   "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18.17.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AliShaikh110/photo-sphere-backend.git",
+    "directory": "packages/live-patch"
+  },
+  "homepage": "https://github.com/AliShaikh110/photo-sphere-backend/tree/main/packages/live-patch#readme",
+  "bugs": {
+    "url": "https://github.com/AliShaikh110/photo-sphere-backend/issues"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "restricted"
+  },
   "dependencies": {
-    "@sphere/experience-compiler": "1.0.0",
-    "@sphere/experience-schema": "1.0.0",
-    "@sphere/viewer-integration": "1.0.0"
+    "@alishaikh110/experience-compiler": "1.0.0",
+    "@alishaikh110/experience-schema": "1.0.0",
+    "@alishaikh110/viewer-integration": "1.0.0"
   }
 }

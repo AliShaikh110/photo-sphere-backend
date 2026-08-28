@@ -9,14 +9,14 @@ export {
   RUNTIME_EVENT_NAMES,
   TIMELINE_INTERACTION_KINDS,
   VIDEO_PLAYBACK_FAILURE_CATEGORIES,
-} from '@sphere/telemetry-contract';
+} from '@alishaikh110/telemetry-contract';
 export type {
   CapabilityFallbackReason,
   InteractionGeometryKind,
   RuntimeEventName,
   TimelineInteractionKind,
   VideoPlaybackFailureCategory,
-} from '@sphere/telemetry-contract';
+} from '@alishaikh110/telemetry-contract';
 
 export type JsonPrimitive = boolean | number | string | null;
 

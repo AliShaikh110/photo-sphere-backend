@@ -1874,6 +1874,19 @@ project-scoped read. A caller with no access receives <code>404</code>.
   "livePatchContractVersion": "live-patch-1",
   "livePatchClassifications": [],
   "compilerVersion": "experience-compiler-1",
+  "packageCompatibility": {
+    "registry": "https://npm.pkg.github.com",
+    "scope": "@alishaikh110",
+    "minimumCompatibleVersion": "1.0.0",
+    "backendPackageVersions": {
+      "@alishaikh110/telemetry-contract": "1.0.0",
+      "@alishaikh110/capability-registry": "1.0.0",
+      "@alishaikh110/experience-schema": "1.0.0",
+      "@alishaikh110/viewer-integration": "1.0.0",
+      "@alishaikh110/experience-compiler": "1.0.0",
+      "@alishaikh110/live-patch": "1.0.0"
+    }
+  },
   "editorPolicy": {
     "role": "owner",
     "canEdit": true,
@@ -1904,6 +1917,39 @@ a read-only caller sees every tool unavailable with the access reason.
 tell the editor which property changes it may apply to the running viewer and
 which need a recompile. See
 [backend-schema.md](backend-schema.md#live-patch-classification).
+
+<code>packageCompatibility</code> is the version floor a client must clear
+before it renders anything. The four contract strings above say what this
+backend speaks; this says which releases of the shared
+<code>@alishaikh110/*</code> packages can speak it.
+
+<code>minimumCompatibleVersion</code> is the oldest package release this backend
+will serve. <code>backendPackageVersions</code> is what the deployed backend is
+itself running, and is what the remedy tells a developer to install.
+
+A client passes both to <code>assertSharedPackageCompatibility</code>, exported
+by <code>@alishaikh110/experience-schema</code>, together with the version
+constant each installed package exports:
+
+~~~ts
+import { assertSharedPackageCompatibility } from '@alishaikh110/experience-schema';
+
+assertSharedPackageCompatibility(bootstrap.packageCompatibility, {
+  '@alishaikh110/experience-compiler': EXPERIENCE_COMPILER_PACKAGE_VERSION,
+  // ...the other five
+});
+~~~
+
+It throws <code>SharedPackageCompatibilityError</code> when the installed set is
+below the floor, a major ahead of the backend, incomplete, or not in lockstep
+with itself. The message names every problem and the <code>npm install</code>
+command that resolves it.
+
+This has to fail at startup rather than degrade. A client running an older
+<code>live-patch</code> table applies mutations the compiler no longer agrees
+with, and the creator is shown a preview that quietly disagrees with what
+publishes. See [shared-packages.md](shared-packages.md) for the version policy
+and the release process.
 
 ### GET /api/v1/projects/:projectId/events
 

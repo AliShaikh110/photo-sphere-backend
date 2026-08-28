@@ -7,7 +7,7 @@ import { incrementMetric } from '../observability';
 import { sha256 } from '../utils/hash';
 import { requireProjectRole } from './access-service';
 import { recordAudit } from './audit-service';
-import { sanitizePlainText } from '@sphere/experience-schema';
+import { sanitizePlainText } from '@alishaikh110/experience-schema';
 
 const TOKEN_BYTES = 32;
 const MAX_ACTIVE_TOKENS = 25;

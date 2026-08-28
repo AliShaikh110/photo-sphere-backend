@@ -1,5 +1,5 @@
-import type { PanoramaDerivativeFamily } from '@sphere/experience-schema';
-import type { RuntimeDeviceClass, RuntimeNetworkClass } from '@sphere/experience-schema';
+import type { PanoramaDerivativeFamily } from '@alishaikh110/experience-schema';
+import type { RuntimeDeviceClass, RuntimeNetworkClass } from '@alishaikh110/experience-schema';
 
 export const QUALITY_POLICY_VERSION = 'panorama-quality-v1' as const;
 

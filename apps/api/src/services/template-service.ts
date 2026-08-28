@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Op, type Transaction } from 'sequelize';
 
-import { CURRENT_EXPERIENCE_SCHEMA_VERSION } from '@sphere/experience-schema';
+import { CURRENT_EXPERIENCE_SCHEMA_VERSION } from '@alishaikh110/experience-schema';
 import { sequelize } from '../database';
 import { AppError, notFound } from '../errors/app-error';
 import {
@@ -38,7 +38,7 @@ import {
   sanitizeTimelineAction,
   sanitizeTimelineContent
 } from './content-service';
-import { sanitizePlainText } from '@sphere/experience-schema';
+import { sanitizePlainText } from '@alishaikh110/experience-schema';
 
 /* --------------------------------------------------------------------- */
 /* Blueprint shape                                                        */

@@ -5,7 +5,7 @@ import {
   logger,
   mediaWorker,
   migrator
-} from '@sphere/api';
+} from '@alishaikh110/api';
 
 async function startWorker(): Promise<void> {
   await connectDatabase();

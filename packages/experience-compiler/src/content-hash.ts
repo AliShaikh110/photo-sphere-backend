@@ -1,4 +1,4 @@
-import { stableJson } from '@sphere/experience-schema';
+import { stableJson } from '@alishaikh110/experience-schema';
 
 /**
  * SHA-256 with no host dependency.
