@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import sharp from 'sharp';
-import { detectImageMime, safeUploadFilename, validateImageUpload } from '../../../src/media/file-policy';
+import { detectImageMime, safeUploadFilename, validateImageUpload } from '../../../apps/api/src/media/file-policy';
 
 describe('image upload policy', () => {
   it('detects content signatures and accepts a matching panorama image', async () => {

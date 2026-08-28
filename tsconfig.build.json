@@ -1,12 +1,14 @@
 {
-  "extends": "./tsconfig.json",
-  "compilerOptions": {
-    "rootDir": "src",
-    "outDir": "dist",
-    "sourceMap": true,
-    "declaration": true,
-    "types": ["node"]
-  },
-  "include": ["src/**/*.ts"],
-  "exclude": ["tests", "dist", "node_modules"]
+  "files": [],
+  "references": [
+    { "path": "./packages/telemetry-contract" },
+    { "path": "./packages/capability-registry" },
+    { "path": "./packages/experience-schema" },
+    { "path": "./packages/viewer-integration" },
+    { "path": "./packages/experience-compiler" },
+    { "path": "./packages/live-patch" },
+    { "path": "./apps/api" },
+    { "path": "./apps/worker" },
+    { "path": "./tsconfig.migrations.json" }
+  ]
 }

@@ -1,15 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { ExperienceCompiler } from '../../../src/compiler/experience-compiler';
+import { ExperienceCompiler } from '../../../apps/api/src/compiler/experience-compiler';
 import {
   isVideoExperienceManifest,
   type CompileExperienceInput,
   type CompiledVideoExperienceManifest,
   type MediaUrlResolutionRequest
-} from '../../../src/compiler/types';
-import type { AssetDerivative, CanonicalAsset, CanonicalProject } from '../../../src/domain/types';
-import { PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION } from '../../../src/compiler/viewer-integration-adapter';
-import { COMPILED_MANIFEST_VERSION } from '../../../src/compiler/types';
+} from '../../../apps/api/src/compiler/types';
+import type { AssetDerivative, CanonicalAsset, CanonicalProject } from '../../../apps/api/src/domain/types';
+import { PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION } from '../../../apps/api/src/compiler/viewer-integration-adapter';
+import { COMPILED_MANIFEST_VERSION } from '../../../apps/api/src/compiler/types';
 
 function videoDerivative(
   kind: AssetDerivative['kind'],

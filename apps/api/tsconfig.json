@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts"],
+  "references": [
+    { "path": "../../packages/capability-registry" },
+    { "path": "../../packages/experience-compiler" },
+    { "path": "../../packages/experience-schema" },
+    { "path": "../../packages/live-patch" },
+    { "path": "../../packages/telemetry-contract" },
+    { "path": "../../packages/viewer-integration" }
+  ]
+}

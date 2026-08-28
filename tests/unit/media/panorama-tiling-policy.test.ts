@@ -4,8 +4,8 @@ import {
   DEFAULT_PANORAMA_TILING_POLICY,
   PANORAMA_TILING_POLICY_VERSION,
   resolvePanoramaTilingPolicy,
-} from '../../../src/media/panorama-quality-policy';
-import type { PanoramaTilingPolicyInput } from '../../../src/media/panorama-quality-policy';
+} from '../../../apps/api/src/media/panorama-quality-policy';
+import type { PanoramaTilingPolicyInput } from '../../../apps/api/src/media/panorama-quality-policy';
 
 function panorama(overrides: Partial<PanoramaTilingPolicyInput> = {}): PanoramaTilingPolicyInput {
   return {

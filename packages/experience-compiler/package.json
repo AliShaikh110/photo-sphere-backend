@@ -1,0 +1,15 @@
+{
+  "name": "@sphere/experience-compiler",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The pure, deterministic Experience Compiler",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "sideEffects": false,
+  "dependencies": {
+    "@sphere/capability-registry": "1.0.0",
+    "@sphere/experience-schema": "1.0.0",
+    "@sphere/telemetry-contract": "1.0.0",
+    "@sphere/viewer-integration": "1.0.0"
+  }
+}

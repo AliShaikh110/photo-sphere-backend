@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { config } from '../../src/config';
+import { config } from '../../apps/api/src/config';
 import { seedReadyPanorama } from '../fixtures/ready-panorama';
 import { bearer, registerIdentity } from '../helpers/api-client';
 import { generatedEquirectangularJpeg } from '../helpers/image-fixture';
@@ -59,7 +59,7 @@ describe.sequential('Sprint 04 — enterprise scale, analytics budget and ingest
 
     // The scene graph is seeded directly: this test is about the publish and
     // delivery path at scale, not about repeating the authoring API 120 times.
-    const { Scene, SceneConnection } = await import('../../src/models');
+    const { Scene, SceneConnection } = await import('../../apps/api/src/models');
     const scenes = await Scene.bulkCreate(
       Array.from({ length: sceneCount }, (_unused, index) => ({
         projectId,
@@ -297,7 +297,7 @@ describe.sequential('Sprint 04 — enterprise scale, analytics budget and ingest
       expect(replayed.body.data.duplicates).toBe(50);
     }
 
-    const { RuntimeEvent } = await import('../../src/models');
+    const { RuntimeEvent } = await import('../../apps/api/src/models');
     const stored = await RuntimeEvent.count({ where: { experienceId: projectId } });
     expect(stored).toBe(acceptedEvents);
   }, 120_000);

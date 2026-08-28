@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { interactionGeometrySchema } from '../../../src/validators/request-schemas';
+import { interactionGeometrySchema } from '../../../apps/api/src/validators/request-schemas';
 
 /**
  * Sprint 04 requires the canonical geometry union to carry point, polygon,

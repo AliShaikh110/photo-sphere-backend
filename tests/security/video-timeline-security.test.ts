@@ -68,7 +68,7 @@ describe.sequential('Sprint 03 timed-content security boundaries', () => {
       .set('Idempotency-Key', `complete-${randomUUID()}`)
       .send({ uploadSessionId: session.body.data.upload.sessionId })
       .expect(202);
-    const { drainMediaJobs } = await import('../../src/services/media-worker-service');
+    const { drainMediaJobs } = await import('../../apps/api/src/services/media-worker-service');
     await drainMediaJobs({ maxJobs: 5 });
 
     await request(context.app)

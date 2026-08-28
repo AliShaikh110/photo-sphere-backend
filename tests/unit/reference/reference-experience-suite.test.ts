@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION
-} from '../../../src/compiler/viewer-integration-adapter';
+} from '../../../apps/api/src/compiler/viewer-integration-adapter';
 import {
   listViewerIntegrationVersions
-} from '../../../src/compiler/viewer-integration-registry';
-import { referenceExperiences, runReferenceExperienceSuite } from '../../../src/reference';
+} from '../../../apps/api/src/compiler/viewer-integration-registry';
+import { referenceExperiences, runReferenceExperienceSuite } from '../../../apps/api/src/reference';
 
 /**
  * Sprint 04 §20 makes this suite the promotion gate for a viewer integration

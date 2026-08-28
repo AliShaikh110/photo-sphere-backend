@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
-import { CompatibilityVideoTranscoder } from '../../../src/integrations/video/compatibility-transcoder';
+import { CompatibilityVideoTranscoder } from '../../../apps/api/src/integrations/video/compatibility-transcoder';
 import {
   buildPosterArguments,
   buildTranscodeArguments
-} from '../../../src/integrations/video/ffmpeg-transcoder';
-import { generateVideoDerivatives } from '../../../src/media/video-derivatives';
+} from '../../../apps/api/src/integrations/video/ffmpeg-transcoder';
+import { generateVideoDerivatives } from '../../../apps/api/src/media/video-derivatives';
 import {
   DEFAULT_VIDEO_TRANSCODING_POLICY,
   planVideoProfileTargets
-} from '../../../src/media/video-profile-policy';
-import { inspectVideo } from '../../../src/media/video-processor';
+} from '../../../apps/api/src/media/video-profile-policy';
+import { inspectVideo } from '../../../apps/api/src/media/video-processor';
 import { buildHandheldSafe360Mp4, buildOversized360Mp4 } from '../../helpers/video-fixture';
 
 function inspect(bytes: Buffer): ReturnType<typeof inspectVideo> {

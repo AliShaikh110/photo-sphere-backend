@@ -2,7 +2,7 @@ import type {
   AssetDerivative,
   CanonicalAsset,
   CanonicalProject,
-} from '../../../src/domain/types';
+} from '../../../apps/api/src/domain/types';
 
 export function derivative(
   assetId: string,

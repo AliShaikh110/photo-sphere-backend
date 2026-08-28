@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   assertSafeUrl,
   validateSafeUrl,
-} from '../../../src/security/url-validator';
+} from '../../../apps/api/src/security/url-validator';
 
 describe('central URL policy', () => {
   it('allows and normalizes HTTPS URLs', () => {

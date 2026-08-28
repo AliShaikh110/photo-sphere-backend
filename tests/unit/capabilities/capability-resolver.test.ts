@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveCapabilities, CapabilityResolver } from '../../../src/capabilities';
+import { resolveCapabilities, CapabilityResolver } from '../../../apps/api/src/capabilities';
 import {
   CAPABILITY_REGISTRY,
   CAPABILITY_DEFINITIONS,
   validateCapabilityRegistry,
-} from '../../../src/capabilities/registry';
-import { CAPABILITY_IDS } from '../../../src/capabilities/types';
+} from '../../../apps/api/src/capabilities/registry';
+import { CAPABILITY_IDS } from '../../../apps/api/src/capabilities/types';
 import type {
   CapabilityId,
   CapabilityResolutionInput,
-} from '../../../src/capabilities/types';
+} from '../../../apps/api/src/capabilities/types';
 
 /** A resolvable baseline: a ready panorama and nothing else. */
 function input(

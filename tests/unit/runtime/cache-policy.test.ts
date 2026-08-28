@@ -9,8 +9,8 @@ import {
   createRuntimeCachePolicy,
   resolveCachePolicy,
   resolveRuntimeCachePolicy,
-} from '../../../src/runtime/cache-policy';
-import { RUNTIME_DEVICE_CLASSES } from '../../../src/runtime/types';
+} from '../../../apps/api/src/runtime/cache-policy';
+import { RUNTIME_DEVICE_CLASSES } from '../../../apps/api/src/runtime/types';
 
 const MEBIBYTE = 1024 * 1024;
 

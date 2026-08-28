@@ -1,16 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { ExperienceCompiler } from '../../../src/compiler/experience-compiler';
-import { PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION } from '../../../src/compiler/viewer-integration-adapter';
-import { isImageExperienceManifest } from '../../../src/compiler/types';
+import { ExperienceCompiler } from '../../../apps/api/src/compiler/experience-compiler';
+import { PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION } from '../../../apps/api/src/compiler/viewer-integration-adapter';
+import { isImageExperienceManifest } from '../../../apps/api/src/compiler/types';
 import type {
   CompiledExperienceBundle,
   CompiledImageExperienceManifest,
   CompileExperienceInput,
   MediaUrlResolutionRequest,
-} from '../../../src/compiler/types';
-import { createTourStrategyPolicy } from '../../../src/runtime/tour-strategy';
-import type { CanonicalProject } from '../../../src/domain/types';
+} from '../../../apps/api/src/compiler/types';
+import { createTourStrategyPolicy } from '../../../apps/api/src/runtime/tour-strategy';
+import type { CanonicalProject } from '../../../apps/api/src/domain/types';
 import {
   derivative,
   panoramaAsset,

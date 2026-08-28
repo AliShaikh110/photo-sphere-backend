@@ -5,7 +5,7 @@ import {
   defaultCandidateOrder,
   selectVideoPlaybackProfile,
   type VideoProfileCandidate
-} from '../../../src/runtime/video-playback-policy';
+} from '../../../apps/api/src/runtime/video-playback-policy';
 
 const desktop: VideoProfileCandidate = {
   profileId: 'desktop',

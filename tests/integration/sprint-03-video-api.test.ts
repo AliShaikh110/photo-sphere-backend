@@ -10,7 +10,7 @@ import {
   truncateApplicationData,
   type IntegrationTestContext
 } from '../helpers/postgres-test-context';
-import { PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION } from '../../src/compiler/viewer-integration-adapter';
+import { PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION } from '../../apps/api/src/compiler/viewer-integration-adapter';
 
 const VIDEO_DURATION_MS = 6_000;
 
@@ -66,7 +66,7 @@ describe.sequential('Sprint 03 — 360 video, timeline and device-aware playback
       .send({ uploadSessionId: session.body.data.upload.sessionId })
       .expect(202);
 
-    const { drainMediaJobs } = await import('../../src/services/media-worker-service');
+    const { drainMediaJobs } = await import('../../apps/api/src/services/media-worker-service');
     await drainMediaJobs({ maxJobs: 5 });
     return assetId;
   }
@@ -515,7 +515,7 @@ describe.sequential('Sprint 03 — 360 video, timeline and device-aware playback
       .set('Idempotency-Key', `reprocess-${randomUUID()}`)
       .send({ profiles: ['mobile'] })
       .expect(202);
-    const { drainMediaJobs } = await import('../../src/services/media-worker-service');
+    const { drainMediaJobs } = await import('../../apps/api/src/services/media-worker-service');
     await drainMediaJobs({ maxJobs: 5 });
 
     const after = await request(context.app)

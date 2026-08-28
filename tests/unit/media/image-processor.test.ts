@@ -4,8 +4,8 @@ import {
   generateDisplayImageDerivatives,
   generatePanoramaDerivatives,
   inspectPanorama
-} from '../../../src/media/image-processor';
-import { extractGpanoMetadata } from '../../../src/media/xmp';
+} from '../../../apps/api/src/media/image-processor';
+import { extractGpanoMetadata } from '../../../apps/api/src/media/xmp';
 
 describe('panorama processing', () => {
   it('inspects a full 2:1 equirectangular panorama and creates all baseline derivatives', async () => {

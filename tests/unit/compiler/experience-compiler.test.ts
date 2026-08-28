@@ -3,17 +3,17 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   ExperienceCompilationError,
   ExperienceCompiler,
-} from '../../../src/compiler/experience-compiler';
+} from '../../../apps/api/src/compiler/experience-compiler';
 import type {
   CompiledImageExperienceManifest,
   CompileExperienceInput,
   MediaUrlResolutionRequest,
-} from '../../../src/compiler/types';
-import { isImageExperienceManifest } from '../../../src/compiler/types';
-import type { CanonicalOverlay } from '../../../src/domain/types';
+} from '../../../apps/api/src/compiler/types';
+import { isImageExperienceManifest } from '../../../apps/api/src/compiler/types';
+import type { CanonicalOverlay } from '../../../apps/api/src/domain/types';
 import { derivative, canonicalProject, panoramaAsset } from './fixtures';
-import { PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION } from '../../../src/compiler/viewer-integration-adapter';
-import { COMPILED_MANIFEST_VERSION } from '../../../src/compiler/types';
+import { PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION } from '../../../apps/api/src/compiler/viewer-integration-adapter';
+import { COMPILED_MANIFEST_VERSION } from '../../../apps/api/src/compiler/types';
 
 function compilerInput(
   overrides: Partial<CompileExperienceInput> = {},

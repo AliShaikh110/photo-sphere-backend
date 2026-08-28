@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { assertAllowedLiveSourceUrl } from '../../src/integrations/live';
+import { assertAllowedLiveSourceUrl } from '../../apps/api/src/integrations/live';
 
 /**
  * Sprint 04 §17 requires the live-source interface to be allow-listed and

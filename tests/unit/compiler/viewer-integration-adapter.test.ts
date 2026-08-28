@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION,
   PhotoSphereViewerIntegrationAdapter,
-} from '../../../src/compiler/viewer-integration-adapter';
-import type { ViewerIntegrationInput } from '../../../src/compiler/types';
+} from '../../../apps/api/src/compiler/viewer-integration-adapter';
+import type { ViewerIntegrationInput } from '../../../apps/api/src/compiler/types';
 
 function adapterInput(): ViewerIntegrationInput {
   return {

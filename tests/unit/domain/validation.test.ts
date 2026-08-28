@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { validateCanonicalProject } from '../../../src/domain/validation';
+import { validateCanonicalProject } from '../../../apps/api/src/domain/validation';
 import { canonicalProject, panoramaAsset } from '../compiler/fixtures';
 
 describe('canonical Experience validation', () => {

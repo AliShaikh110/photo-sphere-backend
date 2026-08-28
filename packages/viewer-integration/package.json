@@ -1,0 +1,13 @@
+{
+  "name": "@sphere/viewer-integration",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Versioned adapters turning a compiled manifest into renderer configuration",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "sideEffects": false,
+  "dependencies": {
+    "@sphere/capability-registry": "1.0.0",
+    "@sphere/experience-schema": "1.0.0"
+  }
+}

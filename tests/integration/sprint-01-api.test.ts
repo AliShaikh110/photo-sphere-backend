@@ -14,7 +14,7 @@ import {
   truncateApplicationData,
   type IntegrationTestContext
 } from '../helpers/postgres-test-context';
-import { PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION } from '../../src/compiler/viewer-integration-adapter';
+import { PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION } from '../../apps/api/src/compiler/viewer-integration-adapter';
 
 describe.sequential('Sprint 01 HTTP integration', () => {
   let context: IntegrationTestContext;
@@ -284,9 +284,9 @@ describe.sequential('Sprint 01 HTTP integration', () => {
       .expect('Idempotency-Replayed', 'true');
     expect(replayedCompletion.body.data).toEqual(completed.body.data);
 
-    const { MediaJob } = await import('../../src/models');
+    const { MediaJob } = await import('../../apps/api/src/models');
     expect(await MediaJob.count({ where: { assetId } })).toBe(1);
-    const { drainMediaJobs } = await import('../../src/services/media-worker-service');
+    const { drainMediaJobs } = await import('../../apps/api/src/services/media-worker-service');
     await expect(drainMediaJobs()).resolves.toBe(1);
     await expect(drainMediaJobs()).resolves.toBe(0);
 
@@ -589,7 +589,7 @@ describe.sequential('Sprint 01 HTTP integration', () => {
       .expect(200);
     expect(changed.body.data.project.revision).toBe(10);
 
-    const { Asset, Publication, RuntimeEvent } = await import('../../src/models');
+    const { Asset, Publication, RuntimeEvent } = await import('../../apps/api/src/models');
     const failedReprocessKey = `reprocess-failure-${randomUUID()}`;
     await request(context.app)
       .post(`/api/v1/assets/${assetId}/reprocess`)
@@ -831,7 +831,7 @@ describe.sequential('Sprint 01 HTTP integration', () => {
       .set('Idempotency-Key', `complete-${randomUUID()}`)
       .send({ uploadSessionId: session.body.data.upload.sessionId })
       .expect(202);
-    const { drainMediaJobs } = await import('../../src/services/media-worker-service');
+    const { drainMediaJobs } = await import('../../apps/api/src/services/media-worker-service');
     await expect(drainMediaJobs()).resolves.toBe(1);
 
     // The pose and framing the camera recorded are inspected and kept, not
@@ -933,8 +933,8 @@ describe.sequential('Sprint 01 HTTP integration', () => {
 
     // A source whose bytes no longer decode fails inside inspection. The stage
     // that failed has to be nameable, not inferred from a whole-job status.
-    const { storage } = await import('../../src/integrations/storage');
-    const { Asset } = await import('../../src/models');
+    const { storage } = await import('../../apps/api/src/integrations/storage');
+    const { Asset } = await import('../../apps/api/src/models');
     const corruptingStorage = {
       ...storage,
       get: async (key: string) => {
@@ -944,7 +944,7 @@ describe.sequential('Sprint 01 HTTP integration', () => {
           : stored;
       }
     } as typeof storage;
-    const { drainMediaJobs } = await import('../../src/services/media-worker-service');
+    const { drainMediaJobs } = await import('../../apps/api/src/services/media-worker-service');
     await expect(drainMediaJobs({ storage: corruptingStorage, maxJobs: 1 })).resolves.toBe(1);
 
     const failed = await request(context.app)
@@ -1012,7 +1012,7 @@ describe.sequential('Sprint 01 HTTP integration', () => {
     // Migrations carry their own snapshot of each vocabulary, so the applied
     // constraint has to be checked against the constant the code writes with.
     // Otherwise a name the worker emits is rejected only in production.
-    const { MEDIA_JOB_STAGE_NAMES } = await import('../../src/models/model.types');
+    const { MEDIA_JOB_STAGE_NAMES } = await import('../../apps/api/src/models/model.types');
     const [constraints] = await context.database.sequelize.query(
       `SELECT pg_get_constraintdef(oid) AS "definition"
        FROM pg_constraint WHERE conname = 'media_job_stages_stage_check'`
@@ -1032,7 +1032,7 @@ describe.sequential('Sprint 01 HTTP integration', () => {
 
     // Repository policy requires reversible migrations, so the newest one is
     // rolled back and reapplied against the same cluster the suite uses.
-    const { createMigrator } = await import('../../src/database/migrate');
+    const { createMigrator } = await import('../../apps/api/src/database/migrate');
     const migrator = createMigrator(context.database.sequelize);
     await migrator.down();
     const reverted = await stageCheck();

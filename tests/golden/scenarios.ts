@@ -2,8 +2,8 @@ import type {
   CanonicalAsset,
   CanonicalProject,
   JsonObject
-} from '../../src/domain/types';
-import type { CompileTarget, PublicationVisibility } from '../../src/compiler/types';
+} from '../../apps/api/src/domain/types';
+import type { CompileTarget, PublicationVisibility } from '../../apps/api/src/compiler/types';
 import {
   referenceCroppedPanoramaAsset,
   referenceHighResolutionPanoramaAsset,
@@ -14,7 +14,7 @@ import {
   referenceProject,
   referenceScene,
   referenceVideoAsset
-} from '../../src/reference/reference-fixtures';
+} from '../../apps/api/src/reference/reference-fixtures';
 
 /**
  * The behaviour freeze for the compiler extraction.

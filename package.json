@@ -4,30 +4,35 @@
   "private": true,
   "description": "Renderer-independent backend for the No-Code 360 Experience Platform",
   "type": "commonjs",
-  "main": "dist/server.js",
+  "main": "apps/api/dist/server.js",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "engines": {
     "node": ">=22.0.0"
   },
   "scripts": {
-    "dev": "tsx watch src/server.ts",
-    "dev:worker": "tsx watch src/worker.ts",
-    "build": "tsc -p tsconfig.build.json && tsc -p tsconfig.migrations.json",
-    "start": "node dist/server.js",
-    "worker": "node dist/worker.js",
+    "dev": "tsx watch apps/api/src/server.ts",
+    "dev:worker": "tsx watch apps/worker/src/worker.ts",
+    "build": "tsc -b tsconfig.build.json",
+    "build:clean": "tsc -b tsconfig.build.json --clean",
+    "start": "node apps/api/dist/server.js",
+    "worker": "node apps/worker/dist/worker.js",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
     "test:security": "vitest run tests/security",
     "test:golden": "vitest run tests/unit/golden",
-    "golden:record": "tsx scripts/record-golden-fixtures.ts",
     "test:coverage": "vitest run --coverage",
     "test:all": "npm run lint && npm run typecheck && npm test && npm run build",
-    "db:migrate": "node dist/database/migrate.js up",
-    "db:migrate:undo": "node dist/database/migrate.js down",
-    "db:migrate:dev": "tsx src/database/migrate.ts up",
-    "db:migrate:undo:dev": "tsx src/database/migrate.ts down"
+    "golden:record": "tsx scripts/record-golden-fixtures.ts",
+    "db:migrate": "node apps/api/dist/database/migrate.js up",
+    "db:migrate:undo": "node apps/api/dist/database/migrate.js down",
+    "db:migrate:dev": "tsx apps/api/src/database/migrate.ts up",
+    "db:migrate:undo:dev": "tsx apps/api/src/database/migrate.ts down"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",

@@ -11,7 +11,9 @@ import dotenv from 'dotenv';
  * dotenv never overwrites a variable already exported in the environment, so
  * CI and deployment secrets still take precedence over both files.
  */
-const projectRoot = path.resolve(__dirname, '..', '..');
+// Four levels up from apps/api/{src,dist}/config is the workspace root,
+// which is where the shared and machine-local env files live.
+const projectRoot = path.resolve(__dirname, '..', '..', '..', '..');
 
 dotenv.config({ path: path.join(projectRoot, '.env.local') });
 dotenv.config({ path: path.join(projectRoot, '.env') });

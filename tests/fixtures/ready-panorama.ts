@@ -14,8 +14,8 @@ export async function seedReadyPanorama(options: {
   projectId: string;
   bytes: Buffer;
 }): Promise<SeededPanorama> {
-  const { Asset, AssetDerivative } = await import('../../src/models');
-  const { storage } = await import('../../src/integrations/storage');
+  const { Asset, AssetDerivative } = await import('../../apps/api/src/models');
+  const { storage } = await import('../../apps/api/src/integrations/storage');
   const assetId = randomUUID();
   const checksum = sha256(options.bytes);
   const sourceStorageKey = `test-fixtures/${assetId}/source.jpg`;

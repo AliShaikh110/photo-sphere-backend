@@ -1,0 +1,10 @@
+{
+  "name": "@sphere/worker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Media pipeline worker for the No-Code 360 Experience Platform",
+  "main": "dist/worker.js",
+  "dependencies": {
+    "@sphere/api": "1.0.0"
+  }
+}

@@ -5,7 +5,7 @@
     "moduleResolution": "Node",
     "lib": ["ES2022"],
     "rootDir": ".",
-    "outDir": "dist",
+    "noEmit": true,
     "strict": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
@@ -14,8 +14,26 @@
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
     "skipLibCheck": true,
-    "types": ["node", "vitest/globals"]
+    "types": ["node", "vitest/globals"],
+    "baseUrl": ".",
+    "paths": {
+      "@sphere/api": ["apps/api/src/index.ts"],
+      "@sphere/capability-registry": ["packages/capability-registry/src/index.ts"],
+      "@sphere/experience-compiler": ["packages/experience-compiler/src/index.ts"],
+      "@sphere/experience-schema": ["packages/experience-schema/src/index.ts"],
+      "@sphere/live-patch": ["packages/live-patch/src/index.ts"],
+      "@sphere/telemetry-contract": ["packages/telemetry-contract/src/index.ts"],
+      "@sphere/viewer-integration": ["packages/viewer-integration/src/index.ts"]
+    }
   },
-  "include": ["src/**/*.ts", "migrations/**/*.ts", "scripts/**/*.ts", "tests/**/*.ts", "vitest.config.ts", "eslint.config.mjs"],
-  "exclude": ["dist", "node_modules", "storage"]
+  "include": [
+    "apps/*/src/**/*.ts",
+    "packages/*/src/**/*.ts",
+    "migrations/**/*.ts",
+    "scripts/**/*.ts",
+    "tests/**/*.ts",
+    "vitest.config.ts",
+    "eslint.config.mjs"
+  ],
+  "exclude": ["dist", "node_modules", "storage", "**/dist/**"]
 }

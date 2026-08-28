@@ -1,0 +1,9 @@
+{
+  "name": "@sphere/capability-registry",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Capability definitions, dependencies, incompatibilities and fallbacks",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "sideEffects": false
+}

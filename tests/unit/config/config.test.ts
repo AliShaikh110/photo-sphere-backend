@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadConfig } from '../../../src/config';
+import { loadConfig } from '../../../apps/api/src/config';
 
 describe('configuration safety', () => {
   it.each([

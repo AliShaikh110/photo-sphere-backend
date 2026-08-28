@@ -9,7 +9,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION
-} from '../../src/compiler/viewer-integration-adapter';
+} from '../../apps/api/src/compiler/viewer-integration-adapter';
 import { seedReadyPanorama } from '../fixtures/ready-panorama';
 import { bearer, registerIdentity } from '../helpers/api-client';
 import { generatedEquirectangularJpeg } from '../helpers/image-fixture';
@@ -415,7 +415,7 @@ describe.sequential('Sprint 02 — multi-scene tours, delivery strategy and capa
       .send({ revision: 2, slug: 'frozen-scene-tour', visibility: 'public' })
       .expect(201);
 
-    const { PublishedSceneDefinition } = await import('../../src/models');
+    const { PublishedSceneDefinition } = await import('../../apps/api/src/models');
     const stored = await PublishedSceneDefinition.findOne({ where: { sceneId: lobby } });
     expect(stored).not.toBeNull();
 
@@ -446,7 +446,7 @@ describe.sequential('Sprint 02 — multi-scene tours, delivery strategy and capa
       .send({ revision: 4, slug: 'thumbnail-tour', visibility: 'public' })
       .expect(201);
 
-    const { AssetDerivative } = await import('../../src/models');
+    const { AssetDerivative } = await import('../../apps/api/src/models');
     const thumbnail = await AssetDerivative.findOne({
       where: { assetId, kind: 'thumbnail' }
     });

@@ -132,13 +132,13 @@ async function startRealPostgres(): Promise<IntegrationTestContext | undefined> 
     started = true;
     process.env.DATABASE_URL = `postgres://sphere_test@127.0.0.1:${port}/postgres`;
 
-    const database = await import('../../src/database');
+    const database = await import('../../apps/api/src/database');
     await database.sequelize.authenticate();
     // Run the full migration chain: a disposable cluster must reach the same
     // schema the deployed database does, not just the initial sprint.
-    const { createMigrator } = await import('../../src/database/migrate');
+    const { createMigrator } = await import('../../apps/api/src/database/migrate');
     await createMigrator(database.sequelize).up();
-    const { app } = await import('../../src/app');
+    const { app } = await import('../../apps/api/src/app');
 
     return {
       app,
@@ -178,8 +178,8 @@ async function startPgMem(): Promise<IntegrationTestContext> {
   const memory = newDb({ autoCreateForeignKeyIndices: true });
   const dialectModule = memory.adapters.createPg();
 
-  vi.doMock('../../src/database', async () => {
-    const { initializeModels } = await import('../../src/models');
+  vi.doMock('../../apps/api/src/database', async () => {
+    const { initializeModels } = await import('../../apps/api/src/models');
     const sequelize = new Sequelize('postgres://sphere_test@localhost/postgres', {
       dialect: 'postgres',
       dialectModule,
@@ -198,9 +198,9 @@ async function startPgMem(): Promise<IntegrationTestContext> {
     };
   });
 
-  const database = await import('../../src/database');
+  const database = await import('../../apps/api/src/database');
   await database.sequelize.sync({ force: true });
-  const { app } = await import('../../src/app');
+  const { app } = await import('../../apps/api/src/app');
   return {
     app,
     database,
@@ -210,11 +210,11 @@ async function startPgMem(): Promise<IntegrationTestContext> {
 }
 
 async function startConfiguredPostgres(): Promise<IntegrationTestContext> {
-  const database = await import('../../src/database');
+  const database = await import('../../apps/api/src/database');
   await database.sequelize.authenticate();
-  const { createMigrator } = await import('../../src/database/migrate');
+  const { createMigrator } = await import('../../apps/api/src/database/migrate');
   await createMigrator(database.sequelize).up();
-  const { app } = await import('../../src/app');
+  const { app } = await import('../../apps/api/src/app');
   return {
     app,
     database,

@@ -1,8 +1,11 @@
-import { config } from './config';
-import { logger } from './config/logger';
-import { connectDatabase, disconnectDatabase } from './database';
-import { migrator } from './database/migrate';
-import { mediaWorker } from './services/media-worker-service';
+import {
+  config,
+  connectDatabase,
+  disconnectDatabase,
+  logger,
+  mediaWorker,
+  migrator
+} from '@sphere/api';
 
 async function startWorker(): Promise<void> {
   await connectDatabase();

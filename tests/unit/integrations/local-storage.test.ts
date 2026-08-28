@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { LocalStorageProvider } from '../../../src/integrations/storage/local-storage';
+import { LocalStorageProvider } from '../../../apps/api/src/integrations/storage/local-storage';
 
 const temporaryRoots: string[] = [];
 

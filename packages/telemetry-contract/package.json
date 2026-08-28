@@ -1,0 +1,12 @@
+{
+  "name": "@sphere/telemetry-contract",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Runtime telemetry event names and payload schemas shared by the platform and its players",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "sideEffects": false,
+  "dependencies": {
+    "zod": "^4.1.3"
+  }
+}

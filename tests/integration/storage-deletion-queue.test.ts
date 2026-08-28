@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto';
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import type { StorageProvider } from '../../src/integrations/storage';
-import { MemoryStorageProvider } from '../../src/integrations/storage';
+import type { StorageProvider } from '../../apps/api/src/integrations/storage';
+import { MemoryStorageProvider } from '../../apps/api/src/integrations/storage';
 import {
   startIntegrationTestContext,
   truncateApplicationData,
@@ -30,9 +30,9 @@ describe.sequential('durable storage deletion queue', () => {
       skip('Outbox claiming requires PostgreSQL row locks.');
     }
 
-    const { Asset, AssetDerivative, StorageDeletionJob, User } = await import('../../src/models');
-    const { deleteAsset } = await import('../../src/services/asset-service');
-    const { drainStorageDeletionJobs } = await import('../../src/services/storage-deletion-service');
+    const { Asset, AssetDerivative, StorageDeletionJob, User } = await import('../../apps/api/src/models');
+    const { deleteAsset } = await import('../../apps/api/src/services/asset-service');
+    const { drainStorageDeletionJobs } = await import('../../apps/api/src/services/storage-deletion-service');
 
     const owner = await User.create({
       email: `cleanup-${randomUUID()}@example.test`,
@@ -115,8 +115,8 @@ describe.sequential('durable storage deletion queue', () => {
       skip('Outbox claiming requires PostgreSQL row locks.');
     }
 
-    const { StorageDeletionJob } = await import('../../src/models');
-    const { drainStorageDeletionJobs } = await import('../../src/services/storage-deletion-service');
+    const { StorageDeletionJob } = await import('../../apps/api/src/models');
+    const { drainStorageDeletionJobs } = await import('../../apps/api/src/services/storage-deletion-service');
     const storage = new MemoryStorageProvider();
     const storageKey = `derivatives/${randomUUID()}/expired.webp`;
     await storage.put(storageKey, Buffer.from('stale'));

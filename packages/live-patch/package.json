@@ -1,0 +1,12 @@
+{
+  "name": "@sphere/live-patch",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Canonical property classification: live, recompile or remount",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "sideEffects": false,
+  "dependencies": {
+    "@sphere/experience-schema": "1.0.0"
+  }
+}

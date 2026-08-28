@@ -5,7 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION
-} from '../../src/compiler/viewer-integration-adapter';
+} from '../../apps/api/src/compiler/viewer-integration-adapter';
 import { seedReadyPanorama } from '../fixtures/ready-panorama';
 import { bearer, registerIdentity } from '../helpers/api-client';
 import { generatedEquirectangularJpeg } from '../helpers/image-fixture';
@@ -286,7 +286,7 @@ describe.sequential('Sprint 04 — spatial data, advanced geometry and immersive
     expect(manifest.body.data.manifest.viewerIntegrationVersion)
       .toBe(PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION);
 
-    const { Publication } = await import('../../src/models');
+    const { Publication } = await import('../../apps/api/src/models');
     const publication = await Publication.findOne({ where: { projectId, isCurrent: true } });
     expect(publication?.viewerIntegrationVersion).toBe(PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION);
 

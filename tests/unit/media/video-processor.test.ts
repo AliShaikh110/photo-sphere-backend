@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { AppError } from '../../../src/errors/app-error';
-import { detectVideoContainer } from '../../../src/media/video-container';
-import { validateVideoUpload } from '../../../src/media/file-policy';
-import { inspectVideo, videoInspectionMetadata } from '../../../src/media/video-processor';
+import { AppError } from '../../../apps/api/src/errors/app-error';
+import { detectVideoContainer } from '../../../apps/api/src/media/video-container';
+import { validateVideoUpload } from '../../../apps/api/src/media/file-policy';
+import { inspectVideo, videoInspectionMetadata } from '../../../apps/api/src/media/video-processor';
 import { buildMp4Fixture } from '../../helpers/video-fixture';
 
 describe('video inspection', () => {

@@ -4,9 +4,9 @@ import {
   createMediaToken,
   createTelemetryToken,
   verifyTelemetryToken
-} from '../../../src/auth/tokens';
-import { config } from '../../../src/config';
-import { decodeAccessToken } from '../../../src/middlewares/auth';
+} from '../../../apps/api/src/auth/tokens';
+import { config } from '../../../apps/api/src/config';
+import { decodeAccessToken } from '../../../apps/api/src/middlewares/auth';
 
 const claims = { email: 'owner@example.test', tokenType: 'access' };
 

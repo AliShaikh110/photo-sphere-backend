@@ -4,9 +4,9 @@ import {
   createViewerIntegrationAdapter,
   type CompileExperienceInput,
   type MediaUrlResolver
-} from '../../src/compiler';
-import { DEFAULT_TOUR_STRATEGY_POLICY } from '../../src/runtime';
-import { sha256, stableJson } from '../../src/utils/hash';
+} from '../../apps/api/src/compiler';
+import { DEFAULT_TOUR_STRATEGY_POLICY } from '../../apps/api/src/runtime';
+import { sha256, stableJson } from '../../apps/api/src/utils/hash';
 import type { GoldenScenario } from './scenarios';
 
 /**

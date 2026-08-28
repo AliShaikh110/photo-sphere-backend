@@ -143,7 +143,7 @@ describe.sequential('Sprint 04 — templates and instantiation', () => {
 
     // The denormalized extension pair must agree with the geometry, which is
     // what the database constraint exists to guarantee.
-    const { Hotspot } = await import('../../src/models');
+    const { Hotspot } = await import('../../apps/api/src/models');
     const stored = await Hotspot.findByPk(copiedHotspot.id as string);
     expect(stored?.geometryKind).toBe('custom');
     expect(stored?.extensionId).toBe('platform.measurement-label');
