@@ -1,4 +1,4 @@
-# Backend API — Sprints 01–04
+# Backend API — Sprints 01–05
 
 This document defines the HTTP contract for the image360 backend MVP. The
 canonical source of data is the Experience model described in
@@ -64,7 +64,7 @@ with <code>PLATFORM_ADMIN_REQUIRED</code>.
 
 ### Token scopes
 
-Three audiences exist and are not interchangeable. A token minted for one
+Four audiences exist and are not interchangeable. A token minted for one
 surface is rejected on the others:
 
 | Audience | Purpose | Presented as |
@@ -72,9 +72,17 @@ surface is rejected on the others:
 | <code>sphere-creator</code> | The authenticated API. | <code>Authorization: Bearer</code> |
 | <code>sphere-media</code> | One derivative of one publication, short-lived. | <code>?token=</code> on a media URL |
 | <code>sphere-telemetry</code> | Runtime events for one published revision. | <code>X-Telemetry-Token</code> |
+| <code>sphere-editor</code> | One project's live authoring session, short-lived. | <code>?token=</code> on the event stream |
 
 A media token is bound to the single derivative it was minted for; it does not
 open another object in the same publication.
+
+An editor session token is issued by editor bootstrap, is scoped to that one
+project, and carries the role the caller already had. It exists so a browser can
+hold the event stream open without the creator's bearer token ever reaching
+browser JavaScript, and because `EventSource` cannot set an Authorization
+header. It grants nothing the caller could not already do, it expires quickly,
+and presenting it for another project is rejected.
 
 ### Optimistic revision preconditions
 
@@ -173,6 +181,8 @@ returned.
 | PATCH | <code>/api/v1/projects/:projectId</code> | Bearer, project editor | <code>revision</code> |
 | POST | <code>/api/v1/projects/:projectId/validate</code> | Bearer, project viewer | <code>revision</code> |
 | POST | <code>/api/v1/projects/:projectId/preview-manifest</code> | Bearer, project editor | <code>revision</code> |
+| GET | <code>/api/v1/projects/:projectId/editor-bootstrap</code> | Bearer, project viewer | None |
+| GET | <code>/api/v1/projects/:projectId/events</code> | Editor session token or bearer, project viewer | Streaming enabled |
 | GET | <code>/api/v1/projects/:projectId/scenes</code> | Bearer, project viewer | None |
 | POST | <code>/api/v1/projects/:projectId/scenes</code> | Bearer, project editor | <code>projectRevision</code> |
 | POST | <code>/api/v1/projects/:projectId/scenes/reorder</code> | Bearer, project editor | <code>projectRevision</code> |
@@ -180,6 +190,7 @@ returned.
 | PATCH | <code>/api/v1/projects/:projectId/scenes/:sceneId</code> | Bearer, project editor | <code>projectRevision</code> |
 | DELETE | <code>/api/v1/projects/:projectId/scenes/:sceneId</code> | Bearer, project editor | <code>projectRevision</code> |
 | POST | <code>/api/v1/projects/:projectId/scenes/:sceneId/hotspots</code> | Bearer, project editor | <code>projectRevision</code> |
+| PATCH | <code>/api/v1/projects/:projectId/scenes/:sceneId/hotspots</code> | Bearer, project editor | <code>projectRevision</code> |
 | PATCH | <code>/api/v1/projects/:projectId/scenes/:sceneId/hotspots/:hotspotId</code> | Bearer, project editor | <code>projectRevision</code> |
 | DELETE | <code>/api/v1/projects/:projectId/scenes/:sceneId/hotspots/:hotspotId</code> | Bearer, project editor | <code>projectRevision</code> |
 | GET | <code>/api/v1/projects/:projectId/timeline</code> | Bearer, project viewer | <code>video360</code> project |
@@ -194,6 +205,7 @@ returned.
 | GET | <code>/api/v1/assets/:assetId</code> | Bearer, asset owner | None |
 | POST | <code>/api/v1/assets/:assetId/reprocess</code> | Bearer, asset owner | <code>Idempotency-Key</code> |
 | DELETE | <code>/api/v1/assets/:assetId</code> | Bearer, asset owner | None |
+| POST | <code>/api/v1/media/tokens</code> | Bearer | Per-derivative authorization |
 | GET | <code>/api/v1/projects/:projectId/plans</code> | Bearer, project viewer | None |
 | POST | <code>/api/v1/projects/:projectId/plans</code> | Bearer, project editor | <code>projectRevision</code>, <code>image360</code> project |
 | POST | <code>/api/v1/projects/:projectId/plans/reorder</code> | Bearer, project editor | <code>projectRevision</code> |
@@ -761,6 +773,40 @@ for later runtime capability work and fail Sprint 01 preflight.
 Accepts <code>projectRevision</code> plus editable hotspot fields. Stable hotspot
 and scene IDs do not change.
 
+### PATCH /api/v1/projects/:projectId/scenes/:sceneId/hotspots
+
+One change applied to many hotspots in a scene, atomically. A multi-select drag
+is one edit to a creator, so it is one request and one revision here.
+
+~~~json
+{
+  "projectRevision": 12,
+  "hotspots": [
+    {
+      "id": "hotspot-a",
+      "position": {
+        "coordinateSystem": "spherical_degrees",
+        "longitudeDegrees": -12.5,
+        "latitudeDegrees": 3
+      }
+    },
+    {
+      "id": "hotspot-b",
+      "appearance": { "color": "#2266aa" }
+    }
+  ]
+}
+~~~
+
+Each entry accepts the same fields as the single-hotspot patch. Every entry is
+validated before any row is written: a rejected batch leaves the scene and the
+project revision exactly as they were. A successful batch bumps the project
+revision once and returns every hotspot in the scene in sort order.
+
+Repeating a hotspot id in one batch is a <code>VALIDATION_FAILED</code>. Naming
+a hotspot that is not in the scene is a <code>HOTSPOT_NOT_FOUND</code>. A stale
+<code>projectRevision</code> is a <code>REVISION_CONFLICT</code>.
+
 ### DELETE /api/v1/projects/:projectId/scenes/:sceneId/hotspots/:hotspotId
 
 ~~~json
@@ -955,9 +1001,17 @@ Requires <code>Idempotency-Key</code>.
 {
   "revision": 9,
   "slug": "museum-lobby",
-  "visibility": "public"
+  "visibility": "public",
+  "contentHash": "optional advisory hash the client computed locally"
 }
 ~~~
+
+<code>contentHash</code> is advisory and optional. Publish always recompiles
+server-side and stores its own result; a client-supplied hash is compared only
+to detect drift. A mismatch is logged as an operational alert with the project,
+its revision, the compiler version and the live-patch contract version, raises
+the <code>publish.hash_drift</code> counter, and changes nothing about what is
+published or returned.
 
 Sprint 01 publishing accepts <code>public</code> or <code>private</code>
 visibility. Publishing validates and compiles an immutable manifest,
@@ -1749,12 +1803,196 @@ today, sized by the indexes on <code>runtime_events</code>; a deployment with
 heavier telemetry can implement the same interface against a dedicated analytics
 store without changing this API or its authorization rules.
 
+## Browser-direct access
+
+Most authoring traffic reaches this API server to server. Three paths cannot,
+because a browser has to make them itself:
+
+| Group | Routes | Credential | Credential mode |
+| --- | --- | --- | --- |
+| Media | <code>/api/v1/media/*</code>, <code>/api/v1/publications/*</code>, <code>/view/*</code> | Signed media URL token, editor session token, or bearer | omit |
+| Events | <code>/api/v1/projects/:projectId/events</code> | Editor session token or bearer | omit |
+| Telemetry | <code>/api/v1/runtime/*</code> | Telemetry ingest token | omit |
+
+Each group has its own origin allowlist, so widening one does not silently
+widen the others. <code>CORS_ORIGINS</code> is the default for every group;
+<code>EDITOR_ORIGINS</code>, <code>PLAYER_ORIGINS</code> and
+<code>EMBED_ORIGINS</code> narrow or widen a specific one. No group uses
+credentialled CORS: every browser-direct call carries an explicit, narrow,
+short-lived token rather than an ambient cookie, so a cross-site request cannot
+borrow a signed-in session. A deployment can read back the policy it is running
+with from <code>GET /api/v1/platform/browser-access-policy</code>.
+
+## Live authoring session
+
+### GET /api/v1/projects/:projectId/editor-bootstrap
+
+Everything an editor needs to render a live preview, in one request. An editor
+that fetches the project, its capabilities, its assets and a preview manifest in
+sequence cannot draw a pixel until four round trips have finished; that blank
+screen is a backend problem, and this is the fix.
+
+Access control, role checks and the error envelope match every other
+project-scoped read. A caller with no access receives <code>404</code>.
+
+~~~json
+{
+  "project": { "id": "project-id", "type": "image360", "revision": 12, "scenes": [] },
+  "revision": 12,
+  "assets": [],
+  "mediaUrls": [
+    {
+      "assetId": "asset-id",
+      "derivativeId": "derivative-id",
+      "kind": "standardWeb",
+      "url": "/api/v1/media/derivative-id?token=...",
+      "expiresAt": "2026-08-28T12:15:00.000Z"
+    }
+  ],
+  "mediaUrlsTruncated": false,
+  "capabilities": [
+    {
+      "id": "gallery",
+      "productFeature": "Gallery",
+      "availability": "available",
+      "appliesToExperience": true,
+      "resolved": false,
+      "deviceRequirements": [],
+      "deviceRequirementResolution": "compile-time",
+      "fallback": null
+    }
+  ],
+  "compileResult": {
+    "manifest": {},
+    "viewerIntegration": { "rendererId": "...", "config": {} },
+    "sceneIndex": [],
+    "diagnostics": [],
+    "contentHash": "64 hex characters"
+  },
+  "schemaVersion": 1,
+  "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+  "livePatchContractVersion": "live-patch-1",
+  "livePatchClassifications": [],
+  "compilerVersion": "experience-compiler-1",
+  "editorPolicy": {
+    "role": "owner",
+    "canEdit": true,
+    "tools": [{ "id": "hotspots", "name": "Hotspots", "state": "available" }]
+  },
+  "editorSession": { "token": "...", "expiresAt": "2026-08-28T12:15:00.000Z" }
+}
+~~~
+
+<code>compileResult.manifest</code> carries signed, expiring media URLs so the
+preview is immediately drawable. <code>contentHash</code> is taken **before**
+those URLs are signed, so a client that compiles the same canonical data locally
+computes the same value — that is what makes the advisory hash on publish
+meaningful.
+
+When the experience cannot be compiled yet, <code>manifest</code> is
+<code>null</code> and <code>diagnostics</code> explains why in product language
+with stable codes and paths. The rest of the payload is still usable, so the
+editor opens and shows the problem rather than a blank screen.
+
+<code>editorPolicy.tools</code> states whether each tool is
+<code>available</code>, <code>unavailable</code> or <code>hidden</code>, and
+why. A tool that cannot exist in this kind of experience is hidden; a tool the
+project asked for and could not resolve is unavailable with the product reason;
+a read-only caller sees every tool unavailable with the access reason.
+
+<code>livePatchClassifications</code> and <code>livePatchContractVersion</code>
+tell the editor which property changes it may apply to the running viewer and
+which need a recompile. See
+[backend-schema.md](backend-schema.md#live-patch-classification).
+
+### GET /api/v1/projects/:projectId/events
+
+A one-way Server-Sent Events channel for a live authoring session.
+
+~~~text
+GET /api/v1/projects/:projectId/events?token=<editor session token>
+Accept: text/event-stream
+Last-Event-ID: 42
+~~~
+
+Authenticated and authorized identically to other project-scoped reads: a bearer
+token in the Authorization header, or an editor session token as the
+<code>token</code> query parameter, because <code>EventSource</code> cannot set
+headers.
+
+Event types:
+
+| Event | Meaning |
+| --- | --- |
+| <code>asset.processing.progress</code> | A media job advanced a stage. |
+| <code>asset.ready</code> | An asset finished processing and can be used. |
+| <code>asset.failed</code> | An asset failed terminally; the payload carries the product-level reason. |
+| <code>project.revision.changed</code> | Any mutation committed; the payload carries the new revision. |
+| <code>publication.completed</code> | A publish succeeded. |
+| <code>publication.failed</code> | A publish failed; the previous revision stays live. |
+
+Each frame carries a monotonic per-project <code>id</code>, the event name, and
+a JSON payload with <code>actorUserId</code> — so a client can ignore the echo
+of its own writes. A comment line is sent on connect and as a periodic
+heartbeat, so an intermediate proxy counting idle seconds does not close the
+connection.
+
+Reconnecting with <code>Last-Event-ID</code> replays what was missed. When the
+gap is longer than the replay buffer the server sends a <code>stream.gap</code>
+event instead of a partial history, and the client should reload rather than
+assume it has the whole story.
+
+Connections are bounded per project and per user; exceeding either returns
+<code>429 EVENT_STREAM_LIMIT_REACHED</code>.
+
+**The stream is an optimization, never a dependency.** Every fact it carries is
+also readable from a polling route. A deployment behind a proxy that blocks
+streaming sets <code>EVENT_STREAM_ENABLED=false</code>; the route then answers
+<code>503 EVENT_STREAM_DISABLED</code> and clients fall back to polling with no
+loss of function.
+
+### POST /api/v1/media/tokens
+
+Reissues expiring media URLs without recompiling the experience.
+
+~~~json
+{ "derivativeIds": ["derivative-a", "derivative-b"] }
+~~~
+
+~~~json
+{
+  "media": [
+    {
+      "assetId": "asset-id",
+      "derivativeId": "derivative-a",
+      "kind": "standardWeb",
+      "url": "/api/v1/media/derivative-a?token=...",
+      "expiresAt": "2026-08-28T12:15:00.000Z"
+    }
+  ]
+}
+~~~
+
+A long editing session outlives the signatures it started with; reloading the
+editor or recompiling the experience to get fresh ones would be absurd. This
+route grants nothing: authorization is re-checked against each derivative on
+every call, exactly as the media route itself would, so a caller can only
+refresh what it could already fetch. One unauthorized entry fails the whole
+request with <code>403 MEDIA_ACCESS_DENIED</code>.
+
 ## Platform and viewer integration
 
 <code>GET /api/v1/platform/capabilities</code>,
 <code>GET /api/v1/platform/viewer-integrations</code> and
 <code>GET /api/v1/platform/reference-suite</code> are readable by any
 authenticated creator. Everything else on this router is platform admin.
+
+### GET /api/v1/platform/browser-access-policy
+
+The browser-direct access policy this deployment is running with: which origins
+may reach media, the event stream and telemetry, which credential each group
+accepts, and the credential mode. See
+[Browser-direct access](#browser-direct-access).
 
 ### GET /api/v1/platform/capabilities
 

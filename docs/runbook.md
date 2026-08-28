@@ -1,8 +1,8 @@
 # Backend Operations Runbook
 
 This runbook covers development, deployment, migrations, the durable media
-worker, private local storage, health/observability, verification, and common
-Sprint 01 incidents.
+worker, private local storage, the live authoring session's push channel,
+health/observability, verification, and common incidents.
 
 ## Deployment shape
 
@@ -68,7 +68,17 @@ The following inventory mirrors <code>.env.example</code>.
 | <code>JWT_SECRET</code> | replacement placeholder | HMAC secret for access tokens; minimum 32 characters. Use a secret manager in production. |
 | <code>JWT_EXPIRES_IN</code> | <code>1h</code> | Access-token lifetime accepted by the JWT library. |
 | <code>PUBLIC_BASE_URL</code> | <code>http://localhost:4000</code> | Externally routed platform/player origin used for share targets. Production routing must provide the frontend shell at <code>/view/:slug</code> and route its manifest request to this backend. No trailing slash is required. |
-| <code>CORS_ORIGINS</code> | <code>http://localhost:3000</code> | Comma-separated allowed creator/editor origins. Do not use a wildcard with credentials. |
+| <code>CORS_ORIGINS</code> | <code>http://localhost:3000</code> | Comma-separated allowed creator/editor origins, and the default for every browser-direct group below. Do not use a wildcard with credentials. |
+| <code>EDITOR_ORIGINS</code> | unset | Origins allowed to reach media and the event stream directly. Defaults to <code>CORS_ORIGINS</code>. |
+| <code>PLAYER_ORIGINS</code> | unset | Origins allowed to reach media and telemetry directly. Defaults to <code>CORS_ORIGINS</code>. |
+| <code>EMBED_ORIGINS</code> | empty | Origins allowed to reach media and telemetry when an experience is embedded. Per-publication embed policy still applies on top of this. |
+| <code>EDITOR_SESSION_TTL_SECONDS</code> | <code>900</code> | Lifetime of the short-lived project-scoped editor session token. Keep it short: it is what a browser holds instead of the creator's bearer token. |
+| <code>EVENT_STREAM_ENABLED</code> | <code>true</code> | Set to <code>false</code> behind a proxy that blocks streaming; clients fall back to polling with no loss of function. |
+| <code>EVENT_STREAM_HEARTBEAT_MS</code> | <code>20000</code> | Interval between keep-alive comments on an open stream. Lower it only for a proxy with a shorter idle timeout. |
+| <code>EVENT_STREAM_MAX_PER_PROJECT</code> | <code>20</code> | Open streams allowed for one project. |
+| <code>EVENT_STREAM_MAX_PER_USER</code> | <code>8</code> | Open streams allowed for one person, across projects. |
+| <code>EVENT_STREAM_REPLAY_BUFFER</code> | <code>200</code> | Events retained per project for <code>Last-Event-ID</code> resume. A longer gap is reported as a gap rather than a partial history. |
+| <code>MEDIA_TOKEN_REFRESH_MAX</code> | <code>200</code> | Media references one refresh request may name, and the ceiling on signed URLs shipped in an editor bootstrap. |
 | <code>STORAGE_ROOT</code> | <code>./storage</code> | Durable private storage directory. Mount and back up this path in production. |
 | <code>MAX_IMAGE_UPLOAD_BYTES</code> | <code>52428800</code> | Maximum original image bytes; default 50 MiB. |
 | <code>MAX_IMAGE_PIXELS</code> | <code>80000000</code> | Sharp input-pixel ceiling protecting against decompression bombs; default 80 million pixels. |
@@ -556,6 +566,101 @@ Prefer <code>deprecated</code> over <code>disabled</code> when drafts still use
 a version: deprecated keeps authoring and publishing working while signalling
 that a newer version exists.
 
+## Live authoring session
+
+Sprint 05 added a push channel, a bootstrap route, a batch mutation and a media
+URL refresh. None of them is load-bearing on its own: every fact the stream
+carries is also readable from a polling route.
+
+### Turning the event stream off
+
+A reverse proxy that buffers or blocks streamed responses will make
+<code>GET /api/v1/projects/:projectId/events</code> appear to hang. When that
+cannot be fixed at the proxy, turn the channel off:
+
+~~~powershell
+$env:EVENT_STREAM_ENABLED = 'false'
+~~~
+
+The route then answers <code>503 EVENT_STREAM_DISABLED</code> and clients fall
+back to polling. Nothing else changes: project reads, asset reads, preview
+compilation and publication history all report the same facts. Confirm after
+restarting:
+
+~~~powershell
+Invoke-WebRequest "http://localhost:4000/api/v1/projects/$projectId/events" `
+  -Headers @{ Authorization = "Bearer $token" } -SkipHttpErrorCheck |
+  Select-Object -ExpandProperty StatusCode
+~~~
+
+The API sends <code>X-Accel-Buffering: no</code> and a heartbeat comment on the
+stream; if a proxy still buffers, raise
+<code>EVENT_STREAM_HEARTBEAT_MS</code> only after confirming the proxy honours
+neither.
+
+### Connection limits
+
+<code>EVENT_STREAM_MAX_PER_PROJECT</code> and
+<code>EVENT_STREAM_MAX_PER_USER</code> bound open streams. A client that leaks
+connections is refused with <code>429 EVENT_STREAM_LIMIT_REACHED</code> rather
+than exhausting sockets. Watch <code>events.stream.opened</code> against
+<code>events.stream.rejected</code>: a rising <code>limit-user</code> rejection
+rate is an editor that is not closing streams, not a capacity problem.
+
+Delivery is in-process. In a multi-process deployment each process serves the
+streams it holds, so an event published by one process does not reach a client
+connected to another. Until a shared fan-out is introduced, either run a single
+API process for editing traffic, pin an editing session to one process, or leave
+the channel off and let clients poll — a client that never sees an event still
+sees the change on its next poll.
+
+### Reading the browser-direct access policy
+
+~~~powershell
+Invoke-RestMethod http://localhost:4000/api/v1/platform/browser-access-policy `
+  -Headers @{ Authorization = "Bearer $token" }
+~~~
+
+This returns the allowlist actually in force for media, events and telemetry.
+Check it after changing <code>CORS_ORIGINS</code>, <code>EDITOR_ORIGINS</code>,
+<code>PLAYER_ORIGINS</code> or <code>EMBED_ORIGINS</code>: getting an origin
+wrong is how an experience becomes embeddable somewhere it should not be.
+
+### A content hash drift alert
+
+Publish always recompiles server-side and stores its own result. When a client
+sends the hash it computed locally and it disagrees, the server logs:
+
+~~~text
+client-computed content hash disagreed with the server; the server result was published
+~~~
+
+with the project, its revision, <code>compilerVersion</code>,
+<code>livePatchContractVersion</code>, <code>viewerIntegrationVersion</code> and
+both hashes, and raises <code>publish.hash_drift</code>.
+
+Nothing is broken for the customer: the server's result was published. What it
+means is that a browser compiled something different from what was published,
+which is a bug worth chasing. Compare the two versions in the log first — a
+client built against an older compiler or live-patch contract is the usual
+cause, and the fix is to ship the matching client, not to change the server.
+A drift rate that rises without a client deploy is the signal that matters.
+
+### The compiler behaviour freeze
+
+<code>npm run test:golden</code> compiles fifteen recorded experiences and
+compares every byte with the committed fixtures. A failure means compiled output
+changed. Re-record only when the change is intended and reviewed:
+
+~~~powershell
+npm run golden:record
+git diff -- tests/golden/expected
+~~~
+
+Re-recording to make a failing test pass destroys the thing being protected.
+Review the diff as a change to what customers' published experiences look like,
+because that is what it is.
+
 ## Verification
 
 ### Fast pre-commit gate
@@ -590,6 +695,7 @@ npm run build
 npm run db:migrate
 npm run lint
 npm run typecheck
+npm run test:golden
 npm run test:unit
 npm run test:integration
 npm run test:security

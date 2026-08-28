@@ -11,6 +11,32 @@ Canonical Experience data is stored independently of Photo Sphere Viewer.
 Preview and publish pass through the same compiler; only the versioned viewer
 integration adapter emits renderer-specific configuration.
 
+The Experience Compiler is a pure, deterministic package rather than a private
+service inside the API, so a browser editor can preview with the same compiler
+that publishes. Publishing always recompiles server-side and remains the only
+authority.
+
+## Repository layout
+
+~~~text
+apps/
+  api/        the HTTP API
+  worker/     the media pipeline worker process
+
+packages/
+  experience-schema/     canonical types, validation, the compiled contract
+  experience-compiler/   pure: CompilerInput -> CompileResult
+  viewer-integration/    versioned adapters: manifest -> renderer config
+  capability-registry/   dependencies, incompatibilities, fallbacks
+  live-patch/            live / recompile / remount classification
+  telemetry-contract/    event names and payload schemas
+~~~
+
+<code>packages/*</code> may not import from <code>apps/*</code>, use a Node
+built-in, read the environment or read a clock. That boundary is enforced by
+project references, lint and a test, not by convention — it is what keeps one
+compiler rather than two.
+
 ## Stack
 
 - Node.js 22 and TypeScript
@@ -179,10 +205,10 @@ server-side when a deployment prefers the decision to be observable centrally.
 | --- | --- |
 | <code>npm run dev</code> | Run the API with TypeScript watch mode. |
 | <code>npm run dev:worker</code> | Run an external worker with TypeScript watch mode. |
-| <code>npm run build</code> | Compile production JavaScript to <code>dist/</code>. |
+| <code>npm run build</code> | Compile every package and app through TypeScript project references. |
 | <code>npm start</code> | Run the compiled API. |
 | <code>npm run worker</code> | Run the compiled external media worker. |
-| <code>npm run db:migrate</code> | Apply migrations from compiled <code>dist/</code>; run <code>npm run build</code> first. |
+| <code>npm run db:migrate</code> | Apply migrations from compiled output; run <code>npm run build</code> first. |
 | <code>npm run db:migrate:undo</code> | Revert the most recent migration from compiled <code>dist/</code>. |
 | <code>npm run db:migrate:dev</code> | Apply migrations directly from TypeScript during development. |
 | <code>npm run db:migrate:undo:dev</code> | Revert the most recent migration directly from TypeScript. |
@@ -192,6 +218,8 @@ server-side when a deployment prefers the decision to be observable centrally.
 | <code>npm run test:unit</code> | Run unit tests. |
 | <code>npm run test:integration</code> | Run API/database integration tests. |
 | <code>npm run test:security</code> | Run security-focused tests. |
+| <code>npm run test:golden</code> | Check compiled output byte for byte against the behaviour freeze. |
+| <code>npm run golden:record</code> | Re-record the behaviour freeze. Only for an intended, reviewed output change. |
 | <code>npm run test:coverage</code> | Run tests with V8 coverage. |
 | <code>npm run test:all</code> | Run lint, typecheck, tests, and build. |
 
@@ -243,6 +271,8 @@ Internal stack traces, database details, and storage keys are not returned.
 - [Sprint 01 execution plan](docs/sprint/sprint-01-backend-foundation-image-mvp.md)
 - [Sprint 02 execution plan](docs/sprint/sprint-02-tours-runtime-capability-resolver.md)
 - [Sprint 03 execution plan](docs/sprint/sprint-03-360-video-timeline-playback.md)
+- [Sprint 04 execution plan](docs/sprint/sprint-04-advanced-spatial-analytics-scale.md)
+- [Sprint 05 execution plan](docs/sprint/sprint-05-compiler-extraction-frontend-enablement.md)
 
 ## Current boundaries
 
@@ -267,6 +297,14 @@ retired or replaced by a private one, the origin denies the old URL. The public
 media cache lifetime is bounded to 60 seconds. Multi-host deployments must
 replace the local provider with shared private object storage behind the
 existing storage interface.
+
+A live authoring session is supported but not shipped here: one bootstrap
+request returns everything an editor needs to draw, scene hotspots have an
+atomic batch route, expiring media URLs refresh without recompiling, and a
+server-sent event channel pushes processing, revision and publication changes.
+The channel is an optimization — every fact it carries is still readable by
+polling, and it can be turned off without losing function. No editor or player
+application code lives in this repository.
 
 The generated <code>/view/:slug</code> direct/embed/QR target belongs to the
 frontend player shell or deployment reverse proxy. This backend exposes the

@@ -1,4 +1,4 @@
-# Backend Schema — Sprints 01–04
+# Backend Schema — Sprints 01–05
 
 This document describes both the renderer-independent canonical Experience
 model and its PostgreSQL persistence representation. API payload details are in
@@ -802,6 +802,95 @@ configuration.
   project/publication-revision-scoped routes whose derivative ID must occur in
   the current public manifest.
 
+## The shared compiler packages
+
+The Experience Compiler is not a private service inside the API. It is a pure,
+deterministic package that the API imports and that a browser application can
+import too, so an editor previews with the same compiler that publishes. There
+is deliberately nowhere to put a second implementation.
+
+| Package | Owns |
+| --- | --- |
+| <code>@sphere/telemetry-contract</code> | Runtime event names, event sets, failure categories and the ingest payload schemas. |
+| <code>@sphere/capability-registry</code> | Capability definitions, dependencies, incompatibilities and fallbacks. |
+| <code>@sphere/experience-schema</code> | Canonical Experience types, validation, sanitization, the runtime policy contract and the compiled manifest contract. |
+| <code>@sphere/viewer-integration</code> | Versioned adapters turning a compiled manifest into renderer configuration. |
+| <code>@sphere/experience-compiler</code> | <code>compile(input)</code>, preflight, derivative selection and the delivery policy. |
+| <code>@sphere/live-patch</code> | The property classification table and its enumerated mutations. |
+
+Dependency boundaries are enforced, not agreed: package projects compile with no
+ambient Node types, and lint forbids <code>packages/*</code> from importing an
+application, a Node built-in, a server runtime, a clock or a random source. A
+test scans the package sources for the same violations.
+
+### Compiler contract
+
+~~~text
+compile(input: CompilerInput): CompileResult
+~~~
+
+<code>CompilerInput</code> carries everything that varies per request, resolved
+by the caller: the canonical experience, asset snapshots, the capability
+registry to resolve against, the delivery and runtime policy, and the versions
+the output must be labelled with. <code>CompileResult</code> carries the
+manifest, the compiled scene definitions, the scene index, the viewer
+integration config, product-language diagnostics, and a deterministic
+<code>contentHash</code>. <code>tryCompile</code> returns the same findings as
+diagnostics rather than throwing.
+
+The compiler does not read a database, filesystem, network or environment; does
+not call <code>Date.now()</code>, <code>Math.random()</code> or generate an id;
+does not produce a signed URL or any credential; and does not mutate its input.
+Compiling the same input twice produces byte-identical output and the same hash.
+
+### Signed URLs stay outside the compiler
+
+The compiler emits **logical derivative references** only — a delivery location
+built from a policy template, with no credential and no expiry. Swapping a
+reference for a signed, expiring URL is a server-only hydration step performed
+after compilation, and it is the same step for a draft preview and for a private
+publication. That is what lets a published manifest be stored immutably,
+recompiled anywhere and compared byte for byte, and it is what makes the
+compiler safe to run in a browser.
+
+### Sanitization stays outside the compiler
+
+Rich content and URLs are sanitized and validated at **write time**, so
+canonical stored data is already safe. The compiler sanitizes again as defence
+in depth, never as the control itself: a browser running the compiler must not
+be able to bypass a security control by not running it.
+
+## Live-patch classification
+
+Every canonical property is classified as <code>live</code>,
+<code>recompile</code> or <code>remount</code>, and the table is versioned as
+<code>livePatchContractVersion</code> and returned by editor bootstrap.
+
+| Class | Meaning | Example |
+| --- | --- | --- |
+| <code>live</code> | Applied directly to a running viewer by an enumerated mutation. | Hotspot position, hotspot colour, tooltip text, auto-rotation speed |
+| <code>recompile</code> | The compiler runs again; the viewer instance is reused. | Adding a scene, enabling a capability, changing view limits |
+| <code>remount</code> | The viewer is destroyed and rebuilt. | Swapping the panorama asset, changing experience type |
+
+Every <code>live</code> property names the mutation that applies it. A property
+that is not classified is <code>recompile</code>. That default is deliberate and
+one-directional: treating a recompile property as live shows a creator a preview
+that lied, while treating a live property as a recompile only costs a round
+trip. Nothing is ever live by default, and a property nested inside a live one
+is not itself live.
+
+**Patch equals recompile.** For every live property, a conformance test compiles
+experience A, applies the enumerated mutation, compiles experience B with the
+same change made canonically, and asserts the two are identical. If a mutation
+and the compiler ever disagree, CI fails rather than a customer seeing a preview
+that lied. The mutations reuse the compiler's own value builders rather than
+restating them, so there is nothing to drift.
+
+The classification is not a guess about cost, it is a statement about
+correctness. Automatic rotation is the worked example: its speed, direction and
+start behaviour are live, but turning it on or off resolves a capability, so the
+switch itself is a recompile — the conformance suite is what established that.
+
 ## Compiler and manifest versioning
 
 The canonical <code>schemaVersion</code>, compiled
@@ -819,7 +908,12 @@ independent:
   behavior used for compilation and telemetry.
 
 Given the same canonical project revision and derivative catalog, compilation is
-deterministic.
+deterministic — byte for byte, on a server or in a browser. A behaviour freeze
+of fifteen recorded experiences guards it: each fixture holds the canonical
+input, the compiled manifest, the viewer integration config, the scene
+definitions and a content hash of each, and CI fails when any byte moves.
+<code>compilerVersion</code> labels the compiler build and is logged beside a
+hash-drift alert.
 
 ## Migrations
 
