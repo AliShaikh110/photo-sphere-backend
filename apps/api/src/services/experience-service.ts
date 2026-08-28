@@ -1,11 +1,15 @@
 import { Op, type Transaction } from 'sequelize';
 import { createMediaToken, createTelemetryToken, verifyMediaToken } from '../auth/tokens';
 import { config } from '../config';
+import { logger } from '../config/logger';
+import { LIVE_PATCH_CONTRACT_VERSION } from '@sphere/live-patch';
 import {
+  COMPILER_VERSION,
   DEFAULT_MEDIA_DELIVERY_POLICY,
   ExperienceCompilationError,
   ExperienceCompiler,
   COMPILED_MANIFEST_VERSION,
+  contentHash,
   createViewerIntegrationAdapter,
   type CompileExperienceInput,
   type CompiledExperienceBundle,
@@ -72,6 +76,7 @@ import {
   resolveEmbedPolicy,
   type EmbedPolicy
 } from './embed-policy-service';
+import { publishProjectEvent } from './project-events-service';
 import { verifyShareToken } from './share-token-service';
 import { resolveViewerIntegrationVersion } from './viewer-integration-service';
 import {
@@ -246,7 +251,13 @@ function mapAsset(asset: Asset): CanonicalAsset {
  * library belongs to. Keeping the two apart is what lets a workspace editor
  * preview and publish a project they do not personally own.
  */
-async function loadExperience(options: {
+/**
+ * Loads a project and its assets in the canonical shape the compiler takes.
+ *
+ * Exported so the editor bootstrap assembles its payload from exactly the same
+ * data publish and preview compile from; a second loader is a second truth.
+ */
+export async function loadCompilableExperience(options: {
   projectId: string;
   actorUserId: string;
   requiredRole: AccessRole;
@@ -347,6 +358,8 @@ async function loadExperience(options: {
   };
   return { project, inputProject, assets: assets.map(mapAsset) };
 }
+
+const loadExperience = loadCompilableExperience;
 
 function assertRevision(project: Project, expectedRevision: number): void {
   if (project.revision !== expectedRevision) {
@@ -495,6 +508,45 @@ function pinnedExtensions(bundle: CompiledExperienceBundle): JsonObject {
   return { ...(bundle.manifest.pinnedExtensions as unknown as JsonObject) };
 }
 
+/**
+ * Compares a client's locally computed content hash with the server's.
+ *
+ * The client's value is advisory and nothing else: publish always recompiles
+ * server-side and stores its own result. A disagreement means a browser
+ * compiled something different from what was published, which is a bug worth
+ * an operational alert — but never a reason to publish the client's answer, or
+ * to fail a publish that is otherwise correct.
+ */
+function recordAdvisoryHash(options: {
+  projectId: string;
+  projectRevision: number;
+  experienceType: string;
+  viewerIntegrationVersion: string;
+  bundle: CompiledExperienceBundle;
+  clientContentHash?: string;
+}): void {
+  if (options.clientContentHash === undefined) return;
+  const serverContentHash = contentHash({
+    manifest: options.bundle.manifest,
+    sceneDefinitions: options.bundle.sceneDefinitions,
+    sceneIndex: options.bundle.sceneIndex ?? []
+  });
+  if (serverContentHash === options.clientContentHash) return;
+  incrementMetric('publish.hash_drift', { experienceType: options.experienceType });
+  logger.warn(
+    {
+      projectId: options.projectId,
+      projectRevision: options.projectRevision,
+      compilerVersion: COMPILER_VERSION,
+      livePatchContractVersion: LIVE_PATCH_CONTRACT_VERSION,
+      viewerIntegrationVersion: options.viewerIntegrationVersion,
+      serverContentHash,
+      clientContentHash: options.clientContentHash
+    },
+    'client-computed content hash disagreed with the server; the server result was published'
+  );
+}
+
 export async function publishExperience(options: {
   projectId: string;
   ownerId: string;
@@ -502,6 +554,8 @@ export async function publishExperience(options: {
   slug: string;
   visibility: PublicationVisibility;
   embedPolicy?: unknown;
+  /** Advisory only: used to detect drift, never to decide what is published. */
+  clientContentHash?: string;
   idempotencyRecord?: IdempotencyRecord;
 }): Promise<Record<string, unknown>> {
   const publishStartedAt = Date.now();
@@ -541,6 +595,16 @@ export async function publishExperience(options: {
           target: 'publication'
         });
         assertPublishBudget(bundle, loaded.project.type);
+        recordAdvisoryHash({
+          projectId: options.projectId,
+          projectRevision: loaded.project.revision,
+          experienceType: loaded.project.type,
+          viewerIntegrationVersion,
+          bundle,
+          ...(options.clientContentHash === undefined
+            ? {}
+            : { clientContentHash: options.clientContentHash })
+        });
       } catch (error) {
         const compilation = error instanceof ExperienceCompilationError ? error : undefined;
         // A budget rejection is also a publish failure: it must leave a
@@ -608,6 +672,18 @@ export async function publishExperience(options: {
             transaction
           });
         }
+        transaction.afterCommit(() => {
+          publishProjectEvent({
+            type: 'publication.failed',
+            projectId: options.projectId,
+            actorUserId: options.ownerId,
+            data: {
+              publicationId: failedPublication.id,
+              publicationRevision,
+              errorCode: publishError.code
+            }
+          });
+        });
         return { compilationError: publishError };
       }
       const manifest = bundle.manifest;
@@ -693,6 +769,19 @@ export async function publishExperience(options: {
         experienceType: loaded.project.type,
         visibility: options.visibility,
         viewerIntegrationVersion: manifest.viewerIntegrationVersion
+      });
+      transaction.afterCommit(() => {
+        publishProjectEvent({
+          type: 'publication.completed',
+          projectId: options.projectId,
+          actorUserId: options.ownerId,
+          data: {
+            publicationId: publication.id,
+            publicationRevision,
+            slug: options.slug,
+            visibility: options.visibility
+          }
+        });
       });
       const result = {
         publication: serializePublication(publication),

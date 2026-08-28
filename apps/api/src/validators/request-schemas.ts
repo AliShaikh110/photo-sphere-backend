@@ -788,6 +788,45 @@ export const embedPolicySchema = z
 
 export const updateEmbedPolicySchema = z.object({ embedPolicy: embedPolicySchema }).strict();
 
+/**
+ * One change applied to many hotspots in a scene.
+ *
+ * The shape mirrors the single-hotspot patch, so a client that can build one
+ * update can build a batch without learning a second vocabulary.
+ */
+export const bulkUpdateHotspotsSchema = z
+  .object({
+    projectRevision: databaseRevision,
+    hotspots: z
+      .array(
+        z
+          .object({
+            id,
+            geometry: interactionGeometrySchema.optional(),
+            position: pointPositionSchema.optional(),
+            appearance: hotspotAppearanceSchema.optional(),
+            content: hotspotContentSchema.optional(),
+            action: hotspotActionSchema.optional(),
+            visibilityRules: visibilityRulesSchema.optional()
+          })
+          .strict()
+      )
+      .min(1)
+      .max(500)
+  })
+  .strict()
+  .refine(
+    (value) => new Set(value.hotspots.map((entry) => entry.id)).size === value.hotspots.length,
+    { path: ['hotspots'], message: 'Hotspot IDs must not repeat in one update.' }
+  );
+
+/** Reissues expiring media URLs the caller is already authorized to read. */
+export const mediaTokenRefreshSchema = z
+  .object({
+    derivativeIds: z.array(id).min(1).max(500)
+  })
+  .strict();
+
 export const publishSchema = z
   .object({
     revision: databaseRevision,
@@ -798,7 +837,13 @@ export const publishSchema = z
       .max(100)
       .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
     visibility: z.enum(['public', 'private']),
-    embedPolicy: embedPolicySchema.optional()
+    embedPolicy: embedPolicySchema.optional(),
+    /**
+     * A content hash the client computed locally. Advisory only: publish always
+     * recompiles server-side and stores its own result. A mismatch is logged as
+     * an operational alert and changes nothing about what is published.
+     */
+    contentHash: z.string().trim().regex(/^[0-9a-f]{64}$/).optional()
   })
   .strict();
 

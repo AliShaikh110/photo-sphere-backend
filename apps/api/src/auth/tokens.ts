@@ -120,3 +120,67 @@ export function verifyTelemetryToken(token: string): TelemetryTokenPayload {
   }
   return decoded as TelemetryTokenPayload;
 }
+
+export type EditorSessionRole = 'viewer' | 'editor' | 'admin' | 'owner';
+
+export type EditorSessionTokenPayload = {
+  tokenType: 'editor-session';
+  projectId: string;
+  userId: string;
+  role: EditorSessionRole;
+};
+
+/**
+ * A short-lived credential scoped to one project, for the three paths a
+ * browser must reach directly: media, the event stream and telemetry.
+ *
+ * The creator's bearer token is never handed to browser JavaScript. This
+ * mirrors the pattern already used for playback, where a signed media URL —
+ * not a bearer token — is the capability the player holds. It grants nothing
+ * the caller could not already do, and it expires quickly.
+ */
+export function createEditorSessionToken(options: {
+  projectId: string;
+  userId: string;
+  role: EditorSessionRole;
+}): string {
+  const payload: EditorSessionTokenPayload = {
+    tokenType: 'editor-session',
+    projectId: options.projectId,
+    userId: options.userId,
+    role: options.role
+  };
+  return jwt.sign(payload, config.jwtSecret, {
+    expiresIn: config.editorSessionTtlSeconds,
+    algorithm: 'HS256',
+    issuer: 'sphere-backend',
+    audience: 'sphere-editor'
+  });
+}
+
+export function verifyEditorSessionToken(token: string): EditorSessionTokenPayload {
+  let decoded: string | jwt.JwtPayload;
+  try {
+    decoded = jwt.verify(token, config.jwtSecret, {
+      algorithms: ['HS256'],
+      issuer: 'sphere-backend',
+      audience: 'sphere-editor'
+    });
+  } catch {
+    throw new AppError('EDITOR_SESSION_INVALID', 'The editing session is invalid or expired.', {
+      status: 401
+    });
+  }
+  if (
+    typeof decoded === 'string'
+    || decoded.tokenType !== 'editor-session'
+    || typeof decoded.projectId !== 'string'
+    || typeof decoded.userId !== 'string'
+    || typeof decoded.role !== 'string'
+  ) {
+    throw new AppError('EDITOR_SESSION_INVALID', 'The editing session is invalid or expired.', {
+      status: 401
+    });
+  }
+  return decoded as EditorSessionTokenPayload;
+}

@@ -22,6 +22,7 @@ import {
   type GeometryInput
 } from './overlay-service';
 import { planPayload } from './plan-service';
+import { publishProjectEvent } from './project-events-service';
 import { timelineInteractionPayload } from './timeline-service';
 import {
   sanitizeBranding,
@@ -96,6 +97,8 @@ export async function bumpProjectRevision(options: {
   projectId: string;
   expectedRevision: number;
   transaction: Transaction;
+  /** Carried on the pushed event so a client can ignore its own writes. */
+  actorUserId?: string;
 }): Promise<number> {
   const nextRevision = options.expectedRevision + 1;
   const [affected] = await Project.update(
@@ -111,6 +114,17 @@ export async function bumpProjectRevision(options: {
   if (affected !== 1) {
     await revisionFailure(options.projectId, options.expectedRevision);
   }
+  // Every mutation funnels through here, so this is the one place a revision
+  // change can be announced. It fires after commit: a client must never be
+  // told about a change that then rolled back.
+  options.transaction.afterCommit(() => {
+    publishProjectEvent({
+      type: 'project.revision.changed',
+      projectId: options.projectId,
+      ...(options.actorUserId === undefined ? {} : { actorUserId: options.actorUserId }),
+      data: { revision: nextRevision, previousRevision: options.expectedRevision }
+    });
+  });
   return nextRevision;
 }
 
@@ -493,7 +507,7 @@ async function assertVideoAsset(
 }
 
 async function validateHotspotAssetReferences(
-  input: HotspotInput,
+  input: HotspotFields,
   projectId: string,
   ownerId: string,
   transaction: Transaction
@@ -798,7 +812,8 @@ export async function createScene(
     const revision = await bumpProjectRevision({
       projectId,
       expectedRevision: input.projectRevision,
-      transaction
+      transaction,
+      actorUserId: ownerId
     });
     const scene = await Scene.create(
       {
@@ -836,7 +851,8 @@ export async function updateScene(
     const revision = await bumpProjectRevision({
       projectId,
       expectedRevision: input.projectRevision,
-      transaction
+      transaction,
+      actorUserId: ownerId
     });
     await scene.update(
       {
@@ -899,7 +915,8 @@ export async function reorderScenes(
     const revision = await bumpProjectRevision({
       projectId,
       expectedRevision: input.projectRevision,
-      transaction
+      transaction,
+      actorUserId: ownerId
     });
     await normalizeSceneRows(orderedScenes as Scene[], transaction);
     const hydrated = await Scene.findAll({
@@ -1007,7 +1024,8 @@ export async function deleteScene(
     const revision = await bumpProjectRevision({
       projectId,
       expectedRevision: projectRevision,
-      transaction
+      transaction,
+      actorUserId: ownerId
     });
     await scene.destroy({ transaction });
     await normalizeSceneRows(scenes, transaction);
@@ -1039,8 +1057,7 @@ async function validateHotspotAction(
   return sanitized;
 }
 
-type HotspotInput = {
-  projectRevision: number;
+type HotspotFields = {
   geometry?: Record<string, unknown>;
   position?: Record<string, unknown>;
   appearance?: Record<string, unknown>;
@@ -1048,6 +1065,8 @@ type HotspotInput = {
   action?: Record<string, unknown>;
   visibilityRules?: Record<string, unknown>;
 };
+
+type HotspotInput = HotspotFields & { projectRevision: number };
 
 export async function createHotspot(
   projectId: string,
@@ -1075,7 +1094,8 @@ export async function createHotspot(
     const revision = await bumpProjectRevision({
       projectId,
       expectedRevision: input.projectRevision,
-      transaction
+      transaction,
+      actorUserId: ownerId
     });
     const maxSort = Number((await Hotspot.max('sortOrder', { where: { sceneId }, transaction })) ?? -1);
     const hotspot = await Hotspot.create(
@@ -1129,7 +1149,8 @@ export async function updateHotspot(
     const revision = await bumpProjectRevision({
       projectId,
       expectedRevision: input.projectRevision,
-      transaction
+      transaction,
+      actorUserId: ownerId
     });
     await hotspot.update(
       {
@@ -1198,9 +1219,112 @@ export async function deleteHotspot(
     const revision = await bumpProjectRevision({
       projectId,
       expectedRevision: projectRevision,
-      transaction
+      transaction,
+      actorUserId: ownerId
     });
     await hotspot.destroy({ transaction });
     return { deleted: true, hotspotId, projectRevision: revision };
+  });
+}
+
+/**
+ * Applies one change to many hotspots in a single scene, atomically.
+ *
+ * A multi-select drag is one edit to a creator. Firing one request per hotspot
+ * against a revision counter that moves each time either loses writes or makes
+ * the interaction impossible to offer, so the whole batch is validated before
+ * anything is written, and the revision moves once.
+ */
+export async function bulkUpdateHotspots(
+  projectId: string,
+  sceneId: string,
+  ownerId: string,
+  input: {
+    projectRevision: number;
+    hotspots: (HotspotFields & { id: string })[];
+  }
+): Promise<Record<string, unknown>> {
+  return sequelize.transaction(async (transaction) => {
+    const project = await getAccessibleProject(projectId, ownerId, 'editor', transaction);
+    const scene = await Scene.findOne({ where: { id: sceneId, projectId }, transaction });
+    if (!scene) throw notFound('scene', sceneId);
+
+    const rows = await Hotspot.findAll({
+      where: { sceneId, id: { [Op.in]: input.hotspots.map((entry) => entry.id) } },
+      order: [['sortOrder', 'ASC'], ['id', 'ASC']],
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    const rowsById = new Map(rows.map((row) => [row.id, row]));
+
+    // Every entry is validated before any row is written: a rejected batch
+    // must leave the scene and the project revision exactly as they were.
+    const prepared: {
+      row: Hotspot;
+      values: Record<string, unknown>;
+    }[] = [];
+    for (const entry of input.hotspots) {
+      const row = rowsById.get(entry.id);
+      if (!row) throw notFound('hotspot', entry.id);
+      const action = await validateHotspotAction(
+        entry.action,
+        projectId,
+        project.ownerId,
+        transaction
+      );
+      await validateHotspotAssetReferences(entry, projectId, project.ownerId, transaction);
+      const geometry = entry.geometry === undefined
+        ? undefined
+        : await sanitizeInteractionGeometry(entry.geometry as GeometryInput, {
+          projectId,
+          ownerId: project.ownerId,
+          experienceType: project.type,
+          transaction,
+          allowPoint: true
+        });
+      prepared.push({
+        row,
+        values: {
+          ...(geometry === undefined
+            ? {}
+            : {
+              geometryKind: geometry.kind,
+              geometry: geometry.geometry,
+              extensionId: geometry.extensionId,
+              extensionVersion: geometry.extensionVersion
+            }),
+          ...(entry.position === undefined ? {} : { position: entry.position as JsonObject }),
+          ...(entry.appearance === undefined
+            ? {}
+            : { appearance: sanitizeHotspotAppearance(entry.appearance) }),
+          ...(entry.content === undefined
+            ? {}
+            : { content: sanitizeHotspotContent(entry.content) }),
+          ...(action === undefined ? {} : { action }),
+          ...(entry.visibilityRules === undefined
+            ? {}
+            : { visibilityRules: entry.visibilityRules as JsonObject })
+        }
+      });
+    }
+
+    const revision = await bumpProjectRevision({
+      projectId,
+      expectedRevision: input.projectRevision,
+      transaction,
+      actorUserId: ownerId
+    });
+    for (const { row, values } of prepared) {
+      await row.update(values, { transaction });
+    }
+    const hotspots = await Hotspot.findAll({
+      where: { sceneId },
+      order: [['sortOrder', 'ASC'], ['id', 'ASC']],
+      transaction
+    });
+    return {
+      hotspots: hotspots.map(hotspotPayload),
+      projectRevision: revision
+    };
   });
 }

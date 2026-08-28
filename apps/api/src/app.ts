@@ -11,6 +11,7 @@ import { REQUIRED_MIGRATION_NAME } from './database/migrate';
 import { AppError } from './errors/app-error';
 import { errorHandler, routeNotFound } from './middlewares/error-handler';
 import { requestContext } from './middlewares/request-context';
+import { browserDirectGroup, isOriginAllowed } from './security/browser-direct-policy';
 import { assetRouter } from './routes/asset-routes';
 import { authRouter } from './routes/auth-routes';
 import { extensionRouter, platformRouter } from './routes/platform-routes';
@@ -40,23 +41,36 @@ export function createApp(): Express {
       }
     })
   );
+  // Cross-origin access is decided per route group. Authoring is normally
+  // called server to server; media, the event stream and telemetry are the
+  // three paths a browser must reach directly, and each has its own allowlist
+  // so widening one does not widen the others. No group uses credentialled
+  // CORS: every browser-direct call carries an explicit, narrow token.
   app.use(
-    cors({
-      origin(origin, callback) {
-        if (!origin || config.corsOrigins.includes(origin)) callback(null, true);
-        else callback(new AppError('CORS_ORIGIN_DENIED', 'This origin is not allowed.', { status: 403 }));
-      },
-      credentials: false,
-      allowedHeaders: [
-        'Authorization',
-        'Content-Type',
-        'Idempotency-Key',
-        'X-Request-ID',
-        'X-Share-Token',
-        'X-Telemetry-Token'
-      ],
-      exposedHeaders: ['X-Request-ID', 'Idempotency-Replayed'],
-      methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS']
+    cors((request: Request, callback) => {
+      const group = browserDirectGroup(request.path);
+      callback(null, {
+        origin(origin: string | undefined, originCallback: (error: Error | null, allow?: boolean) => void) {
+          if (isOriginAllowed(group, origin)) originCallback(null, true);
+          else {
+            originCallback(
+              new AppError('CORS_ORIGIN_DENIED', 'This origin is not allowed.', { status: 403 })
+            );
+          }
+        },
+        credentials: false,
+        allowedHeaders: [
+          'Authorization',
+          'Content-Type',
+          'Idempotency-Key',
+          'Last-Event-ID',
+          'X-Request-ID',
+          'X-Share-Token',
+          'X-Telemetry-Token'
+        ],
+        exposedHeaders: ['X-Request-ID', 'Idempotency-Replayed'],
+        methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS']
+      });
     })
   );
   app.use(

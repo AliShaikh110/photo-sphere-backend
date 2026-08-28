@@ -81,6 +81,9 @@ export async function publish(request: Request, response: Response): Promise<voi
       ...(request.body.embedPolicy === undefined
         ? {}
         : { embedPolicy: request.body.embedPolicy as unknown }),
+      ...(request.body.contentHash === undefined
+        ? {}
+        : { clientContentHash: request.body.contentHash as string }),
       idempotencyRecord
     })
   });

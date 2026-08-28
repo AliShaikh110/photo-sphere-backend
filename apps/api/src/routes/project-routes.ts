@@ -63,10 +63,16 @@ import {
   readTimeline,
   removeInteraction
 } from '../controllers/timeline-controller';
+import {
+  bootstrap as editorBootstrapHandler,
+  events as projectEvents,
+  patchHotspots
+} from '../controllers/editor-controller';
 import { requireAuth } from '../middlewares/auth';
 import { validate } from '../middlewares/validate';
 import { asyncHandler } from '../utils/async-handler';
 import {
+  bulkUpdateHotspotsSchema,
   bulkUpdateTimelineSchema,
   createHotspotSchema,
   createOverlaySchema,
@@ -99,7 +105,23 @@ import {
 
 export const projectRouter = Router();
 
+/**
+ * The event stream authenticates itself: a browser `EventSource` cannot send an
+ * Authorization header, so it carries a short-lived project-scoped session
+ * token instead. It is registered before the bearer guard for that reason.
+ */
+projectRouter.get(
+  '/:projectId/events',
+  validate('params', projectIdParams),
+  asyncHandler(projectEvents)
+);
+
 projectRouter.use(requireAuth);
+projectRouter.get(
+  '/:projectId/editor-bootstrap',
+  validate('params', projectIdParams),
+  asyncHandler(editorBootstrapHandler)
+);
 projectRouter.get('/', asyncHandler(list));
 projectRouter.post('/', validate('body', createProjectSchema), asyncHandler(create));
 projectRouter.get('/:projectId', validate('params', projectIdParams), asyncHandler(read));
@@ -196,6 +218,12 @@ projectRouter.delete(
   asyncHandler(removeInteraction)
 );
 
+projectRouter.patch(
+  '/:projectId/scenes/:sceneId/hotspots',
+  validate('params', sceneParams),
+  validate('body', bulkUpdateHotspotsSchema),
+  asyncHandler(patchHotspots)
+);
 projectRouter.post(
   '/:projectId/scenes/:sceneId/hotspots',
   validate('params', sceneParams),

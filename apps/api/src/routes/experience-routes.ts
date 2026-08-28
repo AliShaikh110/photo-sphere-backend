@@ -10,11 +10,13 @@ import {
   publishedSceneIndex,
   revisionedPublishedScene
 } from '../controllers/experience-controller';
-import { optionalAuth } from '../middlewares/auth';
+import { refreshMediaTokens } from '../controllers/editor-controller';
+import { optionalAuth, requireAuth } from '../middlewares/auth';
 import { validate } from '../middlewares/validate';
 import { asyncHandler } from '../utils/async-handler';
 import {
   derivativeParams,
+  mediaTokenRefreshSchema,
   mediaTileParams,
   publicationMediaParams,
   publicationMediaTileParams,
@@ -52,6 +54,16 @@ viewRouter.get(
   optionalAuth,
   validate('params', publishedSceneParams),
   asyncHandler(publishedScene)
+);
+/**
+ * Reissues expiring media URLs. Registered before the derivative routes so
+ * "tokens" is never read as a derivative id.
+ */
+mediaRouter.post(
+  '/tokens',
+  requireAuth,
+  validate('body', mediaTokenRefreshSchema),
+  asyncHandler(refreshMediaTokens)
 );
 mediaRouter.get(
   '/:derivativeId/tiles/:level/:x/:y',

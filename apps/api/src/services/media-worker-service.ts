@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { col, Op, where } from 'sequelize';
+import { col, Op, where, type Transaction } from 'sequelize';
 import { config } from '../config';
 import { logger } from '../config/logger';
 import { sequelize } from '../database';
@@ -39,6 +39,7 @@ import type {
 } from '../models/model.types';
 import { incrementMetric, observeMetric } from '../observability';
 import { sha256 } from '../utils/hash';
+import { publishProjectEvent } from './project-events-service';
 import { drainStorageDeletionJobs } from './storage-deletion-service';
 
 async function claimJob(): Promise<MediaJob | null> {
@@ -139,6 +140,44 @@ async function updateLeasedJob(job: MediaJob, values: LeasedJobValues): Promise<
   if (updated !== 1) throw new Error('The media job lease was lost.');
 }
 
+/**
+ * Pushes processing progress to anyone watching the project.
+ *
+ * The asset route still reports the same progress, so a client that cannot
+ * hold a stream open loses only the immediacy.
+ */
+function publishAssetProgress(
+  asset: Asset,
+  job: MediaJob,
+  stage: MediaJobStageName | string,
+  progress: number
+): void {
+  if (asset.projectId === null) return;
+  publishProjectEvent({
+    type: 'asset.processing.progress',
+    projectId: asset.projectId,
+    data: { assetId: asset.id, jobId: job.id, stage, progress }
+  });
+}
+
+/**
+ * Announces a finished asset once the transaction that made it ready commits.
+ *
+ * A client must never be told an asset is ready and then find it is not,
+ * which is what a pre-commit announcement risks on a rollback.
+ */
+function publishAssetReady(asset: Asset, transaction: Transaction): void {
+  const projectId = asset.projectId;
+  if (projectId === null) return;
+  transaction.afterCommit(() => {
+    publishProjectEvent({
+      type: 'asset.ready',
+      projectId,
+      data: { assetId: asset.id, mediaType: asset.mediaType }
+    });
+  });
+}
+
 async function setAssetStatus(
   asset: Asset,
   next: AssetProcessingStatus,
@@ -146,6 +185,26 @@ async function setAssetStatus(
 ): Promise<void> {
   assertAssetProcessingTransition(asset.processingStatus, next);
   await asset.update({ processingStatus: next, processingError });
+  // Pushing the transition saves an editor from polling for it. The polling
+  // route stays the source of truth, so nothing here is load-bearing.
+  if (asset.projectId === null) return;
+  if (next === 'ready') {
+    publishProjectEvent({
+      type: 'asset.ready',
+      projectId: asset.projectId,
+      data: { assetId: asset.id, mediaType: asset.mediaType }
+    });
+  } else if (next === 'failed') {
+    publishProjectEvent({
+      type: 'asset.failed',
+      projectId: asset.projectId,
+      data: {
+        assetId: asset.id,
+        mediaType: asset.mediaType,
+        ...(processingError === null ? {} : { processingError })
+      }
+    });
+  }
 }
 
 function failureCategory(error: unknown): AssetProcessingFailureCategory {
@@ -245,6 +304,22 @@ async function persistFailure(asset: Asset, job: MediaJob, error: unknown): Prom
         lockedAt: null,
         leaseToken: null
       }, { transaction });
+      // Only a terminal failure is announced. A retryable one puts the asset
+      // back into processing, and telling an editor it failed would be wrong.
+      const projectId = lockedAsset.projectId;
+      if (projectId !== null) {
+        transaction.afterCommit(() => {
+          publishProjectEvent({
+            type: 'asset.failed',
+            projectId,
+            data: {
+              assetId: lockedAsset.id,
+              mediaType: lockedAsset.mediaType,
+              processingError: failureJson
+            }
+          });
+        });
+      }
     }
   });
 }
@@ -475,6 +550,8 @@ async function processImageAsset(
       await setAssetStatus(asset, 'inspecting');
     }
     await updateLeasedJob(job, { stage: 'inspection', progress: 10, lockedAt: new Date() });
+  publishAssetProgress(asset, job, 'inspection', 10);
+    publishAssetProgress(asset, job, 'inspection', 10);
     const source = await storage.get(asset.sourceStorageKey);
     const { validated, inspection } = await runImageStage(
       job,
@@ -496,6 +573,8 @@ async function processImageAsset(
           maxPixels: config.maxImagePixels
         });
         await updateLeasedJob(job, { lockedAt: new Date(), progress: 25 });
+  publishAssetProgress(asset, job, 'inspection', 25);
+        publishAssetProgress(asset, job, 'inspection', 25);
         await asset.update({
           projection: inspected.projection,
           metadata: {
@@ -519,6 +598,8 @@ async function processImageAsset(
       await setAssetStatus(asset, 'processing');
     }
     await updateLeasedJob(job, { stage: 'processing', progress: 35, lockedAt: new Date() });
+  publishAssetProgress(asset, job, 'processing', 35);
+    publishAssetProgress(asset, job, 'processing', 35);
     const derivativeOptions = {
       assetId: asset.id,
       version: job.derivativeVersion,
@@ -587,6 +668,7 @@ async function processImageAsset(
         lockedAt: null,
         leaseToken: null
       }, { transaction });
+      publishAssetReady(lockedAsset, transaction);
     }));
   }
 }
@@ -657,6 +739,7 @@ async function processVideoAsset(
     await setAssetStatus(asset, 'inspecting');
   }
   await updateLeasedJob(job, { stage: 'inspection', progress: 10, lockedAt: new Date() });
+  publishAssetProgress(asset, job, 'inspection', 10);
   await recordStage(job, asset.id, 'inspect', { status: 'running', startedAt: new Date() });
 
   const source = await storage.get(asset.sourceStorageKey);
@@ -685,6 +768,7 @@ async function processVideoAsset(
   });
 
   await updateLeasedJob(job, { lockedAt: new Date(), progress: 25 });
+  publishAssetProgress(asset, job, 'inspection', 25);
   await asset.update({
     projection: inspection.projection === 'cubemap'
       ? 'cubemap'
@@ -695,6 +779,7 @@ async function processVideoAsset(
     await setAssetStatus(asset, 'processing');
   }
   await updateLeasedJob(job, { stage: 'processing', progress: 35, lockedAt: new Date() });
+  publishAssetProgress(asset, job, 'processing', 35);
 
   // A retried attempt must not re-encode a derivative that is already stored:
   // re-encoding is not byte-deterministic and would collide with the immutable
@@ -834,6 +919,7 @@ async function processVideoAsset(
       lockedAt: null,
       leaseToken: null
     }, { transaction });
+    publishAssetReady(lockedAsset, transaction);
   });
   await recordStage(job, asset.id, 'finalize', {
     status: 'succeeded',

@@ -15,6 +15,7 @@ import {
   setViewerIntegrationRollout,
   viewerIntegrationCatalog
 } from '../services/viewer-integration-service';
+import { browserDirectPolicy } from '../security/browser-direct-policy';
 import { sendData } from '../utils/http-response';
 import {
   viewerIntegrationCheckQuerySchema,
@@ -52,6 +53,20 @@ export async function capabilities(_request: Request, response: Response): Promi
       liveSource: isLiveSourceEnabled() ? 'enabled' : 'unavailable'
     }
   });
+}
+
+/**
+ * The browser-direct access policy, as configured in this deployment.
+ *
+ * Operators need to see which origins may reach media, the event stream and
+ * telemetry without reading the source, because getting one of those wrong is
+ * how an experience becomes embeddable somewhere it should not be.
+ */
+export async function browserAccessPolicy(
+  _request: Request,
+  response: Response
+): Promise<void> {
+  sendData(response, browserDirectPolicy());
 }
 
 export async function viewerIntegrations(_request: Request, response: Response): Promise<void> {

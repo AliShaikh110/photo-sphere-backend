@@ -255,7 +255,8 @@ export async function createOverlay(
     const revision = await bumpProjectRevision({
       projectId,
       expectedRevision: input.projectRevision,
-      transaction
+      transaction,
+      actorUserId: userId
     });
     const maxSort = Number((await Overlay.max('sortOrder', { where: { sceneId }, transaction })) ?? -1);
     const overlay = await Overlay.create(
@@ -305,7 +306,8 @@ export async function updateOverlay(
     const revision = await bumpProjectRevision({
       projectId,
       expectedRevision: input.projectRevision,
-      transaction
+      transaction,
+      actorUserId: userId
     });
     await overlay.update(
       {
@@ -355,7 +357,8 @@ export async function deleteOverlay(
     const revision = await bumpProjectRevision({
       projectId,
       expectedRevision: projectRevision,
-      transaction
+      transaction,
+      actorUserId: userId
     });
     await overlay.destroy({ transaction });
     return { deleted: true, overlayId, projectRevision: revision };

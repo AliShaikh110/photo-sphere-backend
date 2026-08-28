@@ -7,6 +7,7 @@ import {
   register as registerExtensionHandler
 } from '../controllers/extension-controller';
 import {
+  browserAccessPolicy,
   capabilities,
   listChecks,
   metrics,
@@ -45,6 +46,7 @@ export const platformRouter = Router();
 
 platformRouter.use(requireAuth);
 platformRouter.get('/capabilities', asyncHandler(capabilities));
+platformRouter.get('/browser-access-policy', asyncHandler(browserAccessPolicy));
 platformRouter.get('/viewer-integrations', asyncHandler(viewerIntegrations));
 platformRouter.get('/reference-suite', asyncHandler(referenceSuite));
 platformRouter.get('/viewer-integrations/checks', requirePlatformAdmin, asyncHandler(listChecks));

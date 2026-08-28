@@ -413,7 +413,8 @@ export async function createTimelineInteraction(
     const revision = await bumpProjectRevision({
       projectId,
       expectedRevision: input.projectRevision,
-      transaction
+      transaction,
+      actorUserId: userId
     });
     const interaction = await TimelineInteraction.create(
       {
@@ -463,7 +464,8 @@ export async function updateTimelineInteraction(
     const revision = await bumpProjectRevision({
       projectId,
       expectedRevision: input.projectRevision,
-      transaction
+      transaction,
+      actorUserId: userId
     });
     await interaction.update(normalized, { transaction });
     return {
@@ -496,7 +498,8 @@ export async function duplicateTimelineInteraction(
     const revision = await bumpProjectRevision({
       projectId,
       expectedRevision: input.projectRevision,
-      transaction
+      transaction,
+      actorUserId: userId
     });
     // A duplicate is a new entity: it always receives a fresh stable ID.
     const duplicate = await TimelineInteraction.create(
@@ -541,7 +544,8 @@ export async function deleteTimelineInteraction(
     const revision = await bumpProjectRevision({
       projectId,
       expectedRevision: projectRevision,
-      transaction
+      transaction,
+      actorUserId: userId
     });
     await interaction.destroy({ transaction });
     return { deleted: true, interactionId, projectRevision: revision };
@@ -585,7 +589,8 @@ export async function bulkUpdateTimeline(
     const revision = await bumpProjectRevision({
       projectId,
       expectedRevision: input.projectRevision,
-      transaction
+      transaction,
+      actorUserId: userId
     });
     for (const entry of input.interactions) {
       const row = rowsById.get(entry.id)!;

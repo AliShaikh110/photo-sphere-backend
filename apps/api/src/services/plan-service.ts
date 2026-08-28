@@ -90,7 +90,8 @@ export async function createPlan(
     const revision = await bumpProjectRevision({
       projectId,
       expectedRevision: input.projectRevision,
-      transaction
+      transaction,
+      actorUserId: userId
     });
     const existing = await Plan.count({ where: { projectId }, transaction });
     const plan = await Plan.create(
@@ -122,7 +123,8 @@ export async function updatePlan(
     const revision = await bumpProjectRevision({
       projectId,
       expectedRevision: input.projectRevision,
-      transaction
+      transaction,
+      actorUserId: userId
     });
     await plan.update(
       {
@@ -172,7 +174,8 @@ export async function deletePlan(
     const revision = await bumpProjectRevision({
       projectId,
       expectedRevision: projectRevision,
-      transaction
+      transaction,
+      actorUserId: userId
     });
     await plan.destroy({ transaction });
     const remaining = await Plan.findAll({
@@ -214,7 +217,8 @@ export async function reorderPlans(
     const revision = await bumpProjectRevision({
       projectId,
       expectedRevision: input.projectRevision,
-      transaction
+      transaction,
+      actorUserId: userId
     });
     for (const [sortOrder, planId] of input.planIds.entries()) {
       const plan = planById.get(planId)!;

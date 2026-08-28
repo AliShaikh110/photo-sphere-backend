@@ -32,6 +32,21 @@ const envSchema = z
     JWT_EXPIRES_IN: z.string().min(1).default('1h'),
     PUBLIC_BASE_URL: z.url().default('http://localhost:4000'),
     CORS_ORIGINS: z.string().default('http://localhost:3000'),
+    // Browser-direct access policy. Each group defaults to CORS_ORIGINS, so a
+    // deployment that does not split its front ends behaves exactly as before.
+    EDITOR_ORIGINS: z.string().optional(),
+    PLAYER_ORIGINS: z.string().optional(),
+    EMBED_ORIGINS: z.string().default(''),
+    EDITOR_SESSION_TTL_SECONDS: z.coerce.number().int().positive().default(900),
+    EVENT_STREAM_ENABLED: z
+      .enum(['true', 'false'])
+      .default('true')
+      .transform((value) => value === 'true'),
+    EVENT_STREAM_HEARTBEAT_MS: z.coerce.number().int().positive().default(20_000),
+    EVENT_STREAM_MAX_PER_PROJECT: z.coerce.number().int().positive().default(20),
+    EVENT_STREAM_MAX_PER_USER: z.coerce.number().int().positive().default(8),
+    EVENT_STREAM_REPLAY_BUFFER: z.coerce.number().int().positive().max(1_000).default(200),
+    MEDIA_TOKEN_REFRESH_MAX: z.coerce.number().int().positive().max(500).default(200),
     STORAGE_ROOT: z.string().default('./storage'),
     MAX_IMAGE_UPLOAD_BYTES: z.coerce.number().int().positive().default(50 * 1024 * 1024),
     MAX_IMAGE_PIXELS: z.coerce.number().int().positive().default(80_000_000),
@@ -126,6 +141,18 @@ export type AppConfig = {
   jwtExpiresIn: string;
   publicBaseUrl: string;
   corsOrigins: string[];
+  editorOrigins: string[];
+  playerOrigins: string[];
+  embedOrigins: string[];
+  editorSessionTtlSeconds: number;
+  eventStream: {
+    enabled: boolean;
+    heartbeatMs: number;
+    maxConnectionsPerProject: number;
+    maxConnectionsPerUser: number;
+    replayBufferSize: number;
+  };
+  mediaTokenRefreshMax: number;
   storageRoot: string;
   maxImageUploadBytes: number;
   maxImagePixels: number;
@@ -164,6 +191,10 @@ export type AppConfig = {
   };
 };
 
+function originList(value: string): string[] {
+  return value.split(',').map((origin) => origin.trim()).filter(Boolean);
+}
+
 export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppConfig {
   const value = envSchema.parse(environment);
   return {
@@ -181,7 +212,19 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
     jwtSecret: value.JWT_SECRET,
     jwtExpiresIn: value.JWT_EXPIRES_IN,
     publicBaseUrl: value.PUBLIC_BASE_URL.replace(/\/$/, ''),
-    corsOrigins: value.CORS_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean),
+    corsOrigins: originList(value.CORS_ORIGINS),
+    editorOrigins: originList(value.EDITOR_ORIGINS ?? value.CORS_ORIGINS),
+    playerOrigins: originList(value.PLAYER_ORIGINS ?? value.CORS_ORIGINS),
+    embedOrigins: originList(value.EMBED_ORIGINS),
+    editorSessionTtlSeconds: value.EDITOR_SESSION_TTL_SECONDS,
+    eventStream: {
+      enabled: value.EVENT_STREAM_ENABLED,
+      heartbeatMs: value.EVENT_STREAM_HEARTBEAT_MS,
+      maxConnectionsPerProject: value.EVENT_STREAM_MAX_PER_PROJECT,
+      maxConnectionsPerUser: value.EVENT_STREAM_MAX_PER_USER,
+      replayBufferSize: value.EVENT_STREAM_REPLAY_BUFFER
+    },
+    mediaTokenRefreshMax: value.MEDIA_TOKEN_REFRESH_MAX,
     storageRoot: path.resolve(value.STORAGE_ROOT),
     maxImageUploadBytes: value.MAX_IMAGE_UPLOAD_BYTES,
     maxImagePixels: value.MAX_IMAGE_PIXELS,

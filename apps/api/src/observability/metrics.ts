@@ -49,7 +49,16 @@ export type MetricName =
   | 'access.embed_origin_denied'
   /* Viewer integration rollout */
   | 'viewer_integration.reference_suite_run'
-  | 'viewer_integration.promoted';
+  | 'viewer_integration.promoted'
+  /* Live authoring session */
+  | 'editor.bootstrap.duration'
+  | 'editor.session_token.issued'
+  | 'media.token.refreshed'
+  | 'media.token.denied'
+  | 'events.stream.opened'
+  | 'events.stream.rejected'
+  | 'events.published'
+  | 'publish.hash_drift';
 
 export interface MetricDefinition {
   readonly name: MetricName;
@@ -107,7 +116,16 @@ export const METRIC_DEFINITIONS: readonly MetricDefinition[] = Object.freeze([
   define('access.embed_origin_denied', 'counter', 'count', 'Embed attempts blocked by the origin allowlist.', ['surface']),
 
   define('viewer_integration.reference_suite_run', 'counter', 'count', 'Reference experience suite runs.', ['version', 'status']),
-  define('viewer_integration.promoted', 'counter', 'count', 'Viewer integration versions promoted to active.', ['version'])
+  define('viewer_integration.promoted', 'counter', 'count', 'Viewer integration versions promoted to active.', ['version']),
+
+  define('editor.bootstrap.duration', 'histogram', 'milliseconds', 'Time to assemble an editor bootstrap payload.', ['experienceType']),
+  define('editor.session_token.issued', 'counter', 'count', 'Short-lived project-scoped editor session tokens issued.', ['role']),
+  define('media.token.refreshed', 'counter', 'count', 'Expiring media URLs reissued without recompiling.', ['surface']),
+  define('media.token.denied', 'counter', 'count', 'Media URL refreshes refused by the per-derivative authorization check.', ['reason']),
+  define('events.stream.opened', 'counter', 'count', 'Server-sent event streams opened.', ['resumed']),
+  define('events.stream.rejected', 'counter', 'count', 'Server-sent event streams refused.', ['reason']),
+  define('events.published', 'counter', 'count', 'Events published to connected clients.', ['eventType']),
+  define('publish.hash_drift', 'counter', 'count', 'Publishes where a client-computed content hash disagreed with the server.', ['experienceType'])
 ]);
 
 const definitionsByName = new Map(METRIC_DEFINITIONS.map((definition) => [definition.name, definition]));
