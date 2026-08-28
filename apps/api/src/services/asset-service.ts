@@ -3,7 +3,7 @@ import { Op } from 'sequelize';
 import { config } from '../config';
 import { logger } from '../config/logger';
 import { sequelize } from '../database';
-import { assertAssetProcessingTransition } from '../domain/asset-processing';
+import { assertAssetProcessingTransition } from '@sphere/experience-schema';
 import { AppError, conflict, notFound } from '../errors/app-error';
 import { storage as defaultStorage } from '../integrations/storage';
 import type { StorageProvider } from '../integrations/storage';

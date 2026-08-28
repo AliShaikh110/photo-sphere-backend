@@ -1,13 +1,11 @@
-import type { CanonicalAsset, JsonObject } from '../domain/types';
+import type {
+  CanonicalAsset,
+  CompiledPanoramaCrop,
+  CompiledSphereCorrection,
+  JsonObject,
+} from '@sphere/experience-schema';
 
-export interface CompiledPanoramaCrop {
-  readonly fullWidthPixels: number;
-  readonly fullHeightPixels: number;
-  readonly croppedWidthPixels: number;
-  readonly croppedHeightPixels: number;
-  readonly croppedLeftPixels: number;
-  readonly croppedTopPixels: number;
-}
+
 
 function record(value: unknown): Record<string, unknown> | undefined {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -60,11 +58,7 @@ export function readPanoramaCrop(asset: CanonicalAsset): CompiledPanoramaCrop | 
   };
 }
 
-export interface CompiledSphereCorrection {
-  readonly headingDegrees: number;
-  readonly pitchDegrees: number;
-  readonly rollDegrees: number;
-}
+
 
 function finiteNumber(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;

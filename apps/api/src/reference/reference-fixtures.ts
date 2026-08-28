@@ -7,7 +7,7 @@ import type {
   CanonicalProject,
   CanonicalScene,
   JsonObject
-} from '../domain/types';
+} from '@sphere/experience-schema';
 
 /**
  * Canonical fixtures for the reference experience suite.

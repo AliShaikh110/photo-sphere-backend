@@ -1,19 +1,19 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import {
   ExperienceCompilationError,
   ExperienceCompiler,
-} from '../../../apps/api/src/compiler/experience-compiler';
+} from '@sphere/experience-compiler';
 import type {
   CompiledImageExperienceManifest,
   CompileExperienceInput,
-  MediaUrlResolutionRequest,
-} from '../../../apps/api/src/compiler/types';
-import { isImageExperienceManifest } from '../../../apps/api/src/compiler/types';
-import type { CanonicalOverlay } from '../../../apps/api/src/domain/types';
+} from '@sphere/experience-compiler';
+import { isImageExperienceManifest } from '@sphere/experience-compiler';
+import type { CanonicalOverlay } from '@sphere/experience-schema';
+import { compileFailure } from './compile-failure';
 import { derivative, canonicalProject, panoramaAsset } from './fixtures';
-import { PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION } from '../../../apps/api/src/compiler/viewer-integration-adapter';
-import { COMPILED_MANIFEST_VERSION } from '../../../apps/api/src/compiler/types';
+import { PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION } from '@sphere/viewer-integration';
+import { COMPILED_MANIFEST_VERSION } from '@sphere/experience-compiler';
 
 function compilerInput(
   overrides: Partial<CompileExperienceInput> = {},
@@ -34,16 +34,33 @@ function compilerInput(
   };
 }
 
-function createCompiler(requests: MediaUrlResolutionRequest[] = []): ExperienceCompiler {
+function createCompiler(): ExperienceCompiler {
   return new ExperienceCompiler({
     viewerIntegrationVersion: PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION,
-    mediaUrlResolver: {
-      resolve: vi.fn((request: MediaUrlResolutionRequest) => {
-        requests.push(request);
-        return `/media/${request.access}/${request.derivative.id}`;
-      }),
+    mediaDeliveryPolicy: {
+      protectedUrlTemplate: '/media/protected/{derivativeId}',
+      publicUrlTemplate: '/media/public/{derivativeId}',
     },
   });
+}
+
+/** Every media reference the compiler emitted, wherever it sits in the output. */
+function mediaReferences(value: unknown): Record<string, unknown>[] {
+  const found: Record<string, unknown>[] = [];
+  const visit = (candidate: unknown): void => {
+    if (Array.isArray(candidate)) {
+      candidate.forEach(visit);
+      return;
+    }
+    if (candidate === null || typeof candidate !== 'object') return;
+    const object = candidate as Record<string, unknown>;
+    if (typeof object.derivativeId === 'string' && typeof object.url === 'string') {
+      found.push(object);
+    }
+    Object.values(object).forEach(visit);
+  };
+  visit(value);
+  return found;
 }
 
 function expectImageManifest(
@@ -57,12 +74,11 @@ function expectImageManifest(
 
 describe('Experience compiler', () => {
   it('compiles deterministic protected previews through the shared adapter path', async () => {
-    const requests: MediaUrlResolutionRequest[] = [];
-    const compiler = createCompiler(requests);
+    const compiler = createCompiler();
     const input = compilerInput();
 
-    const first = expectImageManifest(await compiler.compile(input));
-    const second = await compiler.compile(input);
+    const first = expectImageManifest(compiler.compile(input));
+    const second = compiler.compile(input);
 
     expect(second).toEqual(first);
     expect(first).toMatchObject({
@@ -98,14 +114,13 @@ describe('Experience compiler', () => {
     expect(first.scenes[0]!.hotspots[0]!.content?.bodyHtml).toBe('<p>Safe</p>');
     expect(first.settings.information?.bodyHtml).toBe('<p>Welcome </p>');
     expect(first.branding.welcomeMessage).not.toContain('onerror');
-    expect(requests.every((request) => request.access === 'protected')).toBe(true);
+    expect(mediaReferences(first).every((reference) => reference.access === 'protected')).toBe(true);
     expect(JSON.stringify(first)).not.toContain('private/asset-panorama');
     expect(Object.isFrozen(first)).toBe(true);
   });
 
   it('uses public media only for public publications', async () => {
-    const publicRequests: MediaUrlResolutionRequest[] = [];
-    const published = await createCompiler(publicRequests).compile(compilerInput({
+    const published = createCompiler().compile(compilerInput({
       target: 'publication',
       publicationRevision: 3,
       visibility: 'public',
@@ -113,21 +128,19 @@ describe('Experience compiler', () => {
     }));
     expect(published.publicationRevision).toBe(3);
     expect(published.visibility).toBe('public');
-    expect(publicRequests.every((request) => request.access === 'public')).toBe(true);
+    expect(mediaReferences(published).every((reference) => reference.access === 'public')).toBe(true);
 
-    const privateRequests: MediaUrlResolutionRequest[] = [];
-    const privateManifest = await createCompiler(privateRequests).compile(compilerInput({
+    const privateManifest = createCompiler().compile(compilerInput({
       target: 'publication',
       publicationRevision: 4,
       visibility: 'private',
       publicationSlug: 'museum-tour',
     }));
     expect(privateManifest.visibility).toBe('private');
-    expect(privateRequests.every((request) => request.access === 'protected')).toBe(true);
+    expect(mediaReferences(privateManifest).every((reference) => reference.access === 'protected')).toBe(true);
   });
 
   it('resolves ready transparent branding media without assuming a panorama MIME type', async () => {
-    const requests: MediaUrlResolutionRequest[] = [];
     const project = canonicalProject({
       branding: { logoAssetId: 'asset-logo', companyName: 'Transparent Brand' },
     });
@@ -137,7 +150,7 @@ describe('Experience compiler', () => {
       width: 512,
       height: 256,
     });
-    const manifest = await createCompiler(requests).compile(compilerInput({
+    const manifest = createCompiler().compile(compilerInput({
       project,
       assets: [
         panoramaAsset(),
@@ -160,10 +173,7 @@ describe('Experience compiler', () => {
       mimeType: 'image/png',
       access: 'protected',
     });
-    expect(requests).toContainEqual(expect.objectContaining({
-      assetId: 'asset-logo',
-      derivative: expect.objectContaining({ id: logoDerivative.id, mimeType: 'image/png' }),
-    }));
+    expect(manifest.branding.logo?.url).toBe(`/media/protected/${logoDerivative.id}`);
   });
 
   it('turns a tilted capture pose into a straighten correction the renderer applies', async () => {
@@ -179,7 +189,7 @@ describe('Experience compiler', () => {
       },
     });
     const manifest = expectImageManifest(
-      await createCompiler().compile(compilerInput({ assets: [tilted] })),
+      createCompiler().compile(compilerInput({ assets: [tilted] })),
     );
 
     expect(manifest.scenes[0]!.panorama.sphereCorrection).toEqual({
@@ -202,7 +212,7 @@ describe('Experience compiler', () => {
       metadata: { xmp: { poseHeadingDegrees: 360, posePitchDegrees: 0 } },
     });
     const manifest = expectImageManifest(
-      await createCompiler().compile(compilerInput({ assets: [level] })),
+      createCompiler().compile(compilerInput({ assets: [level] })),
     );
     expect(manifest.scenes[0]!.panorama.sphereCorrection).toBeUndefined();
     expect(manifest.viewerIntegration.config).not.toHaveProperty('startup.sphereCorrection');
@@ -221,7 +231,7 @@ describe('Experience compiler', () => {
     const unframedScene = canonicalProject({
       scenes: [{ ...canonicalProject().scenes[0]!, initialView: {} }],
     });
-    const captured = expectImageManifest(await createCompiler().compile(compilerInput({
+    const captured = expectImageManifest(createCompiler().compile(compilerInput({
       project: unframedScene,
       assets: [framed],
     })));
@@ -232,7 +242,7 @@ describe('Experience compiler', () => {
     });
 
     // An authored framing is the creator's decision and always wins.
-    const authored = expectImageManifest(await createCompiler().compile(compilerInput({
+    const authored = expectImageManifest(createCompiler().compile(compilerInput({
       assets: [framed],
     })));
     expect(authored.scenes[0]!.initialView).toEqual({
@@ -264,7 +274,7 @@ describe('Experience compiler', () => {
       ],
     });
     const manifest = expectImageManifest(
-      await createCompiler().compile(compilerInput({ assets: [croppedAsset] })),
+      createCompiler().compile(compilerInput({ assets: [croppedAsset] })),
     );
 
     expect(manifest.scenes[0]!.panorama.crop).toEqual({
@@ -301,8 +311,7 @@ describe('Experience compiler', () => {
       }],
     });
 
-    await expect(createCompiler().compile(compilerInput({ project: unsafeProject })))
-      .rejects.toMatchObject({
+    expect(compileFailure(() => createCompiler().compile(compilerInput({ project: unsafeProject })))).toMatchObject({
         code: 'EXPERIENCE_COMPILATION_FAILED',
         issues: expect.arrayContaining([
           expect.objectContaining({
@@ -318,13 +327,12 @@ describe('Experience compiler', () => {
   });
 
   it('rejects missing baseline derivatives before resolving any URL', async () => {
-    const requests: MediaUrlResolutionRequest[] = [];
-    const compiler = createCompiler(requests);
+    const compiler = createCompiler();
     const asset = panoramaAsset({
       derivatives: [derivative('asset-panorama', 'standardWeb')],
     });
 
-    await expect(compiler.compile(compilerInput({ assets: [asset] }))).rejects.toMatchObject({
+    expect(compileFailure(() => compiler.compile(compilerInput({ assets: [asset] })))).toMatchObject({
       code: 'EXPERIENCE_COMPILATION_FAILED',
       issues: [expect.objectContaining({
         code: 'REQUIRED_DERIVATIVE_MISSING',
@@ -333,16 +341,16 @@ describe('Experience compiler', () => {
         retryable: true,
       })],
     });
-    expect(requests).toHaveLength(0);
+
   });
 
   it('rejects publication without a revision using an actionable project path', async () => {
-    await expect(createCompiler().compile(compilerInput({
+    expect(() => createCompiler().compile(compilerInput({
       target: 'publication',
       visibility: 'public',
-    }))).rejects.toBeInstanceOf(ExperienceCompilationError);
+    }))).toThrow(ExperienceCompilationError);
     try {
-      await createCompiler().compile(compilerInput({ target: 'publication' }));
+      createCompiler().compile(compilerInput({ target: 'publication' }));
     } catch (error) {
       expect(error).toMatchObject({
         issues: expect.arrayContaining([expect.objectContaining({
@@ -353,12 +361,15 @@ describe('Experience compiler', () => {
     }
   });
 
-  it('fails closed when the injected resolver returns an unsafe URL', async () => {
+  it('fails closed when the delivery policy produces an unsafe URL', () => {
     const compiler = new ExperienceCompiler({
-      mediaUrlResolver: { resolve: () => 'javascript:alert(1)' },
+      mediaDeliveryPolicy: {
+        protectedUrlTemplate: 'javascript:alert(1)',
+        publicUrlTemplate: 'javascript:alert(1)',
+      },
       viewerIntegrationVersion: PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION,
     });
-    await expect(compiler.compile(compilerInput())).rejects.toMatchObject({
+    expect(compileFailure(() => compiler.compile(compilerInput()))).toMatchObject({
       code: 'EXPERIENCE_COMPILATION_FAILED',
       issues: [expect.objectContaining({ code: 'MEDIA_URL_INVALID' })],
     });

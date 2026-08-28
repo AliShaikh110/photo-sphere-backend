@@ -5,7 +5,7 @@ import {
   defaultCandidateOrder,
   selectVideoPlaybackProfile,
   type VideoProfileCandidate
-} from '../../../apps/api/src/runtime/video-playback-policy';
+} from '@sphere/experience-schema';
 
 const desktop: VideoProfileCandidate = {
   profileId: 'desktop',

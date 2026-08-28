@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
   PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION
-} from '../../../apps/api/src/compiler/viewer-integration-adapter';
+} from '@sphere/viewer-integration';
 import {
   listViewerIntegrationVersions
-} from '../../../apps/api/src/compiler/viewer-integration-registry';
+} from '@sphere/viewer-integration';
 import { referenceExperiences, runReferenceExperienceSuite } from '../../../apps/api/src/reference';
 
 /**

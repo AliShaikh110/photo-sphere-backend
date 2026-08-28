@@ -1,7 +1,7 @@
 import { Op, type Transaction } from 'sequelize';
 import { sequelize } from '../database';
 import { AppError, notFound } from '../errors/app-error';
-import { validateExtensionPayload } from '../extensions';
+import { validateExtensionPayload } from '@sphere/experience-schema';
 import { Asset, Overlay, Scene } from '../models';
 import type { InteractionGeometryKind, JsonObject } from '../models/model.types';
 import {
@@ -11,7 +11,7 @@ import {
 import { requireProjectRole } from './access-service';
 import { loadExtensionRegistry } from './extension-service';
 import { bumpProjectRevision, getAccessibleProject } from './project-service';
-import { sanitizePlainText } from '../security';
+import { sanitizePlainText } from '@sphere/experience-schema';
 
 export type GeometryInput = Record<string, unknown> & { kind: InteractionGeometryKind };
 

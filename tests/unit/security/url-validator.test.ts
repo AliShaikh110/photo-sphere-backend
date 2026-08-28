@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   assertSafeUrl,
   validateSafeUrl,
-} from '../../../apps/api/src/security/url-validator';
+} from '@sphere/experience-schema';
 
 describe('central URL policy', () => {
   it('allows and normalizes HTTPS URLs', () => {

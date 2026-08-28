@@ -1,5 +1,5 @@
-import type { CanonicalProjectType, JsonObject } from '../domain/types';
-import type { CapabilityId } from '../capabilities/types';
+import type { CanonicalProjectType, JsonObject } from '../types';
+import type { CapabilityId } from '@sphere/capability-registry';
 
 export const EXTENSION_STATUSES = ['draft', 'active', 'deprecated', 'disabled'] as const;
 export type ExtensionStatus = (typeof EXTENSION_STATUSES)[number];

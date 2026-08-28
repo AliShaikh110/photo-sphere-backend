@@ -8,8 +8,8 @@ import {
   createAdjacentScenePreloadPolicy,
   rankAdjacentScenePreloads,
   selectAdjacentScenePreloads,
-} from '../../../apps/api/src/runtime/preload-policy';
-import type { ScenePreloadConnection } from '../../../apps/api/src/runtime/preload-policy';
+} from '@sphere/experience-schema';
+import type { ScenePreloadConnection } from '@sphere/experience-schema';
 
 /** A lobby linked to three rooms, plus one link that does not start at the lobby. */
 const connections: readonly ScenePreloadConnection[] = [

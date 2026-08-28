@@ -1,12 +1,16 @@
-import { resolveCapabilities, type CapabilityResolutionResult } from '../capabilities';
-import { validateCanonicalProject } from '../domain/validation';
-import { validateSafeUrl } from '../security/url-validator';
-import type { ValidationIssue } from '../domain/validation';
+import {
+  CAPABILITY_REGISTRY,
+  resolveCapabilities,
+  type CapabilityResolutionResult,
+} from '@sphere/capability-registry';
+import { validateCanonicalProject } from '@sphere/experience-schema';
+import { validateSafeUrl } from '@sphere/experience-schema';
+import type { ValidationIssue } from '@sphere/experience-schema';
 import type {
   CanonicalAsset,
   CanonicalInteractionGeometry,
   CanonicalProject,
-} from '../domain/types';
+} from '@sphere/experience-schema';
 import {
   selectPanoramaDerivatives,
   selectPreferredReadyDerivative,
@@ -191,6 +195,7 @@ function preflightImageExperience(input: CompileExperienceInput): CompilerPrefli
 
   const capabilityResolution = resolveCapabilities(
     analyzeProjectCapabilities(input.project, input.assets),
+    input.capabilities ?? CAPABILITY_REGISTRY,
   );
   issues.push(...capabilityResolution.issues.map((capabilityIssue): ValidationIssue => ({
     code: capabilityIssue.code,
@@ -443,6 +448,7 @@ function preflightVideoExperience(input: CompileExperienceInput): CompilerPrefli
 
   const capabilityResolution = resolveCapabilities(
     analyzeProjectCapabilities(project, input.assets),
+    input.capabilities ?? CAPABILITY_REGISTRY,
   );
   issues.push(...capabilityResolution.issues.map((capabilityIssue): ValidationIssue => ({
     code: capabilityIssue.code,

@@ -1,5 +1,5 @@
 import { AppError } from '../errors/app-error';
-import { HANDHELD_MAX_VIDEO_WIDTH } from '../runtime/video-playback-policy';
+import { HANDHELD_MAX_VIDEO_WIDTH } from '@sphere/experience-schema';
 import {
   detectVideoContainer,
   readVideoContainer,
@@ -50,7 +50,7 @@ export interface VideoCompatibilityFlags {
   readonly upright: boolean;
 }
 
-export { HANDHELD_MAX_VIDEO_WIDTH } from '../runtime/video-playback-policy';
+export { HANDHELD_MAX_VIDEO_WIDTH } from '@sphere/experience-schema';
 
 const WEB_VIDEO_CODECS = new Set(['avc1', 'avc3', 'hvc1', 'hev1', 'av01', 'vp08', 'vp09']);
 const WEB_VIDEO_CODEC_IDS = new Set(['V_VP8', 'V_VP9', 'V_AV1', 'V_MPEG4/ISO/AVC']);

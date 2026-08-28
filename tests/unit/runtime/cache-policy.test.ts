@@ -9,8 +9,8 @@ import {
   createRuntimeCachePolicy,
   resolveCachePolicy,
   resolveRuntimeCachePolicy,
-} from '../../../apps/api/src/runtime/cache-policy';
-import { RUNTIME_DEVICE_CLASSES } from '../../../apps/api/src/runtime/types';
+} from '@sphere/experience-schema';
+import { RUNTIME_DEVICE_CLASSES } from '@sphere/experience-schema';
 
 const MEBIBYTE = 1024 * 1024;
 

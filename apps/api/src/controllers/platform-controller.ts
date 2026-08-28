@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 
-import { CAPABILITY_REGISTRY } from '../capabilities';
+import { CAPABILITY_REGISTRY } from '@sphere/capability-registry';
 import { config } from '../config';
 import { isDualFisheyeIngestEnabled } from '../integrations/ingest';
 import { isLiveSourceEnabled } from '../integrations/live';

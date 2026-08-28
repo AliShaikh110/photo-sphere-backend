@@ -1,6 +1,6 @@
 import { AppError } from '../errors/app-error';
 import type { JsonObject } from '../models/model.types';
-import { sanitizePlainText, sanitizeRichHtml, validateSafeUrl } from '../security';
+import { sanitizePlainText, sanitizeRichHtml, validateSafeUrl } from '@sphere/experience-schema';
 
 function safeExternalUrl(value: unknown, path: string): string | undefined {
   if (value === undefined || value === null || value === '') return undefined;

@@ -1,6 +1,6 @@
-import { validateSafeUrl } from '../security/url-validator';
-import { validateExtensionPayload } from '../extensions/payload-validator';
-import type { ExtensionRegistrySnapshot } from '../extensions/types';
+import { validateSafeUrl } from './security/url-validator';
+import { validateExtensionPayload } from './extensions/payload-validator';
+import type { ExtensionRegistrySnapshot } from './extensions/types';
 import { ASSET_PROCESSING_STATUSES } from './asset-processing';
 import {
   ASSET_DERIVATIVE_KINDS,

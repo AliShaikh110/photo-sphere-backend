@@ -1,4 +1,4 @@
-import type { AssetDerivative } from '../domain/types';
+import type { AssetDerivative } from '@sphere/experience-schema';
 import type { CompiledTileLevel } from './types';
 
 export interface TiledPanoramaMetadata {

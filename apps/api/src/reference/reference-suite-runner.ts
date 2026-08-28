@@ -1,10 +1,11 @@
 import {
+  DEFAULT_MEDIA_DELIVERY_POLICY,
   ExperienceCompilationError,
   ExperienceCompiler,
   createViewerIntegrationAdapter,
-  type CompileExperienceInput,
-  type MediaUrlResolver
-} from '../compiler';
+  jsonByteLength,
+  type CompileExperienceInput
+} from '@sphere/experience-compiler';
 import { config } from '../config';
 import { referenceExperiences, type ReferenceExperience } from './reference-experiences';
 
@@ -37,18 +38,6 @@ export interface ReferenceSuiteResult {
   readonly results: readonly ReferenceExperienceResult[];
 }
 
-/**
- * Media URLs in the suite must be deterministic: the run compares behavior
- * between integration versions, so a signed or time-varying URL would make two
- * identical runs look different.
- */
-const deterministicMediaUrlResolver: MediaUrlResolver = {
-  resolve: ({ derivative, access, experienceId, publicationRevision }) =>
-    access === 'public'
-      ? `/api/v1/publications/${experienceId}/${publicationRevision ?? 1}/media/${derivative.id}`
-      : `/api/v1/media/${derivative.id}`
-};
-
 function toCompileInput(experience: ReferenceExperience): CompileExperienceInput {
   return {
     project: experience.project,
@@ -64,13 +53,13 @@ function toCompileInput(experience: ReferenceExperience): CompileExperienceInput
   };
 }
 
-async function runOne(
+function runOne(
   compiler: ExperienceCompiler,
   experience: ReferenceExperience
-): Promise<ReferenceExperienceResult> {
+): ReferenceExperienceResult {
   const startedAt = Date.now();
   try {
-    const bundle = await compiler.compileBundle(toCompileInput(experience));
+    const bundle = compiler.compileBundle(toCompileInput(experience));
     const manifest = bundle.manifest as unknown as Record<string, unknown>;
     const expectations = experience.expectations.map((expectation) => {
       let passed = false;
@@ -87,7 +76,7 @@ async function runOne(
       covers: experience.covers,
       passed: expectations.every((expectation) => expectation.passed),
       compileDurationMs: Date.now() - startedAt,
-      manifestBytes: Buffer.byteLength(JSON.stringify(bundle.manifest), 'utf8'),
+      manifestBytes: jsonByteLength(bundle.manifest),
       sceneDefinitionCount: bundle.sceneDefinitions.length,
       expectations
     };
@@ -124,14 +113,18 @@ export async function runReferenceExperienceSuite(
   viewerIntegrationVersion: string
 ): Promise<ReferenceSuiteResult> {
   const startedAt = Date.now();
+  // Media URLs in the suite must be deterministic: the run compares behaviour
+  // between integration versions, so a signed or time-varying URL would make
+  // two identical runs look different. The compiler's own delivery policy is
+  // already credential-free, so it is exactly what the suite wants.
   const compiler = new ExperienceCompiler({
-    mediaUrlResolver: deterministicMediaUrlResolver,
+    mediaDeliveryPolicy: DEFAULT_MEDIA_DELIVERY_POLICY,
     viewerIntegrationAdapter: createViewerIntegrationAdapter(viewerIntegrationVersion),
     tourStrategyPolicy: config.tourStrategyPolicy
   });
   const results: ReferenceExperienceResult[] = [];
   for (const experience of referenceExperiences()) {
-    results.push(await runOne(compiler, experience));
+    results.push(runOne(compiler, experience));
   }
   const passedCount = results.filter((result) => result.passed).length;
   return {

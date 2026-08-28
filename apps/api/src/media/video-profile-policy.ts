@@ -1,8 +1,8 @@
-import type { AssetDerivativeKind } from '../domain/types';
+import type { AssetDerivativeKind } from '@sphere/experience-schema';
 import {
   HANDHELD_MAX_VIDEO_WIDTH,
   type VideoPlaybackProfileId,
-} from '../runtime/video-playback-policy';
+} from '@sphere/experience-schema';
 import type { VideoInspection } from './video-processor';
 
 /**

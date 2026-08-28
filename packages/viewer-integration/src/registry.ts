@@ -1,8 +1,8 @@
 import {
   PhotoSphereViewerIntegrationAdapter,
   PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION
-} from './viewer-integration-adapter';
-import type { ViewerIntegrationAdapter } from './types';
+} from './photo-sphere-viewer-adapter';
+import type { ViewerIntegrationAdapter } from '@sphere/experience-schema';
 
 export type ViewerIntegrationStatus = 'active' | 'candidate' | 'retired';
 

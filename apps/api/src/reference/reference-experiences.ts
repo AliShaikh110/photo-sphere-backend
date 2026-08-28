@@ -1,5 +1,5 @@
-import type { CanonicalAsset, CanonicalProject } from '../domain/types';
-import type { CompileTarget, PublicationVisibility } from '../compiler/types';
+import type { CanonicalAsset, CanonicalProject } from '@sphere/experience-schema';
+import type { CompileTarget, PublicationVisibility } from '@sphere/experience-compiler';
 import {
   referenceCroppedPanoramaAsset,
   referenceHighResolutionPanoramaAsset,

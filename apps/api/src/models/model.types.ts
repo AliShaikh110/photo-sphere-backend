@@ -1,3 +1,23 @@
+/**
+ * The runtime telemetry and interaction vocabularies are declared once, in the
+ * shared telemetry contract, and re-exported here so persisted enums and the
+ * events a player reports can never drift apart.
+ */
+export {
+  CAPABILITY_FALLBACK_REASONS,
+  INTERACTION_GEOMETRY_KINDS,
+  RUNTIME_EVENT_NAMES,
+  TIMELINE_INTERACTION_KINDS,
+  VIDEO_PLAYBACK_FAILURE_CATEGORIES,
+} from '@sphere/telemetry-contract';
+export type {
+  CapabilityFallbackReason,
+  InteractionGeometryKind,
+  RuntimeEventName,
+  TimelineInteractionKind,
+  VideoPlaybackFailureCategory,
+} from '@sphere/telemetry-contract';
+
 export type JsonPrimitive = boolean | number | string | null;
 
 export type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
@@ -111,17 +131,6 @@ export const MEDIA_JOB_STAGE_STATUSES = [
 ] as const;
 export type MediaJobStageStatus = (typeof MEDIA_JOB_STAGE_STATUSES)[number];
 
-export const TIMELINE_INTERACTION_KINDS = [
-  'information',
-  'hotspot',
-  'viewpoint',
-  'image',
-  'video',
-  'link',
-  'cta',
-] as const;
-export type TimelineInteractionKind = (typeof TIMELINE_INTERACTION_KINDS)[number];
-
 export const STORAGE_DELETION_JOB_STATUSES = ['queued', 'running', 'succeeded'] as const;
 export type StorageDeletionJobStatus = (typeof STORAGE_DELETION_JOB_STATUSES)[number];
 
@@ -133,66 +142,6 @@ export type PublicationStatus = (typeof PUBLICATION_STATUSES)[number];
 
 export const IDEMPOTENCY_STATUSES = ['in_progress', 'completed', 'failed'] as const;
 export type IdempotencyStatus = (typeof IDEMPOTENCY_STATUSES)[number];
-
-export const RUNTIME_EVENT_NAMES = [
-  'experience_load_started',
-  'first_panorama_visible',
-  'time_to_interactive',
-  'scene_changed',
-  'hotspot_clicked',
-  'video_started',
-  'video_stalled',
-  'asset_failed',
-  'scene_transition_failed',
-  'viewer_error',
-  'experience_exited',
-  'video_paused',
-  'video_resumed',
-  'video_seeked',
-  'video_ended',
-  'video_profile_selected',
-  'video_playback_failed',
-  'timeline_interaction_shown',
-  'timeline_interaction_clicked',
-  'capability_fallback',
-  'overlay_clicked',
-  'map_interaction',
-] as const;
-export type RuntimeEventName = (typeof RUNTIME_EVENT_NAMES)[number];
-
-/** Why an optional capability was not delivered to a visitor. */
-export const CAPABILITY_FALLBACK_REASONS = [
-  'device_unsupported',
-  'permission_denied',
-  'module_load_failed',
-  'media_unavailable',
-  'runtime_error',
-  'unknown',
-] as const;
-export type CapabilityFallbackReason = (typeof CAPABILITY_FALLBACK_REASONS)[number];
-
-/** Stable, product-level categories accepted by video playback telemetry. */
-export const VIDEO_PLAYBACK_FAILURE_CATEGORIES = [
-  'profile_unavailable',
-  'media_unavailable',
-  'decode_failed',
-  'codec_unsupported',
-  'network_error',
-  'autoplay_blocked',
-  'viewer_error',
-  'unknown',
-] as const;
-export type VideoPlaybackFailureCategory = (typeof VIDEO_PLAYBACK_FAILURE_CATEGORIES)[number];
-
-export const INTERACTION_GEOMETRY_KINDS = [
-  'point',
-  'polygon',
-  'polyline',
-  'imageLayer',
-  'videoLayer',
-  'custom',
-] as const;
-export type InteractionGeometryKind = (typeof INTERACTION_GEOMETRY_KINDS)[number];
 
 export const PLAN_COORDINATE_SYSTEMS = ['plan_normalized', 'plan_pixels'] as const;
 export type PlanCoordinateSystem = (typeof PLAN_COORDINATE_SYSTEMS)[number];

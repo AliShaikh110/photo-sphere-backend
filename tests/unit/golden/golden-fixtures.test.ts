@@ -21,12 +21,12 @@ const expectedDirectory = path.resolve(__dirname, '..', '..', 'golden', 'expecte
  */
 describe('golden manifest fixtures', () => {
   for (const scenario of goldenScenarios()) {
-    it(`reproduces ${scenario.id} byte for byte`, async () => {
+    it(`reproduces ${scenario.id} byte for byte`, () => {
       const expected = readFileSync(
         path.join(expectedDirectory, `${scenario.id}.json`),
         'utf8'
       );
-      const actual = serializeGoldenArtifact(await recordGoldenArtifact(scenario));
+      const actual = serializeGoldenArtifact(recordGoldenArtifact(scenario));
       if (actual !== expected) {
         // A whole manifest diff is unreadable; point at the first divergence.
         const divergence = [...actual].findIndex((character, index) => character !== expected[index]);
@@ -59,9 +59,9 @@ describe('golden manifest fixtures', () => {
     ]);
   });
 
-  it('never emits a credential or an expiring URL', async () => {
+  it('never emits a credential or an expiring URL', () => {
     for (const scenario of goldenScenarios()) {
-      const serialized = serializeGoldenArtifact(await recordGoldenArtifact(scenario));
+      const serialized = serializeGoldenArtifact(recordGoldenArtifact(scenario));
       expect(serialized).not.toContain('token=');
       expect(serialized).not.toContain('expiresAt');
       expect(serialized).not.toContain('signature=');

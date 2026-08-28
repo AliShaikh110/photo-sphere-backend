@@ -1,7 +1,7 @@
 import { isIP } from 'node:net';
 
 import { AppError } from '../../errors/app-error';
-import { validateSafeUrl } from '../../security/url-validator';
+import { validateSafeUrl } from '@sphere/experience-schema';
 import type { JsonObject } from '../../models/model.types';
 
 /**

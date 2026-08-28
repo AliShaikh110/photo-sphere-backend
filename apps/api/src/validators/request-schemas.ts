@@ -1,14 +1,10 @@
 import { z } from 'zod';
-import { SCENE_TRANSITION_FAILURE_CATEGORIES } from '../runtime';
 import {
   ACCESS_ROLES,
-  CAPABILITY_FALLBACK_REASONS,
   EXTENSION_STATUSES,
-  INTERACTION_GEOMETRY_KINDS,
   TEMPLATE_ASSET_POLICIES,
   TEMPLATE_STATUSES,
-  TEMPLATE_VISIBILITIES,
-  VIDEO_PLAYBACK_FAILURE_CATEGORIES
+  TEMPLATE_VISIBILITIES
 } from '../models/model.types';
 import { CUSTOM_DOMAIN_STATUSES } from '../models/custom-domain.model';
 
@@ -806,211 +802,19 @@ export const publishSchema = z
   })
   .strict();
 
-export const runtimeEventNameSchema = z.enum([
-  'experience_load_started',
-  'first_panorama_visible',
-  'time_to_interactive',
-  'scene_changed',
-  'hotspot_clicked',
-  'asset_failed',
-  'scene_transition_failed',
-  'viewer_error',
-  'experience_exited',
-  'video_started',
-  'video_paused',
-  'video_resumed',
-  'video_seeked',
-  'video_stalled',
-  'video_ended',
-  'video_profile_selected',
-  'video_playback_failed',
-  'timeline_interaction_shown',
-  'timeline_interaction_clicked',
-  'capability_fallback',
-  'overlay_clicked',
-  'map_interaction'
-]);
-
-const runtimeEventBaseSchema = z
-  .object({
-    eventId: id,
-    experienceId: id,
-    publicationRevision: databaseRevision,
-    viewerIntegrationVersion: z.string().trim().min(1).max(64),
-    sessionId: z.string().trim().min(8).max(128),
-    deviceContext: jsonRecord.default({}),
-    runtimeContext: jsonRecord.default({}),
-    occurredAt: z.iso.datetime({ offset: true })
-  });
-
-const existingRuntimeEventSchema = runtimeEventBaseSchema
-  .extend({
-    eventName: z.enum([
-      'experience_load_started',
-      'first_panorama_visible',
-      'time_to_interactive',
-      'scene_changed',
-      'hotspot_clicked',
-      'asset_failed',
-      'viewer_error',
-      'experience_exited'
-    ]),
-    // `durationMs` is the timing convention these events report against; it is
-    // optional so an older player keeps reporting, and analytics aggregates the
-    // samples that carry it.
-    payload: jsonRecord
-      .and(
-        z
-          .object({ durationMs: z.number().int().min(0).max(3_600_000).optional() })
-          .passthrough()
-      )
-      .default({})
-  })
-  .strict();
-
-const capabilityFallbackEventSchema = runtimeEventBaseSchema
-  .extend({
-    eventName: z.literal('capability_fallback'),
-    payload: z
-      .object({
-        capabilityId: z.string().trim().min(1).max(64),
-        reason: z.enum(CAPABILITY_FALLBACK_REASONS),
-        fallbackApplied: z.string().trim().max(120).optional()
-      })
-      .passthrough()
-  })
-  .strict();
-
-const overlayClickedEventSchema = runtimeEventBaseSchema
-  .extend({
-    eventName: z.literal('overlay_clicked'),
-    payload: z
-      .object({
-        overlayId: id,
-        sceneId: id.optional(),
-        geometryKind: z.enum(INTERACTION_GEOMETRY_KINDS).optional()
-      })
-      .passthrough()
-  })
-  .strict();
-
-const mapInteractionEventSchema = runtimeEventBaseSchema
-  .extend({
-    eventName: z.literal('map_interaction'),
-    payload: z
-      .object({
-        surface: z.enum(['map', 'plan']),
-        action: z.enum(['scene_selected', 'zoom', 'pan', 'opened', 'closed']),
-        sceneId: id.optional(),
-        planId: id.optional()
-      })
-      .passthrough()
-  })
-  .strict();
-
-const videoPlaybackPayloadSchema = z
-  .object({
-    assetId: id.optional(),
-    derivativeId: id.optional(),
-    profileId: z.enum(['desktop', 'mobile']).optional(),
-    currentTimeMs: z.number().int().min(0).optional(),
-    durationMs: z.number().int().min(0).optional()
-  })
-  .passthrough();
-
-const videoPlaybackEventSchema = runtimeEventBaseSchema
-  .extend({
-    eventName: z.enum([
-      'video_started',
-      'video_paused',
-      'video_resumed',
-      'video_seeked',
-      'video_stalled',
-      'video_ended'
-    ]),
-    payload: videoPlaybackPayloadSchema
-  })
-  .strict();
-
-export const videoProfileSelectedPayloadSchema = z
-  .object({
-    assetId: id,
-    derivativeId: id,
-    profileId: z.enum(['desktop', 'mobile']),
-    reason: z.string().trim().max(120).optional(),
-    candidateProfileIds: z.array(z.enum(['desktop', 'mobile'])).max(4).optional()
-  })
-  .passthrough();
-
-const videoProfileSelectedEventSchema = runtimeEventBaseSchema
-  .extend({
-    eventName: z.literal('video_profile_selected'),
-    payload: videoProfileSelectedPayloadSchema
-  })
-  .strict();
-
-export const videoPlaybackFailurePayloadSchema = z
-  .object({
-    assetId: id,
-    derivativeId: id.optional(),
-    profileId: z.enum(['desktop', 'mobile']).optional(),
-    failureCategory: z.enum(VIDEO_PLAYBACK_FAILURE_CATEGORIES),
-    currentTimeMs: z.number().int().min(0).optional()
-  })
-  .passthrough();
-
-const videoPlaybackFailedEventSchema = runtimeEventBaseSchema
-  .extend({
-    eventName: z.literal('video_playback_failed'),
-    payload: videoPlaybackFailurePayloadSchema
-  })
-  .strict();
-
-const timelineInteractionEventSchema = runtimeEventBaseSchema
-  .extend({
-    eventName: z.enum(['timeline_interaction_shown', 'timeline_interaction_clicked']),
-    payload: z
-      .object({
-        interactionId: id,
-        kind: z.enum(['information', 'hotspot', 'viewpoint', 'image', 'video', 'link', 'cta']),
-        timeMs: z.number().int().min(0).optional()
-      })
-      .passthrough()
-  })
-  .strict();
-
-export const sceneTransitionFailurePayloadSchema = z
-  .object({
-    sourceSceneId: id,
-    targetSceneId: id,
-    failureCategory: z.enum(SCENE_TRANSITION_FAILURE_CATEGORIES),
-    assetId: id.optional()
-  })
-  .passthrough();
-
-const sceneTransitionFailureEventSchema = runtimeEventBaseSchema
-  .extend({
-    eventName: z.literal('scene_transition_failed'),
-    payload: sceneTransitionFailurePayloadSchema
-  })
-  .strict();
-
-export const runtimeEventSchema = z.discriminatedUnion('eventName', [
-  existingRuntimeEventSchema,
-  sceneTransitionFailureEventSchema,
-  videoPlaybackEventSchema,
-  videoProfileSelectedEventSchema,
-  videoPlaybackFailedEventSchema,
-  timelineInteractionEventSchema,
-  capabilityFallbackEventSchema,
-  overlayClickedEventSchema,
-  mapInteractionEventSchema
-]);
-
-export const runtimeEventsSchema = z.union([
-  runtimeEventSchema.transform((event) => ({ events: [event] })),
-  z.object({ events: z.array(runtimeEventSchema).min(1).max(100) }).strict()
-]);
+/**
+ * Telemetry ingest validates against the shared contract rather than a second
+ * copy of it, so the events a player is built to send are exactly the events
+ * this endpoint accepts.
+ */
+export {
+  runtimeEventNameSchema,
+  runtimeEventSchema,
+  runtimeEventsSchema,
+  sceneTransitionFailurePayloadSchema,
+  videoPlaybackFailurePayloadSchema,
+  videoProfileSelectedPayloadSchema
+} from '@sphere/telemetry-contract';
 
 export const projectIdParams = z.object({ projectId: id });
 export const assetIdParams = z.object({ assetId: id });

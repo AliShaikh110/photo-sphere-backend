@@ -2,17 +2,16 @@ import { Op, type Transaction } from 'sequelize';
 import { createMediaToken, createTelemetryToken, verifyMediaToken } from '../auth/tokens';
 import { config } from '../config';
 import {
+  DEFAULT_MEDIA_DELIVERY_POLICY,
   ExperienceCompilationError,
   ExperienceCompiler,
   COMPILED_MANIFEST_VERSION,
   createViewerIntegrationAdapter,
   type CompileExperienceInput,
   type CompiledExperienceBundle,
-  type CompiledExperienceManifest,
   type CompilerPreflightResult,
-  type MediaUrlResolver,
   type PublicationVisibility
-} from '../compiler';
+} from '@sphere/experience-compiler';
 import type {
   CanonicalAsset,
   CanonicalBranding,
@@ -40,7 +39,7 @@ import type {
   CanonicalVisibilityRules,
   JsonObject as CanonicalJsonObject,
   SphericalPosition
-} from '../domain';
+} from '@sphere/experience-schema';
 import { sequelize } from '../database';
 import { AppError, conflict, notFound } from '../errors/app-error';
 import {
@@ -80,30 +79,12 @@ import {
   selectVideoPlaybackProfile,
   type VideoDeviceCapabilities,
   type VideoProfileCandidate
-} from '../runtime';
+} from '@sphere/experience-schema';
 import { sha256, stableJson } from '../utils/hash';
 import {
   completeIdempotencyLease,
   failIdempotencyLeasePersisted
 } from './idempotency-service';
-
-const mediaUrlResolver: MediaUrlResolver = {
-  resolve: ({ derivative, access, target, experienceId, publicationRevision }) => {
-    const mediaPath = `/api/v1/media/${derivative.id}`;
-    if (access === 'public' && target === 'publication') {
-      if (publicationRevision === undefined) {
-        throw new Error('Public publication media requires a publication revision.');
-      }
-      return `/api/v1/publications/${experienceId}/${publicationRevision}/media/${derivative.id}`;
-    }
-    if (access !== 'protected' || target !== 'preview') return mediaPath;
-    const token = createMediaToken({ derivativeId: derivative.id });
-    return {
-      url: `${mediaPath}?token=${encodeURIComponent(token)}`,
-      expiresAt: new Date(Date.now() + config.signedMediaTtlSeconds * 1000).toISOString()
-    };
-  }
-};
 
 const compilersByVersion = new Map<string, ExperienceCompiler>();
 
@@ -116,7 +97,10 @@ function compilerFor(viewerIntegrationVersion: string): ExperienceCompiler {
   const existing = compilersByVersion.get(viewerIntegrationVersion);
   if (existing) return existing;
   const created = new ExperienceCompiler({
-    mediaUrlResolver,
+    // The compiler emits logical delivery locations only. Signing them is a
+    // server-side hydration step performed after compilation, which is what
+    // keeps the compiled output free of credentials and safe to reproduce.
+    mediaDeliveryPolicy: DEFAULT_MEDIA_DELIVERY_POLICY,
     viewerIntegrationAdapter: createViewerIntegrationAdapter(viewerIntegrationVersion),
     tourStrategyPolicy: config.tourStrategyPolicy
   });
@@ -417,13 +401,13 @@ export async function previewExperience(
   projectId: string,
   actorUserId: string,
   expectedRevision: number
-): Promise<CompiledExperienceManifest> {
+): Promise<JsonObject> {
   const loaded = await loadExperience({ projectId, actorUserId, requiredRole: 'editor' });
   assertRevision(loaded.project, expectedRevision);
   const viewerIntegrationVersion = await resolveViewerIntegrationVersion(projectId);
   const startedAt = Date.now();
   try {
-    const manifest = await compilerFor(viewerIntegrationVersion).compile({
+    const compiled = compilerFor(viewerIntegrationVersion).compile({
       project: loaded.inputProject,
       assets: loaded.assets,
       target: 'preview',
@@ -433,7 +417,15 @@ export async function previewExperience(
       experienceType: loaded.project.type,
       target: 'preview'
     });
-    return manifest;
+    // The compiled manifest carries logical delivery locations. A creator's
+    // preview needs media it can actually fetch, so the signed, expiring URLs
+    // are applied here — after compilation, where the clock and the signing key
+    // live.
+    return hydrateProtectedMediaUrls(
+      compiled as unknown as JsonObject,
+      undefined,
+      signedMediaExpiry()
+    );
   } catch (error) {
     if (error instanceof ExperienceCompilationError) {
       incrementMetric('compile.validation_failed', {
@@ -543,7 +535,7 @@ export async function publishExperience(options: {
       let bundle: CompiledExperienceBundle;
       try {
         const compileStartedAt = Date.now();
-        bundle = await compilerFor(viewerIntegrationVersion).compileBundle(compileInput);
+        bundle = compilerFor(viewerIntegrationVersion).compileBundle(compileInput);
         observeMetric('compile.duration', Date.now() - compileStartedAt, {
           experienceType: loaded.project.type,
           target: 'publication'
@@ -1095,17 +1087,40 @@ function compilerOwnedMediaReferences(value: unknown): Record<string, unknown>[]
   return references;
 }
 
-function hydrateProtectedMediaUrls(manifest: JsonObject, publicationId: string): JsonObject {
+/** When a signed media URL issued now stops working. */
+function signedMediaExpiry(): string {
+  return new Date(Date.now() + config.signedMediaTtlSeconds * 1000).toISOString();
+}
+
+/**
+ * Turns the compiler's logical delivery locations into fetchable ones.
+ *
+ * This is the only place a media credential is created. The compiler emits a
+ * reference and nothing more, so a manifest can be stored immutably, compiled
+ * again anywhere, and compared byte for byte; the signature that makes it
+ * fetchable is applied per read, against the clock and key this process holds.
+ *
+ * A tile template is rewritten too: it is derived from the same media path, so
+ * it has to carry the same credential.
+ */
+function hydrateProtectedMediaUrls(
+  manifest: JsonObject,
+  publicationId?: string,
+  expiresAt?: string
+): JsonObject {
   const replacements = new Map<string, string>();
   for (const reference of compilerOwnedMediaReferences(manifest)) {
     const derivativeId = reference.derivativeId as string;
     const currentUrl = reference.url as string;
-    const token = createMediaToken({ derivativeId, publicationId });
+    const token = createMediaToken({
+      derivativeId,
+      ...(publicationId === undefined ? {} : { publicationId })
+    });
     const queryIndex = currentUrl.indexOf('?');
     const mediaPath = queryIndex === -1 ? currentUrl : currentUrl.slice(0, queryIndex);
     replacements.set(mediaPath, encodeURIComponent(token));
   }
-  return JSON.parse(JSON.stringify(manifest, (_key, value: unknown) => {
+  const hydrated = JSON.parse(JSON.stringify(manifest, (_key, value: unknown) => {
     if (typeof value !== 'string') return value;
     for (const [mediaPath, token] of replacements) {
       if (value === mediaPath || value.startsWith(`${mediaPath}/`)) {
@@ -1114,6 +1129,12 @@ function hydrateProtectedMediaUrls(manifest: JsonObject, publicationId: string):
     }
     return value;
   })) as JsonObject;
+  if (expiresAt !== undefined) {
+    for (const reference of compilerOwnedMediaReferences(hydrated)) {
+      reference.expiresAt = expiresAt;
+    }
+  }
+  return hydrated;
 }
 
 function manifestReferencesDerivative(value: unknown, derivativeId: string): boolean {

@@ -1,6 +1,7 @@
+import { jsonByteLength } from '../json';
 import { sanitizePlainText, sanitizeRichHtml } from '../security/html-sanitizer';
 import { validateSafeUrl } from '../security/url-validator';
-import type { JsonObject, JsonValue } from '../domain/types';
+import type { JsonObject, JsonValue } from '../types';
 import type {
   ExtensionDefinition,
   ExtensionFieldSchema,
@@ -38,7 +39,7 @@ export function validateExtensionPayload(
   }
 
   const maxBytes = extension.securityPolicy.maxPayloadBytes ?? DEFAULT_MAX_PAYLOAD_BYTES;
-  if (Buffer.byteLength(JSON.stringify(record)) > maxBytes) {
+  if (jsonByteLength(record) > maxBytes) {
     return {
       valid: false,
       issues: [{

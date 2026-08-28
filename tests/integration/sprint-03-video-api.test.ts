@@ -10,7 +10,7 @@ import {
   truncateApplicationData,
   type IntegrationTestContext
 } from '../helpers/postgres-test-context';
-import { PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION } from '../../apps/api/src/compiler/viewer-integration-adapter';
+import { PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION } from '@sphere/viewer-integration';
 
 const VIDEO_DURATION_MS = 6_000;
 

@@ -7,7 +7,7 @@ import {
   canTransitionAssetProcessingStatus,
   createAssetProcessingFailure,
   transitionAssetProcessing,
-} from '../../../apps/api/src/domain/asset-processing';
+} from '@sphere/experience-schema';
 
 describe('asset processing state machine', () => {
   it('accepts the canonical pipeline and idempotent duplicate delivery', () => {

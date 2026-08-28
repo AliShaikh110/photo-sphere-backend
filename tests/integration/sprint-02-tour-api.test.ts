@@ -9,7 +9,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION
-} from '../../apps/api/src/compiler/viewer-integration-adapter';
+} from '@sphere/viewer-integration';
 import { seedReadyPanorama } from '../fixtures/ready-panorama';
 import { bearer, registerIdentity } from '../helpers/api-client';
 import { generatedEquirectangularJpeg } from '../helpers/image-fixture';

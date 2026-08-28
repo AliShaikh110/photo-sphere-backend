@@ -2,7 +2,7 @@ import type {
   AssetDerivative,
   AssetDerivativeKind,
   CanonicalAsset,
-} from '../domain/types';
+} from '@sphere/experience-schema';
 
 export const BASELINE_PANORAMA_DERIVATIVE_KINDS = [
   'lowResolutionBase',

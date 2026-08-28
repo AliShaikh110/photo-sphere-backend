@@ -8,9 +8,9 @@ import {
   type ExtensionSchema,
   type ExtensionSecurityPolicy,
   type ExtensionStatus,
-} from '../extensions';
+} from '@sphere/experience-schema';
 import { Extension } from '../models';
-import type { CapabilityId } from '../capabilities/types';
+import type { CapabilityId } from '@sphere/capability-registry';
 import type { JsonObject, JsonValue, ProjectType } from '../models/model.types';
 import { recordAudit } from './audit-service';
 

@@ -7,7 +7,7 @@ import {
   createTourStrategyPolicy,
   selectTourRuntimeStrategy,
   selectTourStrategy,
-} from '../../../apps/api/src/runtime/tour-strategy';
+} from '@sphere/experience-schema';
 
 describe('tour runtime strategy', () => {
   it('keeps an ordinary tour inline', () => {

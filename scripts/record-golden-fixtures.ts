@@ -13,17 +13,19 @@ import { goldenScenarios } from '../tests/golden/scenarios';
  */
 const outputDirectory = path.resolve(__dirname, '..', 'tests', 'golden', 'expected');
 
-async function main(): Promise<void> {
+function main(): void {
   mkdirSync(outputDirectory, { recursive: true });
   for (const scenario of goldenScenarios()) {
-    const artifact = await recordGoldenArtifact(scenario);
+    const artifact = recordGoldenArtifact(scenario);
     const file = path.join(outputDirectory, `${scenario.id}.json`);
     writeFileSync(file, serializeGoldenArtifact(artifact), 'utf8');
     process.stdout.write(`recorded ${scenario.id} (${artifact.outcome})\n`);
   }
 }
 
-void main().catch((error: unknown) => {
+try {
+  main();
+} catch (error: unknown) {
   process.stderr.write(`${error instanceof Error ? error.stack : String(error)}\n`);
   process.exitCode = 1;
-});
+}

@@ -1,10 +1,15 @@
+/**
+ * The compiled runtime contract.
+ *
+ * This is the shape a player reads and a viewer integration adapts. It lives
+ * beside the canonical types rather than inside the compiler so an editor, an
+ * adapter and the API can all depend on the contract without depending on the
+ * thing that produces it.
+ */
 import type {
-  AssetDerivative,
   AssetDerivativeKind,
-  CanonicalAsset,
   CanonicalInitialView,
   CanonicalLayerAnchor,
-  CanonicalProject,
   CanonicalProjectSettings,
   CanonicalSpatialData,
   CanonicalSpatialCoordinateSystem,
@@ -15,24 +20,42 @@ import type {
   JsonObject,
   PanoramaDerivativeFamily,
   SphericalPosition,
-} from '../domain/types';
+} from './types';
 import type {
   AppliedCapabilityFallback,
   CapabilityId,
   DeferredDeviceCapability,
   DeviceRequirement,
   RuntimeModuleDeclaration,
-} from '../capabilities/types';
+} from '@sphere/capability-registry';
 import type {
   CompiledRuntimeCachePolicy,
   SceneTransitionFailureCategory,
   VideoPlaybackProfileId,
   VideoProfileCandidate,
-} from '../runtime';
-import type { ExtensionRegistrySnapshot } from '../extensions/types';
-import type { CompiledPanoramaCrop, CompiledSphereCorrection } from './panorama-metadata';
+} from './runtime';
+import type { CompiledTelemetryEvent } from '@sphere/telemetry-contract';
 
-export type { CompiledPanoramaCrop, CompiledSphereCorrection } from './panorama-metadata';
+/**
+ * Crop geometry carried by a panorama captured with a partial sphere. The
+ * compiler derives it from capture metadata; the player uses it to place the
+ * image on the sphere.
+ */
+export interface CompiledPanoramaCrop {
+  readonly fullWidthPixels: number;
+  readonly fullHeightPixels: number;
+  readonly croppedWidthPixels: number;
+  readonly croppedHeightPixels: number;
+  readonly croppedLeftPixels: number;
+  readonly croppedTopPixels: number;
+}
+
+/** The product-level "straighten" correction derived from the capture pose. */
+export interface CompiledSphereCorrection {
+  readonly headingDegrees: number;
+  readonly pitchDegrees: number;
+  readonly rollDegrees: number;
+}
 
 export const COMPILED_MANIFEST_VERSION = 4 as const;
 export const COMPILED_SCENE_VERSION = 2 as const;
@@ -40,38 +63,6 @@ export const COMPILED_SCENE_VERSION = 2 as const;
 export type CompileTarget = 'preview' | 'publication';
 export type PublicationVisibility = 'public' | 'private';
 export type MediaAccess = 'protected' | 'public';
-
-export interface CompileExperienceInput {
-  readonly project: CanonicalProject;
-  readonly assets: readonly CanonicalAsset[];
-  readonly target: CompileTarget;
-  readonly publicationRevision?: number;
-  readonly visibility?: PublicationVisibility;
-  /** Required for revision-pinned progressive scene URLs in published output. */
-  readonly publicationSlug?: string;
-  /** Enables custom interaction validation and runtime module allow-listing. */
-  readonly extensions?: ExtensionRegistrySnapshot;
-}
-
-export interface MediaUrlResolutionRequest {
-  readonly experienceId: string;
-  readonly assetId: string;
-  readonly derivative: AssetDerivative;
-  readonly access: MediaAccess;
-  readonly target: CompileTarget;
-  readonly publicationRevision?: number;
-}
-
-export interface ResolvedMediaUrl {
-  readonly url: string;
-  readonly expiresAt?: string;
-}
-
-export type MediaUrlResolution = string | ResolvedMediaUrl;
-
-export interface MediaUrlResolver {
-  resolve(request: MediaUrlResolutionRequest): MediaUrlResolution | Promise<MediaUrlResolution>;
-}
 
 export interface CompiledMediaReference {
   readonly assetId: string;
@@ -360,43 +351,16 @@ export interface RuntimeDeclarations {
   readonly fallbackPolicy: RuntimeFallbackPolicy;
 }
 
-export const BASELINE_TELEMETRY_EVENTS = [
-  'experience_load_started',
-  'first_panorama_visible',
-  'time_to_interactive',
-  'scene_changed',
-  'hotspot_clicked',
-  'asset_failed',
-  'scene_transition_failed',
-  'viewer_error',
-  'experience_exited',
-  'capability_fallback',
-] as const;
-
-/** Added when an experience publishes advanced spatial or overlay features. */
-export const SPATIAL_TELEMETRY_EVENTS = [
-  'overlay_clicked',
-  'map_interaction',
-] as const;
-
-/** Added for video360 experiences on top of the baseline event set. */
-export const VIDEO_TELEMETRY_EVENTS = [
-  'video_started',
-  'video_paused',
-  'video_resumed',
-  'video_seeked',
-  'video_stalled',
-  'video_ended',
-  'video_profile_selected',
-  'video_playback_failed',
-  'timeline_interaction_shown',
-  'timeline_interaction_clicked',
-] as const;
-
-export type CompiledTelemetryEvent =
-  | (typeof BASELINE_TELEMETRY_EVENTS)[number]
-  | (typeof VIDEO_TELEMETRY_EVENTS)[number]
-  | (typeof SPATIAL_TELEMETRY_EVENTS)[number];
+/**
+ * Telemetry event sets are declared once in the shared telemetry contract and
+ * re-exported here so a compiled manifest and the ingest endpoint agree.
+ */
+export {
+  BASELINE_TELEMETRY_EVENTS,
+  SPATIAL_TELEMETRY_EVENTS,
+  VIDEO_TELEMETRY_EVENTS,
+} from '@sphere/telemetry-contract';
+export type { CompiledTelemetryEvent } from '@sphere/telemetry-contract';
 
 export interface CompiledTelemetryMetadata {
   readonly enabled: true;

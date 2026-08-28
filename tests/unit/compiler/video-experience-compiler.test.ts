@@ -1,15 +1,15 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-import { ExperienceCompiler } from '../../../apps/api/src/compiler/experience-compiler';
+import { ExperienceCompiler } from '@sphere/experience-compiler';
 import {
   isVideoExperienceManifest,
   type CompileExperienceInput,
-  type CompiledVideoExperienceManifest,
-  type MediaUrlResolutionRequest
-} from '../../../apps/api/src/compiler/types';
-import type { AssetDerivative, CanonicalAsset, CanonicalProject } from '../../../apps/api/src/domain/types';
-import { PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION } from '../../../apps/api/src/compiler/viewer-integration-adapter';
-import { COMPILED_MANIFEST_VERSION } from '../../../apps/api/src/compiler/types';
+  type CompiledVideoExperienceManifest
+} from '@sphere/experience-compiler';
+import type { AssetDerivative, CanonicalAsset, CanonicalProject } from '@sphere/experience-schema';
+import { PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION } from '@sphere/viewer-integration';
+import { COMPILED_MANIFEST_VERSION } from '@sphere/experience-compiler';
+import { compileFailure } from './compile-failure';
 
 function videoDerivative(
   kind: AssetDerivative['kind'],
@@ -126,34 +126,50 @@ function compilerInput(overrides: Partial<CompileExperienceInput> = {}): Compile
   };
 }
 
-function createCompiler(requests: MediaUrlResolutionRequest[] = []): ExperienceCompiler {
+/** Every media reference the compiler emitted, wherever it sits in the output. */
+function mediaReferences(value: unknown): Record<string, unknown>[] {
+  const found: Record<string, unknown>[] = [];
+  const visit = (candidate: unknown): void => {
+    if (Array.isArray(candidate)) {
+      candidate.forEach(visit);
+      return;
+    }
+    if (candidate === null || typeof candidate !== 'object') return;
+    const object = candidate as Record<string, unknown>;
+    if (typeof object.derivativeId === 'string' && typeof object.url === 'string') {
+      found.push(object);
+    }
+    Object.values(object).forEach(visit);
+  };
+  visit(value);
+  return found;
+}
+
+function createCompiler(): ExperienceCompiler {
   return new ExperienceCompiler({
     viewerIntegrationVersion: PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION,
-    mediaUrlResolver: {
-      resolve: vi.fn((request: MediaUrlResolutionRequest) => {
-        requests.push(request);
-        return `/media/${request.access}/${request.derivative.id}`;
-      })
+    mediaDeliveryPolicy: {
+      protectedUrlTemplate: '/media/protected/{derivativeId}',
+      publicUrlTemplate: '/media/public/{derivativeId}'
     }
   });
 }
 
-async function compileVideo(
+function compileVideo(
   input: CompileExperienceInput = compilerInput()
-): Promise<CompiledVideoExperienceManifest> {
-  const manifest = await createCompiler().compile(input);
+): CompiledVideoExperienceManifest {
+  const manifest = createCompiler().compile(input);
   if (!isVideoExperienceManifest(manifest)) throw new Error('Expected a video360 manifest.');
   return manifest;
 }
 
 describe('Experience compiler — 360 video', () => {
   it('compiles a video360 manifest through the shared compiler path', async () => {
-    const requests: MediaUrlResolutionRequest[] = [];
-    const compiler = createCompiler(requests);
+    const compiler = createCompiler();
     const input = compilerInput();
 
-    const first = await compiler.compile(input);
-    const second = await compiler.compile(input);
+    const first = compiler.compile(input);
+    const second = compiler.compile(input);
 
     expect(second).toEqual(first);
     expect(first).toMatchObject({
@@ -166,13 +182,13 @@ describe('Experience compiler — 360 video', () => {
       visibility: 'private',
       viewerIntegrationVersion: PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION
     });
-    expect(requests.every((request) => request.access === 'protected')).toBe(true);
+    expect(mediaReferences(first).every((reference) => reference.access === 'protected')).toBe(true);
     expect(Object.isFrozen(first)).toBe(true);
     expect(JSON.stringify(first)).not.toContain('private/asset-video');
   });
 
   it('publishes ordered playback candidates with a handheld-safe default', async () => {
-    const manifest = await compileVideo();
+    const manifest = compileVideo();
 
     expect(manifest.video).toMatchObject({
       assetId: 'asset-video',
@@ -201,7 +217,7 @@ describe('Experience compiler — 360 video', () => {
   });
 
   it('normalises the timeline deterministically and sanitizes timed content', async () => {
-    const manifest = await compileVideo();
+    const manifest = compileVideo();
 
     expect(manifest.timeline.map((interaction) => interaction.id))
       .toEqual(['interaction-1', 'interaction-2', 'interaction-3']);
@@ -220,7 +236,7 @@ describe('Experience compiler — 360 video', () => {
   });
 
   it('declares the video capability set, runtime policy and telemetry contract', async () => {
-    const manifest = await compileVideo();
+    const manifest = compileVideo();
 
     const capabilityIds = manifest.capabilities.map((capability) => capability.id);
     expect(capabilityIds).toEqual(expect.arrayContaining([
@@ -251,7 +267,7 @@ describe('Experience compiler — 360 video', () => {
   });
 
   it('emits renderer configuration only through the integration adapter', async () => {
-    const manifest = await compileVideo();
+    const manifest = compileVideo();
 
     expect(manifest.viewerIntegration.rendererId).toBe('photo-sphere-viewer');
     expect(manifest.viewerIntegration.config).toMatchObject({
@@ -264,8 +280,7 @@ describe('Experience compiler — 360 video', () => {
   });
 
   it('uses public media for public publications and pins the selection endpoint', async () => {
-    const requests: MediaUrlResolutionRequest[] = [];
-    const manifest = await createCompiler(requests).compile(compilerInput({
+    const manifest = createCompiler().compile(compilerInput({
       target: 'publication',
       publicationRevision: 5,
       visibility: 'public',
@@ -274,7 +289,7 @@ describe('Experience compiler — 360 video', () => {
     if (!isVideoExperienceManifest(manifest)) throw new Error('Expected a video360 manifest.');
 
     expect(manifest.publicationRevision).toBe(5);
-    expect(requests.every((request) => request.access === 'public')).toBe(true);
+    expect(mediaReferences(manifest).every((reference) => reference.access === 'public')).toBe(true);
     expect(manifest.video.selectionPolicy.selectionUrl)
       .toBe('/view/harbour-tour/playback-profile');
   });
@@ -282,8 +297,7 @@ describe('Experience compiler — 360 video', () => {
   it('refuses to compile a video experience with no playback profile', async () => {
     const asset = videoAsset({ derivatives: [videoDerivative('videoPoster')] });
 
-    await expect(createCompiler().compile(compilerInput({ assets: [asset] })))
-      .rejects.toMatchObject({
+    expect(compileFailure(() => createCompiler().compile(compilerInput({ assets: [asset] })))).toMatchObject({
         code: 'EXPERIENCE_COMPILATION_FAILED',
         issues: expect.arrayContaining([expect.objectContaining({
           code: 'VIDEO_PROFILE_UNAVAILABLE',
@@ -295,8 +309,7 @@ describe('Experience compiler — 360 video', () => {
   it('refuses to compile while the video is still processing', async () => {
     const asset = videoAsset({ processingStatus: 'processing', derivatives: [] });
 
-    await expect(createCompiler().compile(compilerInput({ assets: [asset] })))
-      .rejects.toMatchObject({
+    expect(compileFailure(() => createCompiler().compile(compilerInput({ assets: [asset] })))).toMatchObject({
         issues: expect.arrayContaining([expect.objectContaining({
           code: 'VIDEO_ASSET_NOT_READY',
           path: 'videoAssetId',
@@ -316,8 +329,7 @@ describe('Experience compiler — 360 video', () => {
       }]
     });
 
-    await expect(createCompiler().compile(compilerInput({ project })))
-      .rejects.toMatchObject({
+    expect(compileFailure(() => createCompiler().compile(compilerInput({ project })))).toMatchObject({
         issues: expect.arrayContaining([expect.objectContaining({
           code: 'TIMELINE_TIME_OUT_OF_RANGE',
           path: 'timeline[0].timeMs'
@@ -336,8 +348,7 @@ describe('Experience compiler — 360 video', () => {
       }]
     });
 
-    await expect(createCompiler().compile(compilerInput({ project })))
-      .rejects.toMatchObject({
+    expect(compileFailure(() => createCompiler().compile(compilerInput({ project })))).toMatchObject({
         issues: expect.arrayContaining([expect.objectContaining({
           code: 'INVALID_URL',
           path: 'timeline[0].action.url'
@@ -356,8 +367,7 @@ describe('Experience compiler — 360 video', () => {
       }]
     });
 
-    await expect(createCompiler().compile(compilerInput({ project })))
-      .rejects.toMatchObject({
+    expect(compileFailure(() => createCompiler().compile(compilerInput({ project })))).toMatchObject({
         issues: expect.arrayContaining([expect.objectContaining({
           code: 'CAPABILITY_UNSUPPORTED',
           path: 'scenes'
@@ -399,7 +409,7 @@ describe('Experience compiler — 360 video', () => {
       ]
     });
 
-    const preview = await compileVideo(compilerInput({ project }));
+    const preview = compileVideo(compilerInput({ project }));
     expect(preview.timeline.map((entry) => entry.id)).toEqual([
       'mm-earlier',
       'zz-authored-first',
@@ -408,7 +418,7 @@ describe('Experience compiler — 360 video', () => {
     expect(preview.timeline.map((entry) => entry.sortOrder)).toEqual([2, 0, 1]);
 
     // Publication compiles through the same path, so the order must match.
-    const published = await compileVideo(compilerInput({
+    const published = compileVideo(compilerInput({
       project,
       target: 'publication',
       publicationRevision: 1,
@@ -440,7 +450,7 @@ describe('Experience compiler — 360 video', () => {
       ]
     });
 
-    const manifest = await compileVideo(compilerInput({ project }));
+    const manifest = compileVideo(compilerInput({ project }));
     expect(manifest.timeline.map((entry) => entry.id)).toEqual(['aaa', 'bbb']);
   });
 });

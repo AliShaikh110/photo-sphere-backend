@@ -1,5 +1,5 @@
-import type { AssetDerivative, CanonicalAsset } from '../domain/types';
-import type { VideoPlaybackProfileId } from '../runtime';
+import type { AssetDerivative, CanonicalAsset } from '@sphere/experience-schema';
+import type { VideoPlaybackProfileId } from '@sphere/experience-schema';
 import { isDerivativeReady, selectLatestReadyDerivative } from './derivative-selector';
 
 export const VIDEO_PROFILE_ID_BY_DERIVATIVE_KIND = Object.freeze({

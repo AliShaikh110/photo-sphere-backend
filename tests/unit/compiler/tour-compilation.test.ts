@@ -1,16 +1,15 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-import { ExperienceCompiler } from '../../../apps/api/src/compiler/experience-compiler';
-import { PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION } from '../../../apps/api/src/compiler/viewer-integration-adapter';
-import { isImageExperienceManifest } from '../../../apps/api/src/compiler/types';
+import { ExperienceCompiler } from '@sphere/experience-compiler';
+import { PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION } from '@sphere/viewer-integration';
+import { isImageExperienceManifest } from '@sphere/experience-compiler';
 import type {
   CompiledExperienceBundle,
   CompiledImageExperienceManifest,
   CompileExperienceInput,
-  MediaUrlResolutionRequest,
-} from '../../../apps/api/src/compiler/types';
-import { createTourStrategyPolicy } from '../../../apps/api/src/runtime/tour-strategy';
-import type { CanonicalProject } from '../../../apps/api/src/domain/types';
+} from '@sphere/experience-compiler';
+import { createTourStrategyPolicy } from '@sphere/experience-schema';
+import type { CanonicalProject } from '@sphere/experience-schema';
 import {
   derivative,
   panoramaAsset,
@@ -23,8 +22,9 @@ function createCompiler(
 ): ExperienceCompiler {
   return new ExperienceCompiler({
     viewerIntegrationVersion: PHOTO_SPHERE_VIEWER_INTEGRATION_VERSION,
-    mediaUrlResolver: {
-      resolve: vi.fn((request: MediaUrlResolutionRequest) => `/media/${request.derivative.id}`),
+    mediaDeliveryPolicy: {
+      protectedUrlTemplate: '/media/{derivativeId}',
+      publicUrlTemplate: '/media/{derivativeId}',
     },
     ...overrides,
   });
@@ -53,7 +53,7 @@ function imageManifest(bundle: CompiledExperienceBundle): CompiledImageExperienc
 
 describe('tour compilation — delivery strategy', () => {
   it('compiles a small tour with every scene definition inline', async () => {
-    const bundle = await createCompiler().compileBundle(publicationInput(tourProject(3)));
+    const bundle = createCompiler().compileBundle(publicationInput(tourProject(3)));
     const manifest = imageManifest(bundle);
 
     expect(manifest.tour.strategy).toBe('embedded');
@@ -70,7 +70,7 @@ describe('tour compilation — delivery strategy', () => {
       tourStrategyPolicy: createTourStrategyPolicy({ maxInlineSceneCount: 3 }),
     });
 
-    const bundle = await compiler.compileBundle(publicationInput(tourProject(8)));
+    const bundle = compiler.compileBundle(publicationInput(tourProject(8)));
     const manifest = imageManifest(bundle);
 
     expect(manifest.tour.strategy).toBe('progressive');
@@ -92,7 +92,7 @@ describe('tour compilation — delivery strategy', () => {
       tourStrategyPolicy: createTourStrategyPolicy({ maxInlineSceneCount: 1 }),
     });
 
-    const manifest = imageManifest(await compiler.compileBundle(publicationInput(tourProject(4))));
+    const manifest = imageManifest(compiler.compileBundle(publicationInput(tourProject(4))));
 
     for (const entry of manifest.tour.sceneIndex) {
       expect(Object.keys(entry).sort()).toEqual([
@@ -114,8 +114,8 @@ describe('tour compilation — delivery strategy', () => {
       tourStrategyPolicy: createTourStrategyPolicy({ maxInlineSceneCount: 4 }),
     });
 
-    const small = imageManifest(await compiler.compileBundle(publicationInput(tourProject(4))));
-    const large = imageManifest(await compiler.compileBundle(publicationInput(tourProject(40))));
+    const small = imageManifest(compiler.compileBundle(publicationInput(tourProject(4))));
+    const large = imageManifest(compiler.compileBundle(publicationInput(tourProject(40))));
 
     const smallBytes = Buffer.byteLength(JSON.stringify(small));
     const largeBytes = Buffer.byteLength(JSON.stringify(large));
@@ -134,7 +134,7 @@ describe('tour compilation — delivery strategy', () => {
       tourStrategyPolicy: createTourStrategyPolicy({ maxInlineSceneCount: 1 }),
     });
 
-    const preview = imageManifest(await compiler.compileBundle({
+    const preview = imageManifest(compiler.compileBundle({
       project: tourProject(4),
       assets: [panoramaAsset()],
       target: 'preview',
@@ -151,7 +151,7 @@ describe('tour compilation — delivery strategy', () => {
 describe('tour compilation — preload and cache hints', () => {
   it('names only likely adjacent scenes, never the whole tour', async () => {
     const manifest = imageManifest(
-      await createCompiler().compileBundle(publicationInput(tourProject(6))),
+      createCompiler().compileBundle(publicationInput(tourProject(6))),
     );
 
     expect(manifest.runtime.preload.strategy).toBe('selective-adjacent');
@@ -184,7 +184,7 @@ describe('tour compilation — preload and cache hints', () => {
     };
 
     const manifest = imageManifest(
-      await createCompiler().compileBundle(publicationInput(hinted)),
+      createCompiler().compileBundle(publicationInput(hinted)),
     );
 
     const preloads = manifest.scenes[0]!.preloadSceneIds;
@@ -194,7 +194,7 @@ describe('tour compilation — preload and cache hints', () => {
 
   it('compiles a bounded, versioned cache contract for every device profile', async () => {
     const manifest = imageManifest(
-      await createCompiler().compileBundle(publicationInput(tourProject(3))),
+      createCompiler().compileBundle(publicationInput(tourProject(3))),
     );
 
     const cache = manifest.runtime.cache;
@@ -214,7 +214,7 @@ describe('tour compilation — preload and cache hints', () => {
 
 describe('tour compilation — quality policy', () => {
   it('delivers tiled detail over a low-resolution base when the derivatives exist', async () => {
-    const bundle = await createCompiler().compileBundle(publicationInput(tourProject(2), {
+    const bundle = createCompiler().compileBundle(publicationInput(tourProject(2), {
       assets: [tiledPanoramaAsset()],
     }));
     const manifest = imageManifest(bundle);
@@ -231,7 +231,7 @@ describe('tour compilation — quality policy', () => {
 
   it('falls back to the standard derivative when no tiled set was generated', async () => {
     const manifest = imageManifest(
-      await createCompiler().compileBundle(publicationInput(tourProject(2))),
+      createCompiler().compileBundle(publicationInput(tourProject(2))),
     );
 
     const scene = manifest.scenes[0]!;
@@ -250,7 +250,7 @@ describe('tour compilation — quality policy', () => {
         : scene)),
     };
 
-    const manifest = imageManifest(await createCompiler().compileBundle(
+    const manifest = imageManifest(createCompiler().compileBundle(
       publicationInput(standard, { assets: [tiledPanoramaAsset()] }),
     ));
 
@@ -262,7 +262,7 @@ describe('tour compilation — quality policy', () => {
 describe('tour compilation — scene index media', () => {
   it('uses the dedicated thumbnail derivative rather than the panorama base', async () => {
     const manifest = imageManifest(
-      await createCompiler().compileBundle(publicationInput(tourProject(3))),
+      createCompiler().compileBundle(publicationInput(tourProject(3))),
     );
 
     for (const entry of manifest.tour.sceneIndex) {
@@ -276,7 +276,7 @@ describe('tour compilation — scene index media', () => {
 
   it('serves the gallery from the same lightweight thumbnail', async () => {
     const project = tourProject(3);
-    const manifest = imageManifest(await createCompiler().compileBundle(publicationInput({
+    const manifest = imageManifest(createCompiler().compileBundle(publicationInput({
       ...project,
       settings: { ...project.settings, gallery: { enabled: true } },
     })));
@@ -298,7 +298,7 @@ describe('tour compilation — scene index media', () => {
       ],
     });
 
-    const manifest = imageManifest(await createCompiler().compileBundle(
+    const manifest = imageManifest(createCompiler().compileBundle(
       publicationInput(tourProject(2), { assets: [withoutThumbnail] }),
     ));
 
@@ -318,7 +318,7 @@ describe('tour compilation — scene index media', () => {
       ],
     });
 
-    const manifest = imageManifest(await createCompiler().compileBundle(
+    const manifest = imageManifest(createCompiler().compileBundle(
       publicationInput(tourProject(2), { assets: [reprocessed] }),
     ));
 
@@ -331,7 +331,7 @@ describe('tour compilation — scene index media', () => {
 
 describe('tour compilation — published scene definitions', () => {
   it('emits one immutable definition per scene, pinned to the publication revision', async () => {
-    const bundle = await createCompiler().compileBundle(publicationInput(tourProject(3), {
+    const bundle = createCompiler().compileBundle(publicationInput(tourProject(3), {
       publicationRevision: 7,
     }));
 
@@ -348,7 +348,7 @@ describe('tour compilation — published scene definitions', () => {
   });
 
   it('emits no published scene definitions for a draft preview', async () => {
-    const bundle = await createCompiler().compileBundle({
+    const bundle = createCompiler().compileBundle({
       project: tourProject(3),
       assets: [panoramaAsset()],
       target: 'preview',
@@ -358,15 +358,15 @@ describe('tour compilation — published scene definitions', () => {
   });
 
   it('compiles the same input to the same output, so a revision is reproducible', async () => {
-    const first = await createCompiler().compileBundle(publicationInput(tourProject(4)));
-    const second = await createCompiler().compileBundle(publicationInput(tourProject(4)));
+    const first = createCompiler().compileBundle(publicationInput(tourProject(4)));
+    const second = createCompiler().compileBundle(publicationInput(tourProject(4)));
 
     expect(JSON.stringify(second)).toBe(JSON.stringify(first));
   });
 
   it('does not carry a later draft edit into an already-compiled revision', async () => {
     const compiler = createCompiler();
-    const published = await compiler.compileBundle(publicationInput(tourProject(3)));
+    const published = compiler.compileBundle(publicationInput(tourProject(3)));
 
     const edited = tourProject(3);
     const renamed: CanonicalProject = {
@@ -376,7 +376,7 @@ describe('tour compilation — published scene definitions', () => {
         ? { ...scene, name: 'Renamed after publish' }
         : scene)),
     };
-    const republished = await compiler.compileBundle(publicationInput(renamed, {
+    const republished = compiler.compileBundle(publicationInput(renamed, {
       publicationRevision: 2,
     }));
 

@@ -1,8 +1,8 @@
 import {
   createAssetProcessingFailure,
   type AssetProcessingFailure,
-} from '../domain/asset-processing';
-import type { AssetDerivativeKind } from '../domain/types';
+} from '@sphere/experience-schema';
+import type { AssetDerivativeKind } from '@sphere/experience-schema';
 import { VideoProfileUnavailableError, type VideoTranscoder } from '../integrations/video';
 import type { MediaJobStageName } from '../models/model.types';
 import { sha256 } from '../utils/hash';

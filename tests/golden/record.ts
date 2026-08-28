@@ -1,11 +1,11 @@
 import {
+  DEFAULT_MEDIA_DELIVERY_POLICY,
   ExperienceCompilationError,
-  ExperienceCompiler,
-  createViewerIntegrationAdapter,
-  type CompileExperienceInput,
-  type MediaUrlResolver
-} from '../../apps/api/src/compiler';
-import { DEFAULT_TOUR_STRATEGY_POLICY } from '../../apps/api/src/runtime';
+  compile,
+  contentHash,
+  type CompilerInput
+} from '@sphere/experience-compiler';
+import { DEFAULT_TOUR_STRATEGY_POLICY } from '@sphere/experience-schema';
 import { sha256, stableJson } from '../../apps/api/src/utils/hash';
 import type { GoldenScenario } from './scenarios';
 
@@ -15,20 +15,6 @@ import type { GoldenScenario } from './scenarios';
  * differs, and makes a version bump an explicit, reviewable re-record.
  */
 export const GOLDEN_VIEWER_INTEGRATION_VERSION = 'psv-5.14.3-adapter-2';
-
-/**
- * The logical delivery locations the compiler emits.
- *
- * They carry no credential and never vary between two runs: signing a URL is a
- * server-side hydration step performed after compilation, so a golden fixture
- * stays byte-stable and the compiled output stays safe to produce in a browser.
- */
-export const GOLDEN_MEDIA_URL_RESOLVER: MediaUrlResolver = {
-  resolve: ({ derivative, access, experienceId, publicationRevision }) =>
-    access === 'public'
-      ? `/api/v1/publications/${experienceId}/${publicationRevision ?? 1}/media/${derivative.id}`
-      : `/api/v1/media/${derivative.id}`
-};
 
 export interface GoldenArtifact {
   readonly id: string;
@@ -44,11 +30,18 @@ export interface GoldenArtifact {
   readonly hashes: Record<string, string>;
 }
 
-export function goldenCompileInput(scenario: GoldenScenario): CompileExperienceInput {
+export function goldenCompileInput(scenario: GoldenScenario): CompilerInput {
   return {
     project: scenario.project,
     assets: scenario.assets,
     target: scenario.target,
+    viewerIntegrationVersion: GOLDEN_VIEWER_INTEGRATION_VERSION,
+    // Delivery locations and runtime policy are pinned rather than read from
+    // configuration, so a golden fixture stays byte-stable everywhere.
+    policy: {
+      media: DEFAULT_MEDIA_DELIVERY_POLICY,
+      tour: DEFAULT_TOUR_STRATEGY_POLICY
+    },
     ...(scenario.target === 'publication'
       ? {
         publicationRevision: scenario.publicationRevision ?? 1,
@@ -73,22 +66,14 @@ export function goldenContentHash(bundle: {
   sceneDefinitions: unknown;
   sceneIndex?: unknown;
 }): string {
-  return sha256(stableJson({
+  return contentHash({
     manifest: bundle.manifest,
     sceneDefinitions: bundle.sceneDefinitions,
     sceneIndex: bundle.sceneIndex ?? []
-  }));
-}
-
-function createGoldenCompiler(): ExperienceCompiler {
-  return new ExperienceCompiler({
-    mediaUrlResolver: GOLDEN_MEDIA_URL_RESOLVER,
-    viewerIntegrationAdapter: createViewerIntegrationAdapter(GOLDEN_VIEWER_INTEGRATION_VERSION),
-    tourStrategyPolicy: DEFAULT_TOUR_STRATEGY_POLICY
   });
 }
 
-export async function recordGoldenArtifact(scenario: GoldenScenario): Promise<GoldenArtifact> {
+export function recordGoldenArtifact(scenario: GoldenScenario): GoldenArtifact {
   const input = goldenCompileInput(scenario);
   const recordedInput: Record<string, unknown> = {
     target: input.target,
@@ -101,38 +86,23 @@ export async function recordGoldenArtifact(scenario: GoldenScenario): Promise<Go
     project: scenario.project,
     assets: scenario.assets
   };
+  const identity = {
+    id: scenario.id,
+    description: scenario.description,
+    viewerIntegrationVersion: GOLDEN_VIEWER_INTEGRATION_VERSION,
+    input: recordedInput
+  };
 
+  let result;
   try {
-    const bundle = await createGoldenCompiler().compileBundle(input);
-    const sceneIndex = bundle.sceneIndex ?? [];
-    return {
-      id: scenario.id,
-      description: scenario.description,
-      viewerIntegrationVersion: GOLDEN_VIEWER_INTEGRATION_VERSION,
-      input: recordedInput,
-      outcome: 'compiled',
-      manifest: bundle.manifest,
-      viewerIntegration: bundle.manifest.viewerIntegration,
-      sceneDefinitions: bundle.sceneDefinitions,
-      sceneIndex,
-      diagnostics: [],
-      hashes: {
-        input: sha256(stableJson(recordedInput)),
-        manifest: sha256(stableJson(bundle.manifest)),
-        viewerIntegration: sha256(stableJson(bundle.manifest.viewerIntegration)),
-        sceneDefinitions: sha256(stableJson(bundle.sceneDefinitions)),
-        sceneIndex: sha256(stableJson(sceneIndex)),
-        content: goldenContentHash({ ...bundle, sceneIndex })
-      }
-    };
+    result = compile(input);
   } catch (error) {
     if (!(error instanceof ExperienceCompilationError)) throw error;
+    // A rejection is frozen too: the codes, paths and alternatives a creator is
+    // shown are as much a contract as a manifest is.
     const diagnostics = error.issues;
     return {
-      id: scenario.id,
-      description: scenario.description,
-      viewerIntegrationVersion: GOLDEN_VIEWER_INTEGRATION_VERSION,
-      input: recordedInput,
+      ...identity,
       outcome: 'rejected',
       manifest: null,
       viewerIntegration: null,
@@ -145,6 +115,24 @@ export async function recordGoldenArtifact(scenario: GoldenScenario): Promise<Go
       }
     };
   }
+
+  return {
+    ...identity,
+    outcome: 'compiled',
+    manifest: result.manifest,
+    viewerIntegration: result.viewerIntegration,
+    sceneDefinitions: result.sceneDefinitions,
+    sceneIndex: result.sceneIndex,
+    diagnostics: [],
+    hashes: {
+      input: sha256(stableJson(recordedInput)),
+      manifest: sha256(stableJson(result.manifest)),
+      viewerIntegration: sha256(stableJson(result.viewerIntegration)),
+      sceneDefinitions: sha256(stableJson(result.sceneDefinitions)),
+      sceneIndex: sha256(stableJson(result.sceneIndex)),
+      content: result.contentHash
+    }
+  };
 }
 
 /** The exact bytes a golden fixture file holds. */

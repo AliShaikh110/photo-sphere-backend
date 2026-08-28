@@ -73,11 +73,14 @@ jobs:
       - name: Apply migrations to fresh PostgreSQL
         run: npm run db:migrate
 
-      - name: Lint
+      - name: Lint and dependency boundaries
         run: npm run lint
 
       - name: Typecheck
         run: npm run typecheck
+
+      - name: Golden manifest fixtures
+        run: npm run test:golden
 
       - name: Unit tests
         run: npm run test:unit

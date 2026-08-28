@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   sanitizePlainText,
   sanitizeRichHtml,
-} from '../../../apps/api/src/security/html-sanitizer';
+} from '@sphere/experience-schema';
 
 describe('shared HTML sanitizer', () => {
   it('removes executable tags, event handlers, inline styles, and unsafe links', () => {

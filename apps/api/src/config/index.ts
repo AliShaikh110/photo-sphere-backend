@@ -3,7 +3,7 @@ import path from 'node:path';
 import { z } from 'zod';
 import type { PanoramaTilingPolicy } from '../media/panorama-quality-policy';
 import type { VideoTranscodingPolicy } from '../media/video-profile-policy';
-import type { TourStrategyPolicyConfig } from '../runtime';
+import type { TourStrategyPolicyConfig } from '@sphere/experience-schema';
 
 const booleanFromString = z
   .enum(['true', 'false'])

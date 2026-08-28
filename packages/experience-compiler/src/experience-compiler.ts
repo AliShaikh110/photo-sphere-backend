@@ -14,12 +14,13 @@ import type {
   CanonicalViewpoint,
   JsonObject,
   JsonValue,
-} from '../domain/types';
-import { resolvePanoramaQuality } from '../media/quality-policy';
-import { CAPABILITY_REGISTRY } from '../capabilities/registry';
-import type { ValidationIssue } from '../domain/validation';
-import { sanitizePlainText, sanitizeRichHtml } from '../security/html-sanitizer';
-import { validateSafeUrl } from '../security/url-validator';
+} from '@sphere/experience-schema';
+import { jsonByteLength } from '@sphere/experience-schema';
+import { resolvePanoramaQuality } from './quality-policy';
+import { CAPABILITY_REGISTRY } from '@sphere/capability-registry';
+import type { ValidationIssue } from '@sphere/experience-schema';
+import { sanitizePlainText, sanitizeRichHtml } from '@sphere/experience-schema';
+import { validateSafeUrl } from '@sphere/experience-schema';
 import {
   DEFAULT_ADJACENT_SCENE_PRELOAD_POLICY,
   DEFAULT_RUNTIME_CACHE_POLICY,
@@ -31,12 +32,12 @@ import {
   resolveRuntimeCachePolicy,
   selectAdjacentScenePreloads,
   selectTourRuntimeStrategy,
-} from '../runtime';
+} from '@sphere/experience-schema';
 import type {
   AdjacentScenePreloadPolicyConfig,
   RuntimeCachePolicyConfig,
   TourStrategyPolicyConfig,
-} from '../runtime';
+} from '@sphere/experience-schema';
 import {
   requirePanoramaDerivatives,
   selectPanoramaFamilyDerivatives,
@@ -50,17 +51,19 @@ import {
   readPanoramaSphereCorrection,
 } from './panorama-metadata';
 import { readTiledPanoramaMetadata } from './tiled-panorama';
-import { VIDEO_PLAYBACK_FAILURE_CATEGORIES } from '../models/model.types';
+import { VIDEO_PLAYBACK_FAILURE_CATEGORIES } from '@sphere/telemetry-contract';
 import {
   isHandheldSafeProfile,
   selectVideoDerivatives,
 } from './video-derivative-selector';
 import {
   BASELINE_TELEMETRY_EVENTS,
-  COMPILED_MANIFEST_VERSION,
-  COMPILED_SCENE_VERSION,
   SPATIAL_TELEMETRY_EVENTS,
   VIDEO_TELEMETRY_EVENTS,
+} from '@sphere/telemetry-contract';
+import {
+  COMPILED_MANIFEST_VERSION,
+  COMPILED_SCENE_VERSION,
 } from './types';
 import type {
   CompileExperienceInput,
@@ -90,18 +93,21 @@ import type {
   CompiledVideoMedia,
   CompiledVideoPlaybackProfile,
   MediaAccess,
-  MediaUrlResolution,
-  MediaUrlResolutionRequest,
-  MediaUrlResolver,
   PublicationVisibility,
   RuntimeCapabilityDeclaration,
   RuntimeDeclarations,
   ViewerIntegrationAdapter,
 } from './types';
-import { PhotoSphereViewerIntegrationAdapter } from './viewer-integration-adapter';
+import { PhotoSphereViewerIntegrationAdapter } from '@sphere/viewer-integration';
+import {
+  DEFAULT_MEDIA_DELIVERY_POLICY,
+  formatMediaLocation,
+  type MediaDeliveryPolicy,
+} from './media-delivery-policy';
 
 export interface ExperienceCompilerDependencies {
-  readonly mediaUrlResolver: MediaUrlResolver;
+  /** Where compiled media references point; defaults to the platform routes. */
+  readonly mediaDeliveryPolicy?: MediaDeliveryPolicy;
   readonly viewerIntegrationAdapter?: ViewerIntegrationAdapter;
   readonly viewerIntegrationVersion?: string;
   readonly tourStrategyPolicy?: TourStrategyPolicyConfig;
@@ -112,7 +118,7 @@ export interface ExperienceCompilerDependencies {
 interface ResolutionContext {
   readonly input: CompileExperienceInput;
   readonly access: MediaAccess;
-  readonly cache: Map<string, Promise<CompiledMediaReference>>;
+  readonly cache: Map<string, CompiledMediaReference>;
 }
 
 interface IssueLocation {
@@ -145,14 +151,14 @@ export class ExperienceCompilationError extends Error {
 
 /** Shared compilation boundary used unchanged by draft preview and publication. */
 export class ExperienceCompiler {
-  private readonly mediaUrlResolver: MediaUrlResolver;
+  private readonly mediaDeliveryPolicy: MediaDeliveryPolicy;
   private readonly viewerIntegrationAdapter: ViewerIntegrationAdapter;
   private readonly tourStrategyPolicy: TourStrategyPolicyConfig;
   private readonly preloadPolicy: AdjacentScenePreloadPolicyConfig;
   private readonly cachePolicy: RuntimeCachePolicyConfig;
 
-  constructor(dependencies: ExperienceCompilerDependencies) {
-    this.mediaUrlResolver = dependencies.mediaUrlResolver;
+  constructor(dependencies: ExperienceCompilerDependencies = {}) {
+    this.mediaDeliveryPolicy = dependencies.mediaDeliveryPolicy ?? DEFAULT_MEDIA_DELIVERY_POLICY;
     this.viewerIntegrationAdapter = dependencies.viewerIntegrationAdapter
       ?? new PhotoSphereViewerIntegrationAdapter(dependencies.viewerIntegrationVersion);
     this.tourStrategyPolicy = dependencies.tourStrategyPolicy ?? DEFAULT_TOUR_STRATEGY_POLICY;
@@ -169,11 +175,11 @@ export class ExperienceCompiler {
     return preflightExperience(input);
   }
 
-  async compile(input: CompileExperienceInput): Promise<CompiledExperienceManifest> {
-    return (await this.compileBundle(input)).manifest;
+  compile(input: CompileExperienceInput): CompiledExperienceManifest {
+    return this.compileBundle(input).manifest;
   }
 
-  async compileBundle(input: CompileExperienceInput): Promise<CompiledExperienceBundle> {
+  compileBundle(input: CompileExperienceInput): CompiledExperienceBundle {
     const preflight = this.preflight(input);
     if (!preflight.valid) {
       throw new ExperienceCompilationError(preflight.issues);
@@ -193,7 +199,7 @@ export class ExperienceCompiler {
     const initialSceneId = input.project.scenes.find((scene) => scene.isPrimary)?.id
       ?? input.project.scenes[0]!.id;
     const settings = deepFreeze(compileSettings(input.project.settings));
-    const branding = deepFreeze(await this.compileBranding(
+    const branding = deepFreeze(this.compileBranding(
       input.project.branding,
       input.project.id,
       assetsById,
@@ -207,7 +213,7 @@ export class ExperienceCompiler {
     for (const [sceneIndex, scene] of input.project.scenes.entries()) {
       const panoramaAsset = assetsById.get(scene.panoramaAssetId!)!;
       const derivatives = requirePanoramaDerivatives(panoramaAsset);
-      const base = await this.resolveDerivative(
+      const base = this.resolveDerivative(
         panoramaAsset,
         derivatives.lowResolutionBase,
         context,
@@ -217,7 +223,7 @@ export class ExperienceCompiler {
           path: `scenes[${sceneIndex}].panoramaAssetId`,
         },
       );
-      const primary = await this.resolveDerivative(
+      const primary = this.resolveDerivative(
         panoramaAsset,
         derivatives.standardWeb,
         context,
@@ -227,7 +233,7 @@ export class ExperienceCompiler {
           path: `scenes[${sceneIndex}].panoramaAssetId`,
         },
       );
-      sceneIndexThumbnails.set(scene.id, await this.resolveDerivative(
+      sceneIndexThumbnails.set(scene.id, this.resolveDerivative(
         panoramaAsset,
         selectSceneIndexThumbnail(panoramaAsset, derivatives),
         context,
@@ -245,7 +251,7 @@ export class ExperienceCompiler {
         && qualityPreference !== 'standard'
         && derivatives.tiledLevels !== undefined) {
         const tileMetadata = readTiledPanoramaMetadata(derivatives.tiledLevels)!;
-        const tileManifest = await this.resolveDerivative(
+        const tileManifest = this.resolveDerivative(
           panoramaAsset,
           derivatives.tiledLevels,
           context,
@@ -265,7 +271,7 @@ export class ExperienceCompiler {
 
       const hotspots: CompiledHotspot[] = [];
       for (const [hotspotIndex, hotspot] of scene.hotspots.entries()) {
-        hotspots.push(await this.compileHotspot(
+        hotspots.push(this.compileHotspot(
           hotspot,
           `scenes[${sceneIndex}].hotspots[${hotspotIndex}]`,
           assetsById,
@@ -274,7 +280,7 @@ export class ExperienceCompiler {
       }
       const overlays: CompiledOverlay[] = [];
       for (const [overlayIndex, overlay] of (scene.overlays ?? []).entries()) {
-        overlays.push(await this.compileOverlay(
+        overlays.push(this.compileOverlay(
           overlay,
           `scenes[${sceneIndex}].overlays[${overlayIndex}]`,
           assetsById,
@@ -305,7 +311,7 @@ export class ExperienceCompiler {
       const cubemap = cubemapDerivative === undefined
         || !capabilityResolution.capabilities.includes('cubemapPanorama')
         ? undefined
-        : await this.resolveDerivative(panoramaAsset, cubemapDerivative, context, {
+        : this.resolveDerivative(panoramaAsset, cubemapDerivative, context, {
           entityType: 'scene',
           entityId: scene.id,
           path: `scenes[${sceneIndex}].panoramaAssetId`,
@@ -395,7 +401,7 @@ export class ExperienceCompiler {
     );
     const tourDecision = selectTourRuntimeStrategy({
       sceneCount: frozenScenes.length,
-      estimatedManifestBytes: Buffer.byteLength(JSON.stringify(frozenScenes)),
+      estimatedManifestBytes: jsonByteLength(frozenScenes),
       connectionCount,
     }, this.tourStrategyPolicy);
     const progressive = input.target === 'publication'
@@ -427,7 +433,7 @@ export class ExperienceCompiler {
     const inlineSceneIndex = sceneIndexSegmented
       ? sceneIndex.slice(0, SCENE_INDEX_SEGMENT_THRESHOLD)
       : sceneIndex;
-    const plans = deepFreeze(await this.compilePlans(
+    const plans = deepFreeze(this.compilePlans(
       input.project.plans ?? [],
       input.project.scenes,
       assetsById,
@@ -561,10 +567,10 @@ export class ExperienceCompiler {
    * resolution, media resolution, sanitization and integration-adapter path
    * used by image experiences; only the media and timeline shapes differ.
    */
-  private async compileVideoBundle(
+  private compileVideoBundle(
     input: CompileExperienceInput,
     capabilityResolution: ReturnType<typeof preflightExperience>['capabilityResolution'],
-  ): Promise<CompiledExperienceBundle> {
+  ): CompiledExperienceBundle {
     const visibility = resolveVisibility(input);
     const access: MediaAccess = input.target === 'preview' || visibility === 'private'
       ? 'protected'
@@ -572,7 +578,7 @@ export class ExperienceCompiler {
     const context: ResolutionContext = { input, access, cache: new Map() };
     const assetsById = new Map(input.assets.map((asset) => [asset.id, asset]));
     const settings = deepFreeze(compileSettings(input.project.settings));
-    const branding = deepFreeze(await this.compileBranding(
+    const branding = deepFreeze(this.compileBranding(
       input.project.branding,
       input.project.id,
       assetsById,
@@ -580,10 +586,10 @@ export class ExperienceCompiler {
     ));
 
     const videoAsset = assetsById.get(input.project.videoAssetId!)!;
-    const video = deepFreeze(await this.compileVideoMedia(videoAsset, input, context));
+    const video = deepFreeze(this.compileVideoMedia(videoAsset, input, context));
     const timeline: CompiledTimelineInteraction[] = [];
     for (const [index, interaction] of (input.project.timeline ?? []).entries()) {
-      timeline.push(await this.compileTimelineInteraction(
+      timeline.push(this.compileTimelineInteraction(
         interaction,
         `timeline[${index}]`,
         assetsById,
@@ -685,15 +691,15 @@ export class ExperienceCompiler {
     return deepFreeze({ manifest, sceneDefinitions: [] });
   }
 
-  private async compileVideoMedia(
+  private compileVideoMedia(
     videoAsset: CanonicalAsset,
     input: CompileExperienceInput,
     context: ResolutionContext,
-  ): Promise<CompiledVideoMedia> {
+  ): CompiledVideoMedia {
     const selected = selectVideoDerivatives(videoAsset);
     const profiles: CompiledVideoPlaybackProfile[] = [];
     for (const candidate of selected.profiles) {
-      const media = await this.resolveDerivative(videoAsset, candidate.derivative, context, {
+      const media = this.resolveDerivative(videoAsset, candidate.derivative, context, {
         entityType: 'project',
         entityId: input.project.id,
         path: 'videoAssetId',
@@ -733,7 +739,7 @@ export class ExperienceCompiler {
     );
     const poster = selected.poster === undefined
       ? undefined
-      : await this.resolveDerivative(videoAsset, selected.poster, context, {
+      : this.resolveDerivative(videoAsset, selected.poster, context, {
         entityType: 'project',
         entityId: input.project.id,
         path: 'videoAssetId',
@@ -772,13 +778,13 @@ export class ExperienceCompiler {
     };
   }
 
-  private async compileTimelineInteraction(
+  private compileTimelineInteraction(
     interaction: CanonicalTimelineInteraction,
     path: string,
     assetsById: ReadonlyMap<string, CanonicalAsset>,
     context: ResolutionContext,
-  ): Promise<CompiledTimelineInteraction> {
-    const appearance = await this.compileHotspotAppearance(
+  ): CompiledTimelineInteraction {
+    const appearance = this.compileHotspotAppearance(
       { ...interaction, sceneId: '', geometry: { kind: 'point' } } as unknown as CanonicalHotspot,
       path,
       assetsById,
@@ -786,7 +792,7 @@ export class ExperienceCompiler {
     );
     const baseContent = interaction.content === undefined
       ? undefined
-      : await this.compileHotspotContent(
+      : this.compileHotspotContent(
         {
           id: interaction.id,
           sceneId: '',
@@ -832,7 +838,7 @@ export class ExperienceCompiler {
       case 'openAsset':
         action = {
           kind: 'openAsset',
-          media: await this.resolveDisplayAsset(
+          media: this.resolveDisplayAsset(
             interaction.action.assetId,
             assetsById,
             context,
@@ -879,12 +885,12 @@ export class ExperienceCompiler {
     };
   }
 
-  private async compileBranding(
+  private compileBranding(
     branding: CanonicalBranding,
     projectId: string,
     assetsById: ReadonlyMap<string, CanonicalAsset>,
     context: ResolutionContext,
-  ): Promise<CompiledBranding> {
+  ): CompiledBranding {
     const properties: Record<string, JsonValue> = {
       ...(branding.companyName === undefined
         ? {}
@@ -939,7 +945,7 @@ export class ExperienceCompiler {
       if (asset === undefined || asset.processingStatus !== 'ready') continue;
       const derivative = selectPreferredReadyDerivative(asset);
       if (derivative === undefined) continue;
-      resolved[outputField] = await this.resolveDerivative(asset, derivative, context, {
+      resolved[outputField] = this.resolveDerivative(asset, derivative, context, {
         entityType: 'branding',
         entityId: projectId,
         path: `branding.${field}`,
@@ -948,20 +954,20 @@ export class ExperienceCompiler {
     return { ...compiled, ...resolved };
   }
 
-  private async compileHotspot(
+  private compileHotspot(
     hotspot: CanonicalHotspot,
     path: string,
     assetsById: ReadonlyMap<string, CanonicalAsset>,
     context: ResolutionContext,
-  ): Promise<CompiledHotspot> {
-    const appearance = await this.compileHotspotAppearance(
+  ): CompiledHotspot {
+    const appearance = this.compileHotspotAppearance(
       hotspot,
       path,
       assetsById,
       context,
     );
-    const content = await this.compileHotspotContent(hotspot, path, assetsById, context);
-    const action = await this.compileHotspotAction(
+    const content = this.compileHotspotContent(hotspot, path, assetsById, context);
+    const action = this.compileHotspotAction(
       hotspot,
       path,
       assetsById,
@@ -970,7 +976,7 @@ export class ExperienceCompiler {
 
     return {
       id: hotspot.id,
-      geometry: await this.compileGeometry(
+      geometry: this.compileGeometry(
         hotspot.geometry,
         `${path}.geometry`,
         hotspot.id,
@@ -993,12 +999,12 @@ export class ExperienceCompiler {
    * Compiles an overlay through exactly the same content, action and
    * sanitization boundary as a hotspot. Only the geometry family differs.
    */
-  private async compileOverlay(
+  private compileOverlay(
     overlay: CanonicalOverlay,
     path: string,
     assetsById: ReadonlyMap<string, CanonicalAsset>,
     context: ResolutionContext,
-  ): Promise<CompiledOverlay> {
+  ): CompiledOverlay {
     const asHotspot: CanonicalHotspot = {
       id: overlay.id,
       sceneId: overlay.sceneId,
@@ -1011,9 +1017,9 @@ export class ExperienceCompiler {
       ...(overlay.content === undefined ? {} : { content: overlay.content }),
       action: overlay.action,
     };
-    const content = await this.compileHotspotContent(asHotspot, path, assetsById, context);
-    const action = await this.compileHotspotAction(asHotspot, path, assetsById, context);
-    const geometry = await this.compileGeometry(
+    const content = this.compileHotspotContent(asHotspot, path, assetsById, context);
+    const action = this.compileHotspotAction(asHotspot, path, assetsById, context);
+    const geometry = this.compileGeometry(
       overlay.geometry,
       `${path}.geometry`,
       overlay.id,
@@ -1044,14 +1050,14 @@ export class ExperienceCompiler {
    * geometry is only compiled when its extension resolves in the registry
    * snapshot, so a published revision can never name unregistered client code.
    */
-  private async compileGeometry(
+  private compileGeometry(
     geometry: CanonicalInteractionGeometry,
     path: string,
     entityId: string,
     entityType: IssueLocation['entityType'],
     assetsById: ReadonlyMap<string, CanonicalAsset>,
     context: ResolutionContext,
-  ): Promise<CompiledInteractionGeometry> {
+  ): CompiledInteractionGeometry {
     switch (geometry.kind) {
       case 'point':
         return { kind: 'point' };
@@ -1061,7 +1067,7 @@ export class ExperienceCompiler {
         return { kind: 'polyline', vertices: geometry.vertices.map((vertex) => ({ ...vertex })) };
       case 'imageLayer':
       case 'videoLayer': {
-        const media = await this.resolveDisplayAsset(
+        const media = this.resolveDisplayAsset(
           geometry.assetId,
           assetsById,
           context,
@@ -1105,13 +1111,13 @@ export class ExperienceCompiler {
    * Plans are compiled with their image derivative and the scenes placed on
    * them, so a plan view needs no extra round trips.
    */
-  private async compilePlans(
+  private compilePlans(
     plans: readonly CanonicalPlan[],
     scenes: readonly CanonicalScene[],
     assetsById: ReadonlyMap<string, CanonicalAsset>,
     context: ResolutionContext,
     planCapabilityEnabled: boolean,
-  ): Promise<CompiledPlan[]> {
+  ): CompiledPlan[] {
     if (!planCapabilityEnabled) return [];
     const compiled: CompiledPlan[] = [];
     for (const [index, plan] of [...plans]
@@ -1125,7 +1131,7 @@ export class ExperienceCompiler {
         : selectPreferredReadyDerivative(asset);
       const image = asset === undefined || derivative === undefined
         ? undefined
-        : await this.resolveDerivative(asset, derivative, context, {
+        : this.resolveDerivative(asset, derivative, context, {
           entityType: 'plan',
           entityId: plan.id,
           path: `plans.${plan.id}.assetId`,
@@ -1145,12 +1151,12 @@ export class ExperienceCompiler {
     return compiled;
   }
 
-  private async compileHotspotAppearance(
+  private compileHotspotAppearance(
     hotspot: CanonicalHotspot,
     path: string,
     assetsById: ReadonlyMap<string, CanonicalAsset>,
     context: ResolutionContext,
-  ): Promise<CompiledHotspotAppearance | undefined> {
+  ): CompiledHotspotAppearance | undefined {
     const appearance = hotspot.appearance;
     if (appearance === undefined) {
       return undefined;
@@ -1174,7 +1180,7 @@ export class ExperienceCompiler {
     }
     const asset = assetsById.get(appearance.iconAssetId)!;
     const derivative = selectPreferredReadyDerivative(asset)!;
-    const icon = await this.resolveDerivative(asset, derivative, context, {
+    const icon = this.resolveDerivative(asset, derivative, context, {
       entityType: 'hotspot',
       entityId: hotspot.id,
       path: `${path}.appearance.iconAssetId`,
@@ -1182,12 +1188,12 @@ export class ExperienceCompiler {
     return { ...compiled, icon };
   }
 
-  private async compileHotspotContent(
+  private compileHotspotContent(
     hotspot: CanonicalHotspot,
     path: string,
     assetsById: ReadonlyMap<string, CanonicalAsset>,
     context: ResolutionContext,
-  ): Promise<CompiledHotspotContent | undefined> {
+  ): CompiledHotspotContent | undefined {
     const content = hotspot.content;
     if (content === undefined) {
       return undefined;
@@ -1212,7 +1218,7 @@ export class ExperienceCompiler {
     };
     const image = content.imageAssetId === undefined
       ? undefined
-      : await this.resolveDisplayAsset(
+      : this.resolveDisplayAsset(
         content.imageAssetId,
         assetsById,
         context,
@@ -1224,7 +1230,7 @@ export class ExperienceCompiler {
       );
     const video = content.videoAssetId === undefined
       ? undefined
-      : await this.resolveDisplayAsset(
+      : this.resolveDisplayAsset(
         content.videoAssetId,
         assetsById,
         context,
@@ -1257,12 +1263,12 @@ export class ExperienceCompiler {
     };
   }
 
-  private async compileHotspotAction(
+  private compileHotspotAction(
     hotspot: CanonicalHotspot,
     path: string,
     assetsById: ReadonlyMap<string, CanonicalAsset>,
     context: ResolutionContext,
-  ): Promise<CompiledHotspotAction> {
+  ): CompiledHotspotAction {
     const action = hotspot.action;
     switch (action.kind) {
       case 'none':
@@ -1274,7 +1280,7 @@ export class ExperienceCompiler {
       case 'goToScene':
         return { kind: 'goToScene', sceneId: action.sceneId };
       case 'openAsset': {
-        const media = await this.resolveDisplayAsset(
+        const media = this.resolveDisplayAsset(
           action.assetId,
           assetsById,
           context,
@@ -1289,12 +1295,12 @@ export class ExperienceCompiler {
     }
   }
 
-  private async resolveDisplayAsset(
+  private resolveDisplayAsset(
     assetId: string,
     assetsById: ReadonlyMap<string, CanonicalAsset>,
     context: ResolutionContext,
     location: IssueLocation,
-  ): Promise<CompiledMediaReference> {
+  ): CompiledMediaReference {
     const asset = assetsById.get(assetId)!;
     const derivative = selectPreferredReadyDerivative(
       asset,
@@ -1312,7 +1318,7 @@ export class ExperienceCompiler {
     derivative: AssetDerivative,
     context: ResolutionContext,
     location: IssueLocation,
-  ): Promise<CompiledMediaReference> {
+  ): CompiledMediaReference {
     const cacheKey = `${context.access}:${asset.id}:${derivative.id}:${derivative.version}`;
     const cached = context.cache.get(cacheKey);
     if (cached !== undefined) {
@@ -1324,46 +1330,33 @@ export class ExperienceCompiler {
     return resolution;
   }
 
-  private async resolveDerivativeUncached(
+  private resolveDerivativeUncached(
     asset: CanonicalAsset,
     derivative: AssetDerivative,
     context: ResolutionContext,
     location: IssueLocation,
-  ): Promise<CompiledMediaReference> {
-    const request: MediaUrlResolutionRequest = {
+  ): CompiledMediaReference {
+    // A logical delivery location, never a credential. Signing this reference
+    // is a server-side hydration step performed after compilation, which is
+    // what keeps the compiler safe to run in a browser.
+    const rawUrl = formatMediaLocation(this.mediaDeliveryPolicy, {
+      access: context.access,
       experienceId: context.input.project.id,
       assetId: asset.id,
-      derivative,
-      access: context.access,
-      target: context.input.target,
+      derivativeId: derivative.id,
       ...(context.input.publicationRevision === undefined
         ? {}
         : { publicationRevision: context.input.publicationRevision }),
-    };
-
-    let resolution: MediaUrlResolution;
-    try {
-      resolution = await this.mediaUrlResolver.resolve(request);
-    } catch {
-      throw new ExperienceCompilationError([{
-        code: 'MEDIA_URL_RESOLUTION_FAILED',
-        message: 'A protected media reference could not be generated.',
-        ...location,
-        retryable: true,
-      }]);
-    }
-
-    const rawUrl = typeof resolution === 'string' ? resolution : resolution.url;
+    });
     const url = validateSafeUrl(rawUrl, { allowInternalRelative: true });
     if (!url.valid) {
       throw new ExperienceCompilationError([{
         code: 'MEDIA_URL_INVALID',
-        message: 'The media resolver returned a URL outside the delivery policy.',
+        message: 'The media delivery policy produced a URL outside the delivery policy.',
         ...location,
         retryable: false,
       }]);
     }
-    const expiresAt = typeof resolution === 'string' ? undefined : resolution.expiresAt;
     return Object.freeze({
       assetId: asset.id,
       derivativeId: derivative.id,
@@ -1374,32 +1367,25 @@ export class ExperienceCompiler {
       height: derivative.height,
       url: url.normalizedUrl,
       access: context.access,
-      ...(expiresAt === undefined ? {} : { expiresAt }),
     });
   }
 }
 
-export async function compileExperience(
+export function compileExperience(
   input: CompileExperienceInput,
   dependencies: ExperienceCompilerDependencies,
-): Promise<CompiledExperienceManifest> {
+): CompiledExperienceManifest {
   return new ExperienceCompiler(dependencies).compile(input);
 }
 
-export async function compileExperienceBundle(
+export function compileExperienceBundle(
   input: CompileExperienceInput,
   dependencies: ExperienceCompilerDependencies,
-): Promise<CompiledExperienceBundle> {
+): CompiledExperienceBundle {
   return new ExperienceCompiler(dependencies).compileBundle(input);
 }
 
 export const compileExperienceManifest = compileExperience;
-
-export function createMediaUrlResolver(
-  resolve: MediaUrlResolver['resolve'],
-): MediaUrlResolver {
-  return { resolve };
-}
 
 /** Segmented delivery keeps the initial manifest small for enterprise tours. */
 export const SCENE_INDEX_SEGMENT_THRESHOLD = 250;
