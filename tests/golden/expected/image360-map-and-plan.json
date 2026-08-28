@@ -1,0 +1,1081 @@
+{
+  "id": "image360-map-and-plan",
+  "description": "image360 with world coordinates, a floor plan and a spatial index.",
+  "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+  "input": {
+    "target": "publication",
+    "visibility": "public",
+    "publicationRevision": 1,
+    "publicationSlug": "golden-map-plan",
+    "schemaVersion": 1,
+    "project": {
+      "id": "22222222-1111-4000-8000-000000000008",
+      "ownerId": "00000000-0000-4000-8000-000000000001",
+      "type": "image360",
+      "name": "Map and plan",
+      "schemaVersion": 1,
+      "revision": 1,
+      "settings": {
+        "map": {
+          "enabled": true,
+          "showSceneMarkers": true,
+          "showHeadingCone": true
+        },
+        "plan": {
+          "enabled": true,
+          "defaultPlanId": "22222222-5555-4000-8000-000000000001",
+          "showSceneMarkers": true
+        }
+      },
+      "branding": {},
+      "scenes": [
+        {
+          "projectId": "22222222-1111-4000-8000-000000000008",
+          "sortOrder": 0,
+          "isPrimary": true,
+          "initialView": {
+            "headingDegrees": 0,
+            "pitchDegrees": 0,
+            "horizontalFovDegrees": 70
+          },
+          "viewLimits": {},
+          "hotspots": [],
+          "overlays": [],
+          "connections": [],
+          "spatialData": {
+            "coordinateSystem": "plan_normalized",
+            "latitude": 51.5007,
+            "longitude": -0.1246,
+            "headingDegrees": 90,
+            "planId": "22222222-5555-4000-8000-000000000001",
+            "mapX": 0.25,
+            "mapY": 0.4
+          },
+          "runtimeHints": {},
+          "id": "22222222-2222-4000-8000-000000000081",
+          "name": "Entrance",
+          "panoramaAssetId": "22222222-0000-4000-8000-000000000008"
+        },
+        {
+          "projectId": "22222222-1111-4000-8000-000000000008",
+          "sortOrder": 1,
+          "isPrimary": false,
+          "initialView": {
+            "headingDegrees": 0,
+            "pitchDegrees": 0,
+            "horizontalFovDegrees": 70
+          },
+          "viewLimits": {},
+          "hotspots": [],
+          "overlays": [],
+          "connections": [],
+          "spatialData": {
+            "coordinateSystem": "plan_normalized",
+            "latitude": 51.5011,
+            "longitude": -0.1239,
+            "headingDegrees": 180,
+            "planId": "22222222-5555-4000-8000-000000000001",
+            "mapX": 0.65,
+            "mapY": 0.55
+          },
+          "runtimeHints": {},
+          "id": "22222222-2222-4000-8000-000000000082",
+          "name": "Courtyard",
+          "panoramaAssetId": "22222222-0000-4000-8000-000000000008"
+        }
+      ],
+      "publication": {
+        "slug": "golden-map-plan",
+        "visibility": "public"
+      },
+      "plans": [
+        {
+          "id": "22222222-5555-4000-8000-000000000001",
+          "projectId": "22222222-1111-4000-8000-000000000008",
+          "name": "Ground floor",
+          "assetId": "22222222-0000-4000-8000-000000000018",
+          "coordinateSystem": "plan_normalized",
+          "metadata": {},
+          "sortOrder": 0
+        }
+      ]
+    },
+    "assets": [
+      {
+        "id": "22222222-0000-4000-8000-000000000008",
+        "ownerId": "00000000-0000-4000-8000-000000000001",
+        "projectId": null,
+        "mediaType": "panorama_image",
+        "projection": "equirectangular",
+        "processingStatus": "ready",
+        "metadata": {
+          "width": 4096,
+          "height": 2048,
+          "is360": true,
+          "isFullSphere": true
+        },
+        "derivatives": [
+          {
+            "id": "22222222-0000-4000-8000-000000000008-thumbnail",
+            "assetId": "22222222-0000-4000-8000-000000000008",
+            "kind": "thumbnail",
+            "version": 1,
+            "storageKey": "reference/22222222-0000-4000-8000-000000000008/thumbnail.jpg",
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "sizeBytes": 512000,
+            "readiness": "ready",
+            "metadata": {
+              "checksumSha256": "60ae6f4fa6d8f5a8154bd554fadf46c3fa3521b083d9381d1c4679fa98b7b4e7"
+            }
+          },
+          {
+            "id": "22222222-0000-4000-8000-000000000008-lowResolutionBase",
+            "assetId": "22222222-0000-4000-8000-000000000008",
+            "kind": "lowResolutionBase",
+            "version": 1,
+            "storageKey": "reference/22222222-0000-4000-8000-000000000008/lowResolutionBase.jpg",
+            "mimeType": "image/jpeg",
+            "width": 1024,
+            "height": 512,
+            "sizeBytes": 512000,
+            "readiness": "ready",
+            "metadata": {
+              "checksumSha256": "f878346402635f1c8cb92aba1c4df8dddda4f9b3fceeb6e6c27721cfcb3fdf29"
+            }
+          },
+          {
+            "id": "22222222-0000-4000-8000-000000000008-standardWeb",
+            "assetId": "22222222-0000-4000-8000-000000000008",
+            "kind": "standardWeb",
+            "version": 1,
+            "storageKey": "reference/22222222-0000-4000-8000-000000000008/standardWeb.jpg",
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "sizeBytes": 512000,
+            "readiness": "ready",
+            "metadata": {
+              "checksumSha256": "02fba6398ba454590ad3faf7abc540ba0514280d754d4e0813d70409f4da9016"
+            }
+          }
+        ]
+      },
+      {
+        "id": "22222222-0000-4000-8000-000000000018",
+        "ownerId": "00000000-0000-4000-8000-000000000001",
+        "projectId": null,
+        "mediaType": "plan_image",
+        "projection": "unknown",
+        "processingStatus": "ready",
+        "metadata": {
+          "width": 2000,
+          "height": 1400
+        },
+        "derivatives": [
+          {
+            "id": "22222222-0000-4000-8000-000000000018-thumbnail",
+            "assetId": "22222222-0000-4000-8000-000000000018",
+            "kind": "thumbnail",
+            "version": 1,
+            "storageKey": "reference/22222222-0000-4000-8000-000000000018/thumbnail.jpg",
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "sizeBytes": 512000,
+            "readiness": "ready",
+            "metadata": {
+              "checksumSha256": "042bb10bb0409b87391fe842eca884a8d85007f549da445d555442af6f37c88e"
+            }
+          },
+          {
+            "id": "22222222-0000-4000-8000-000000000018-planImage",
+            "assetId": "22222222-0000-4000-8000-000000000018",
+            "kind": "planImage",
+            "version": 1,
+            "storageKey": "reference/22222222-0000-4000-8000-000000000018/planImage.jpg",
+            "mimeType": "image/webp",
+            "width": 2000,
+            "height": 1400,
+            "sizeBytes": 512000,
+            "readiness": "ready",
+            "metadata": {
+              "checksumSha256": "f1e3fcd50844694eaa3f0801c0c83c1fbeba1e1f513edc0f898393a2604fbdf2"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "outcome": "compiled",
+  "manifest": {
+    "manifestVersion": 4,
+    "schemaVersion": 1,
+    "experienceId": "22222222-1111-4000-8000-000000000008",
+    "experienceName": "Map and plan",
+    "experienceType": "image360",
+    "projectRevision": 1,
+    "publicationRevision": 1,
+    "target": "publication",
+    "visibility": "public",
+    "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+    "initialSceneId": "22222222-2222-4000-8000-000000000081",
+    "settings": {
+      "map": {
+        "enabled": true,
+        "showSceneMarkers": true,
+        "showHeadingCone": true
+      },
+      "plan": {
+        "enabled": true,
+        "defaultPlanId": "22222222-5555-4000-8000-000000000001",
+        "showSceneMarkers": true
+      }
+    },
+    "branding": {
+      "properties": {}
+    },
+    "scenes": [
+      {
+        "id": "22222222-2222-4000-8000-000000000081",
+        "name": "Entrance",
+        "sortOrder": 0,
+        "isPrimary": true,
+        "panorama": {
+          "assetId": "22222222-0000-4000-8000-000000000008",
+          "projection": "equirectangular",
+          "family": "standardEquirectangular",
+          "fallbackFamilies": [],
+          "base": {
+            "assetId": "22222222-0000-4000-8000-000000000008",
+            "derivativeId": "22222222-0000-4000-8000-000000000008-lowResolutionBase",
+            "kind": "lowResolutionBase",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 1024,
+            "height": 512,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000008/1/media/22222222-0000-4000-8000-000000000008-lowResolutionBase",
+            "access": "public"
+          },
+          "primary": {
+            "assetId": "22222222-0000-4000-8000-000000000008",
+            "derivativeId": "22222222-0000-4000-8000-000000000008-standardWeb",
+            "kind": "standardWeb",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000008/1/media/22222222-0000-4000-8000-000000000008-standardWeb",
+            "access": "public"
+          }
+        },
+        "initialView": {
+          "headingDegrees": 0,
+          "pitchDegrees": 0,
+          "horizontalFovDegrees": 70
+        },
+        "hotspots": [],
+        "overlays": [],
+        "connections": [],
+        "spatialData": {
+          "coordinateSystem": "plan_normalized",
+          "latitude": 51.5007,
+          "longitude": -0.1246,
+          "headingDegrees": 90,
+          "planId": "22222222-5555-4000-8000-000000000001",
+          "mapX": 0.25,
+          "mapY": 0.4
+        },
+        "runtimeHints": {},
+        "preloadSceneIds": []
+      },
+      {
+        "id": "22222222-2222-4000-8000-000000000082",
+        "name": "Courtyard",
+        "sortOrder": 1,
+        "isPrimary": false,
+        "panorama": {
+          "assetId": "22222222-0000-4000-8000-000000000008",
+          "projection": "equirectangular",
+          "family": "standardEquirectangular",
+          "fallbackFamilies": [],
+          "base": {
+            "assetId": "22222222-0000-4000-8000-000000000008",
+            "derivativeId": "22222222-0000-4000-8000-000000000008-lowResolutionBase",
+            "kind": "lowResolutionBase",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 1024,
+            "height": 512,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000008/1/media/22222222-0000-4000-8000-000000000008-lowResolutionBase",
+            "access": "public"
+          },
+          "primary": {
+            "assetId": "22222222-0000-4000-8000-000000000008",
+            "derivativeId": "22222222-0000-4000-8000-000000000008-standardWeb",
+            "kind": "standardWeb",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000008/1/media/22222222-0000-4000-8000-000000000008-standardWeb",
+            "access": "public"
+          }
+        },
+        "initialView": {
+          "headingDegrees": 0,
+          "pitchDegrees": 0,
+          "horizontalFovDegrees": 70
+        },
+        "hotspots": [],
+        "overlays": [],
+        "connections": [],
+        "spatialData": {
+          "coordinateSystem": "plan_normalized",
+          "latitude": 51.5011,
+          "longitude": -0.1239,
+          "headingDegrees": 180,
+          "planId": "22222222-5555-4000-8000-000000000001",
+          "mapX": 0.65,
+          "mapY": 0.55
+        },
+        "runtimeHints": {},
+        "preloadSceneIds": []
+      }
+    ],
+    "tour": {
+      "strategy": "embedded",
+      "sceneIndexVersion": "scene-index-2-1",
+      "sceneIndex": [
+        {
+          "id": "22222222-2222-4000-8000-000000000081",
+          "name": "Entrance",
+          "sortOrder": 0,
+          "isPrimary": true,
+          "panoramaAssetId": "22222222-0000-4000-8000-000000000008",
+          "thumbnail": {
+            "assetId": "22222222-0000-4000-8000-000000000008",
+            "derivativeId": "22222222-0000-4000-8000-000000000008-thumbnail",
+            "kind": "thumbnail",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000008/1/media/22222222-0000-4000-8000-000000000008-thumbnail",
+            "access": "public"
+          },
+          "hasHotspots": false,
+          "hasOverlays": false,
+          "spatial": {
+            "coordinateSystem": "plan_normalized",
+            "latitude": 51.5007,
+            "longitude": -0.1246,
+            "headingDegrees": 90,
+            "planId": "22222222-5555-4000-8000-000000000001",
+            "mapX": 0.25,
+            "mapY": 0.4
+          },
+          "connectionTargetSceneIds": []
+        },
+        {
+          "id": "22222222-2222-4000-8000-000000000082",
+          "name": "Courtyard",
+          "sortOrder": 1,
+          "isPrimary": false,
+          "panoramaAssetId": "22222222-0000-4000-8000-000000000008",
+          "thumbnail": {
+            "assetId": "22222222-0000-4000-8000-000000000008",
+            "derivativeId": "22222222-0000-4000-8000-000000000008-thumbnail",
+            "kind": "thumbnail",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000008/1/media/22222222-0000-4000-8000-000000000008-thumbnail",
+            "access": "public"
+          },
+          "hasHotspots": false,
+          "hasOverlays": false,
+          "spatial": {
+            "coordinateSystem": "plan_normalized",
+            "latitude": 51.5011,
+            "longitude": -0.1239,
+            "headingDegrees": 180,
+            "planId": "22222222-5555-4000-8000-000000000001",
+            "mapX": 0.65,
+            "mapY": 0.55
+          },
+          "connectionTargetSceneIds": []
+        }
+      ],
+      "sceneCount": 2
+    },
+    "plans": [
+      {
+        "id": "22222222-5555-4000-8000-000000000001",
+        "name": "Ground floor",
+        "coordinateSystem": "plan_normalized",
+        "sortOrder": 0,
+        "image": {
+          "assetId": "22222222-0000-4000-8000-000000000018",
+          "derivativeId": "22222222-0000-4000-8000-000000000018-thumbnail",
+          "kind": "thumbnail",
+          "version": 1,
+          "mimeType": "image/jpeg",
+          "width": 4096,
+          "height": 2048,
+          "url": "/api/v1/publications/22222222-1111-4000-8000-000000000008/1/media/22222222-0000-4000-8000-000000000018-thumbnail",
+          "access": "public"
+        },
+        "sceneIds": [
+          "22222222-2222-4000-8000-000000000081",
+          "22222222-2222-4000-8000-000000000082"
+        ],
+        "metadata": {}
+      }
+    ],
+    "spatialIndex": {
+      "hasWorldCoordinates": true,
+      "hasPlanCoordinates": true,
+      "entries": [
+        {
+          "sceneId": "22222222-2222-4000-8000-000000000081",
+          "name": "Entrance",
+          "spatial": {
+            "coordinateSystem": "plan_normalized",
+            "latitude": 51.5007,
+            "longitude": -0.1246,
+            "headingDegrees": 90,
+            "planId": "22222222-5555-4000-8000-000000000001",
+            "mapX": 0.25,
+            "mapY": 0.4
+          }
+        },
+        {
+          "sceneId": "22222222-2222-4000-8000-000000000082",
+          "name": "Courtyard",
+          "spatial": {
+            "coordinateSystem": "plan_normalized",
+            "latitude": 51.5011,
+            "longitude": -0.1239,
+            "headingDegrees": 180,
+            "planId": "22222222-5555-4000-8000-000000000001",
+            "mapX": 0.65,
+            "mapY": 0.55
+          }
+        }
+      ],
+      "bounds": {
+        "minLatitude": 51.5007,
+        "maxLatitude": 51.5011,
+        "minLongitude": -0.1246,
+        "maxLongitude": -0.1239
+      }
+    },
+    "capabilities": [
+      {
+        "id": "basicPanorama",
+        "required": true,
+        "resolution": "compile-time"
+      },
+      {
+        "id": "sceneNavigation",
+        "required": false,
+        "resolution": "compile-time"
+      },
+      {
+        "id": "map",
+        "required": false,
+        "resolution": "compile-time"
+      },
+      {
+        "id": "plan",
+        "required": false,
+        "resolution": "compile-time"
+      }
+    ],
+    "runtime": {
+      "modules": [
+        "core-panorama",
+        "virtual-tour",
+        "map",
+        "plan"
+      ],
+      "moduleDeclarations": [
+        {
+          "id": "core-panorama",
+          "load": "eager",
+          "capabilities": [
+            "basicPanorama"
+          ]
+        },
+        {
+          "id": "virtual-tour",
+          "load": "eager",
+          "capabilities": [
+            "sceneNavigation"
+          ]
+        },
+        {
+          "id": "map",
+          "load": "lazy",
+          "capabilities": [
+            "map"
+          ]
+        },
+        {
+          "id": "plan",
+          "load": "lazy",
+          "capabilities": [
+            "plan"
+          ]
+        }
+      ],
+      "capabilityFallbacks": [],
+      "deferredDeviceCapabilities": [],
+      "preload": {
+        "strategy": "selective-adjacent",
+        "maxScenesPerSource": 2,
+        "content": "scene-definition-and-base-media"
+      },
+      "cache": {
+        "defaultProfile": "standard",
+        "profiles": {
+          "constrained": {
+            "policyVersion": 1,
+            "deviceClass": "constrained",
+            "mediaClass": "image-tour",
+            "maxRecentScenes": 2,
+            "maxEstimatedBytes": 67108864,
+            "evictionStrategy": "least-recently-used",
+            "duplicateRequestStrategy": "coalesce",
+            "suppressDuplicateRequests": true
+          },
+          "standard": {
+            "policyVersion": 1,
+            "deviceClass": "standard",
+            "mediaClass": "image-tour",
+            "maxRecentScenes": 4,
+            "maxEstimatedBytes": 201326592,
+            "evictionStrategy": "least-recently-used",
+            "duplicateRequestStrategy": "coalesce",
+            "suppressDuplicateRequests": true
+          },
+          "capable": {
+            "policyVersion": 1,
+            "deviceClass": "capable",
+            "mediaClass": "image-tour",
+            "maxRecentScenes": 6,
+            "maxEstimatedBytes": 402653184,
+            "evictionStrategy": "least-recently-used",
+            "duplicateRequestStrategy": "coalesce",
+            "suppressDuplicateRequests": true
+          }
+        }
+      },
+      "fallbackPolicy": {
+        "panorama": "low-resolution-base-then-standard-or-tiled-detail",
+        "optionalCapabilities": "continue-without-capability",
+        "immersive": "continue-in-normal-360"
+      }
+    },
+    "telemetry": {
+      "enabled": true,
+      "experienceId": "22222222-1111-4000-8000-000000000008",
+      "projectRevision": 1,
+      "publicationRevision": 1,
+      "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+      "events": [
+        "experience_load_started",
+        "first_panorama_visible",
+        "time_to_interactive",
+        "scene_changed",
+        "hotspot_clicked",
+        "asset_failed",
+        "scene_transition_failed",
+        "viewer_error",
+        "experience_exited",
+        "capability_fallback",
+        "overlay_clicked",
+        "map_interaction"
+      ],
+      "sceneTransitionFailureCategories": [
+        "scene_definition_unavailable",
+        "scene_definition_invalid",
+        "asset_unavailable",
+        "asset_decode_failed",
+        "unsupported_media",
+        "viewer_error",
+        "transition_timeout",
+        "unknown"
+      ]
+    },
+    "pinnedExtensions": {},
+    "viewerIntegration": {
+      "rendererId": "photo-sphere-viewer",
+      "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+      "config": {
+        "adapter": "equirectangular",
+        "initialSceneId": "22222222-2222-4000-8000-000000000081",
+        "navbar": [
+          "move",
+          "zoom",
+          "fullscreen"
+        ],
+        "mousewheel": true,
+        "mousemove": true,
+        "touchControlsEnabled": true,
+        "keyboard": true,
+        "sceneNavigation": true,
+        "map": {
+          "enabled": true,
+          "coordinateSystem": "wgs84",
+          "showHeadingCone": true,
+          "bounds": {
+            "minLatitude": 51.5007,
+            "maxLatitude": 51.5011,
+            "minLongitude": -0.1246,
+            "maxLongitude": -0.1239
+          },
+          "hotspots": [
+            {
+              "id": "22222222-2222-4000-8000-000000000081",
+              "nodeId": "22222222-2222-4000-8000-000000000081",
+              "tooltip": "Entrance",
+              "gps": [
+                -0.1246,
+                51.5007
+              ],
+              "yaw": 1.5707963267948966
+            },
+            {
+              "id": "22222222-2222-4000-8000-000000000082",
+              "nodeId": "22222222-2222-4000-8000-000000000082",
+              "tooltip": "Courtyard",
+              "gps": [
+                -0.1239,
+                51.5011
+              ],
+              "yaw": 3.141592653589793
+            }
+          ]
+        },
+        "plan": {
+          "enabled": true,
+          "defaultPlanId": "22222222-5555-4000-8000-000000000001",
+          "showHeadingCone": true,
+          "layers": [
+            {
+              "id": "22222222-5555-4000-8000-000000000001",
+              "name": "Ground floor",
+              "coordinateSystem": "plan_normalized",
+              "imageUrl": "/api/v1/publications/22222222-1111-4000-8000-000000000008/1/media/22222222-0000-4000-8000-000000000018-thumbnail",
+              "hotspots": [
+                {
+                  "id": "22222222-2222-4000-8000-000000000081",
+                  "nodeId": "22222222-2222-4000-8000-000000000081",
+                  "tooltip": "Entrance",
+                  "x": 0.25,
+                  "y": 0.4,
+                  "yaw": 1.5707963267948966
+                },
+                {
+                  "id": "22222222-2222-4000-8000-000000000082",
+                  "nodeId": "22222222-2222-4000-8000-000000000082",
+                  "tooltip": "Courtyard",
+                  "x": 0.65,
+                  "y": 0.55,
+                  "yaw": 3.141592653589793
+                }
+              ]
+            }
+          ]
+        },
+        "startup": {
+          "id": "22222222-2222-4000-8000-000000000081",
+          "adapter": "equirectangular",
+          "panorama": "/api/v1/publications/22222222-1111-4000-8000-000000000008/1/media/22222222-0000-4000-8000-000000000008-standardWeb",
+          "basePanorama": "/api/v1/publications/22222222-1111-4000-8000-000000000008/1/media/22222222-0000-4000-8000-000000000008-lowResolutionBase",
+          "defaultYaw": 0,
+          "defaultPitch": 0,
+          "defaultZoomLvl": 61.236,
+          "markers": [],
+          "links": [],
+          "preloadSceneIds": []
+        },
+        "scenes": [
+          {
+            "id": "22222222-2222-4000-8000-000000000081",
+            "adapter": "equirectangular",
+            "panorama": "/api/v1/publications/22222222-1111-4000-8000-000000000008/1/media/22222222-0000-4000-8000-000000000008-standardWeb",
+            "basePanorama": "/api/v1/publications/22222222-1111-4000-8000-000000000008/1/media/22222222-0000-4000-8000-000000000008-lowResolutionBase",
+            "defaultYaw": 0,
+            "defaultPitch": 0,
+            "defaultZoomLvl": 61.236,
+            "markers": [],
+            "links": [],
+            "preloadSceneIds": []
+          },
+          {
+            "id": "22222222-2222-4000-8000-000000000082",
+            "adapter": "equirectangular",
+            "panorama": "/api/v1/publications/22222222-1111-4000-8000-000000000008/1/media/22222222-0000-4000-8000-000000000008-standardWeb",
+            "basePanorama": "/api/v1/publications/22222222-1111-4000-8000-000000000008/1/media/22222222-0000-4000-8000-000000000008-lowResolutionBase",
+            "defaultYaw": 0,
+            "defaultPitch": 0,
+            "defaultZoomLvl": 61.236,
+            "markers": [],
+            "links": [],
+            "preloadSceneIds": []
+          }
+        ]
+      }
+    }
+  },
+  "viewerIntegration": {
+    "rendererId": "photo-sphere-viewer",
+    "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+    "config": {
+      "adapter": "equirectangular",
+      "initialSceneId": "22222222-2222-4000-8000-000000000081",
+      "navbar": [
+        "move",
+        "zoom",
+        "fullscreen"
+      ],
+      "mousewheel": true,
+      "mousemove": true,
+      "touchControlsEnabled": true,
+      "keyboard": true,
+      "sceneNavigation": true,
+      "map": {
+        "enabled": true,
+        "coordinateSystem": "wgs84",
+        "showHeadingCone": true,
+        "bounds": {
+          "minLatitude": 51.5007,
+          "maxLatitude": 51.5011,
+          "minLongitude": -0.1246,
+          "maxLongitude": -0.1239
+        },
+        "hotspots": [
+          {
+            "id": "22222222-2222-4000-8000-000000000081",
+            "nodeId": "22222222-2222-4000-8000-000000000081",
+            "tooltip": "Entrance",
+            "gps": [
+              -0.1246,
+              51.5007
+            ],
+            "yaw": 1.5707963267948966
+          },
+          {
+            "id": "22222222-2222-4000-8000-000000000082",
+            "nodeId": "22222222-2222-4000-8000-000000000082",
+            "tooltip": "Courtyard",
+            "gps": [
+              -0.1239,
+              51.5011
+            ],
+            "yaw": 3.141592653589793
+          }
+        ]
+      },
+      "plan": {
+        "enabled": true,
+        "defaultPlanId": "22222222-5555-4000-8000-000000000001",
+        "showHeadingCone": true,
+        "layers": [
+          {
+            "id": "22222222-5555-4000-8000-000000000001",
+            "name": "Ground floor",
+            "coordinateSystem": "plan_normalized",
+            "imageUrl": "/api/v1/publications/22222222-1111-4000-8000-000000000008/1/media/22222222-0000-4000-8000-000000000018-thumbnail",
+            "hotspots": [
+              {
+                "id": "22222222-2222-4000-8000-000000000081",
+                "nodeId": "22222222-2222-4000-8000-000000000081",
+                "tooltip": "Entrance",
+                "x": 0.25,
+                "y": 0.4,
+                "yaw": 1.5707963267948966
+              },
+              {
+                "id": "22222222-2222-4000-8000-000000000082",
+                "nodeId": "22222222-2222-4000-8000-000000000082",
+                "tooltip": "Courtyard",
+                "x": 0.65,
+                "y": 0.55,
+                "yaw": 3.141592653589793
+              }
+            ]
+          }
+        ]
+      },
+      "startup": {
+        "id": "22222222-2222-4000-8000-000000000081",
+        "adapter": "equirectangular",
+        "panorama": "/api/v1/publications/22222222-1111-4000-8000-000000000008/1/media/22222222-0000-4000-8000-000000000008-standardWeb",
+        "basePanorama": "/api/v1/publications/22222222-1111-4000-8000-000000000008/1/media/22222222-0000-4000-8000-000000000008-lowResolutionBase",
+        "defaultYaw": 0,
+        "defaultPitch": 0,
+        "defaultZoomLvl": 61.236,
+        "markers": [],
+        "links": [],
+        "preloadSceneIds": []
+      },
+      "scenes": [
+        {
+          "id": "22222222-2222-4000-8000-000000000081",
+          "adapter": "equirectangular",
+          "panorama": "/api/v1/publications/22222222-1111-4000-8000-000000000008/1/media/22222222-0000-4000-8000-000000000008-standardWeb",
+          "basePanorama": "/api/v1/publications/22222222-1111-4000-8000-000000000008/1/media/22222222-0000-4000-8000-000000000008-lowResolutionBase",
+          "defaultYaw": 0,
+          "defaultPitch": 0,
+          "defaultZoomLvl": 61.236,
+          "markers": [],
+          "links": [],
+          "preloadSceneIds": []
+        },
+        {
+          "id": "22222222-2222-4000-8000-000000000082",
+          "adapter": "equirectangular",
+          "panorama": "/api/v1/publications/22222222-1111-4000-8000-000000000008/1/media/22222222-0000-4000-8000-000000000008-standardWeb",
+          "basePanorama": "/api/v1/publications/22222222-1111-4000-8000-000000000008/1/media/22222222-0000-4000-8000-000000000008-lowResolutionBase",
+          "defaultYaw": 0,
+          "defaultPitch": 0,
+          "defaultZoomLvl": 61.236,
+          "markers": [],
+          "links": [],
+          "preloadSceneIds": []
+        }
+      ]
+    }
+  },
+  "sceneDefinitions": [
+    {
+      "sceneDefinitionVersion": 2,
+      "experienceId": "22222222-1111-4000-8000-000000000008",
+      "publicationRevision": 1,
+      "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+      "scene": {
+        "id": "22222222-2222-4000-8000-000000000081",
+        "name": "Entrance",
+        "sortOrder": 0,
+        "isPrimary": true,
+        "panorama": {
+          "assetId": "22222222-0000-4000-8000-000000000008",
+          "projection": "equirectangular",
+          "family": "standardEquirectangular",
+          "fallbackFamilies": [],
+          "base": {
+            "assetId": "22222222-0000-4000-8000-000000000008",
+            "derivativeId": "22222222-0000-4000-8000-000000000008-lowResolutionBase",
+            "kind": "lowResolutionBase",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 1024,
+            "height": 512,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000008/1/media/22222222-0000-4000-8000-000000000008-lowResolutionBase",
+            "access": "public"
+          },
+          "primary": {
+            "assetId": "22222222-0000-4000-8000-000000000008",
+            "derivativeId": "22222222-0000-4000-8000-000000000008-standardWeb",
+            "kind": "standardWeb",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000008/1/media/22222222-0000-4000-8000-000000000008-standardWeb",
+            "access": "public"
+          }
+        },
+        "initialView": {
+          "headingDegrees": 0,
+          "pitchDegrees": 0,
+          "horizontalFovDegrees": 70
+        },
+        "hotspots": [],
+        "overlays": [],
+        "connections": [],
+        "spatialData": {
+          "coordinateSystem": "plan_normalized",
+          "latitude": 51.5007,
+          "longitude": -0.1246,
+          "headingDegrees": 90,
+          "planId": "22222222-5555-4000-8000-000000000001",
+          "mapX": 0.25,
+          "mapY": 0.4
+        },
+        "runtimeHints": {},
+        "preloadSceneIds": []
+      },
+      "viewerIntegration": {
+        "rendererId": "photo-sphere-viewer",
+        "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+        "sceneId": "22222222-2222-4000-8000-000000000081",
+        "config": {
+          "id": "22222222-2222-4000-8000-000000000081",
+          "adapter": "equirectangular",
+          "panorama": "/api/v1/publications/22222222-1111-4000-8000-000000000008/1/media/22222222-0000-4000-8000-000000000008-standardWeb",
+          "basePanorama": "/api/v1/publications/22222222-1111-4000-8000-000000000008/1/media/22222222-0000-4000-8000-000000000008-lowResolutionBase",
+          "defaultYaw": 0,
+          "defaultPitch": 0,
+          "defaultZoomLvl": 61.236,
+          "markers": [],
+          "links": [],
+          "preloadSceneIds": []
+        }
+      }
+    },
+    {
+      "sceneDefinitionVersion": 2,
+      "experienceId": "22222222-1111-4000-8000-000000000008",
+      "publicationRevision": 1,
+      "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+      "scene": {
+        "id": "22222222-2222-4000-8000-000000000082",
+        "name": "Courtyard",
+        "sortOrder": 1,
+        "isPrimary": false,
+        "panorama": {
+          "assetId": "22222222-0000-4000-8000-000000000008",
+          "projection": "equirectangular",
+          "family": "standardEquirectangular",
+          "fallbackFamilies": [],
+          "base": {
+            "assetId": "22222222-0000-4000-8000-000000000008",
+            "derivativeId": "22222222-0000-4000-8000-000000000008-lowResolutionBase",
+            "kind": "lowResolutionBase",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 1024,
+            "height": 512,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000008/1/media/22222222-0000-4000-8000-000000000008-lowResolutionBase",
+            "access": "public"
+          },
+          "primary": {
+            "assetId": "22222222-0000-4000-8000-000000000008",
+            "derivativeId": "22222222-0000-4000-8000-000000000008-standardWeb",
+            "kind": "standardWeb",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000008/1/media/22222222-0000-4000-8000-000000000008-standardWeb",
+            "access": "public"
+          }
+        },
+        "initialView": {
+          "headingDegrees": 0,
+          "pitchDegrees": 0,
+          "horizontalFovDegrees": 70
+        },
+        "hotspots": [],
+        "overlays": [],
+        "connections": [],
+        "spatialData": {
+          "coordinateSystem": "plan_normalized",
+          "latitude": 51.5011,
+          "longitude": -0.1239,
+          "headingDegrees": 180,
+          "planId": "22222222-5555-4000-8000-000000000001",
+          "mapX": 0.65,
+          "mapY": 0.55
+        },
+        "runtimeHints": {},
+        "preloadSceneIds": []
+      },
+      "viewerIntegration": {
+        "rendererId": "photo-sphere-viewer",
+        "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+        "sceneId": "22222222-2222-4000-8000-000000000082",
+        "config": {
+          "id": "22222222-2222-4000-8000-000000000082",
+          "adapter": "equirectangular",
+          "panorama": "/api/v1/publications/22222222-1111-4000-8000-000000000008/1/media/22222222-0000-4000-8000-000000000008-standardWeb",
+          "basePanorama": "/api/v1/publications/22222222-1111-4000-8000-000000000008/1/media/22222222-0000-4000-8000-000000000008-lowResolutionBase",
+          "defaultYaw": 0,
+          "defaultPitch": 0,
+          "defaultZoomLvl": 61.236,
+          "markers": [],
+          "links": [],
+          "preloadSceneIds": []
+        }
+      }
+    }
+  ],
+  "sceneIndex": [
+    {
+      "id": "22222222-2222-4000-8000-000000000081",
+      "name": "Entrance",
+      "sortOrder": 0,
+      "isPrimary": true,
+      "panoramaAssetId": "22222222-0000-4000-8000-000000000008",
+      "thumbnail": {
+        "assetId": "22222222-0000-4000-8000-000000000008",
+        "derivativeId": "22222222-0000-4000-8000-000000000008-thumbnail",
+        "kind": "thumbnail",
+        "version": 1,
+        "mimeType": "image/jpeg",
+        "width": 4096,
+        "height": 2048,
+        "url": "/api/v1/publications/22222222-1111-4000-8000-000000000008/1/media/22222222-0000-4000-8000-000000000008-thumbnail",
+        "access": "public"
+      },
+      "hasHotspots": false,
+      "hasOverlays": false,
+      "spatial": {
+        "coordinateSystem": "plan_normalized",
+        "latitude": 51.5007,
+        "longitude": -0.1246,
+        "headingDegrees": 90,
+        "planId": "22222222-5555-4000-8000-000000000001",
+        "mapX": 0.25,
+        "mapY": 0.4
+      },
+      "connectionTargetSceneIds": []
+    },
+    {
+      "id": "22222222-2222-4000-8000-000000000082",
+      "name": "Courtyard",
+      "sortOrder": 1,
+      "isPrimary": false,
+      "panoramaAssetId": "22222222-0000-4000-8000-000000000008",
+      "thumbnail": {
+        "assetId": "22222222-0000-4000-8000-000000000008",
+        "derivativeId": "22222222-0000-4000-8000-000000000008-thumbnail",
+        "kind": "thumbnail",
+        "version": 1,
+        "mimeType": "image/jpeg",
+        "width": 4096,
+        "height": 2048,
+        "url": "/api/v1/publications/22222222-1111-4000-8000-000000000008/1/media/22222222-0000-4000-8000-000000000008-thumbnail",
+        "access": "public"
+      },
+      "hasHotspots": false,
+      "hasOverlays": false,
+      "spatial": {
+        "coordinateSystem": "plan_normalized",
+        "latitude": 51.5011,
+        "longitude": -0.1239,
+        "headingDegrees": 180,
+        "planId": "22222222-5555-4000-8000-000000000001",
+        "mapX": 0.65,
+        "mapY": 0.55
+      },
+      "connectionTargetSceneIds": []
+    }
+  ],
+  "diagnostics": [],
+  "hashes": {
+    "input": "01dc6c1d1f9272dc8c931aa10992f240ef4fca1ec57a09c418a104a5f8beca48",
+    "manifest": "645a9172aa955b427659b5d24585e2c013aca4fb841ca3fe47bfe457b175c0ff",
+    "viewerIntegration": "82f87faa981f2aae8bd5c7478a82166d65f0e4cd3c9bcccce9833d50477693f9",
+    "sceneDefinitions": "5861018fc2191e47931037e42fb360833bb0b1fdfef08ba88e037a72bbed0ab1",
+    "sceneIndex": "2997ce8ebf11aece047dcc5c36ce995f078020bb0e14fef0b4d2595e4aac2b91",
+    "content": "d81b205c07a2e8555350076796f3d3f0370974c141101fc8e95867e91499f064"
+  }
+}

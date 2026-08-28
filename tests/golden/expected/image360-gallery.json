@@ -1,0 +1,996 @@
+{
+  "id": "image360-gallery",
+  "description": "image360 with gallery enabled.",
+  "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+  "input": {
+    "target": "publication",
+    "visibility": "public",
+    "publicationRevision": 1,
+    "publicationSlug": "golden-gallery",
+    "schemaVersion": 1,
+    "project": {
+      "id": "22222222-1111-4000-8000-000000000004",
+      "ownerId": "00000000-0000-4000-8000-000000000001",
+      "type": "image360",
+      "name": "Gallery",
+      "schemaVersion": 1,
+      "revision": 1,
+      "settings": {
+        "gallery": {
+          "enabled": true,
+          "showSceneNames": true,
+          "showThumbnails": true
+        },
+        "quality": {
+          "preference": "high"
+        }
+      },
+      "branding": {},
+      "scenes": [
+        {
+          "projectId": "22222222-1111-4000-8000-000000000004",
+          "sortOrder": 0,
+          "isPrimary": true,
+          "initialView": {
+            "headingDegrees": 0,
+            "pitchDegrees": 0,
+            "horizontalFovDegrees": 70
+          },
+          "viewLimits": {},
+          "hotspots": [],
+          "overlays": [],
+          "connections": [],
+          "spatialData": {},
+          "runtimeHints": {},
+          "id": "22222222-2222-4000-8000-000000000040",
+          "name": "Atrium",
+          "panoramaAssetId": "22222222-0000-4000-8000-000000000004"
+        },
+        {
+          "projectId": "22222222-1111-4000-8000-000000000004",
+          "sortOrder": 1,
+          "isPrimary": false,
+          "initialView": {
+            "headingDegrees": 0,
+            "pitchDegrees": 0,
+            "horizontalFovDegrees": 70
+          },
+          "viewLimits": {},
+          "hotspots": [],
+          "overlays": [],
+          "connections": [],
+          "spatialData": {},
+          "runtimeHints": {},
+          "id": "22222222-2222-4000-8000-000000000041",
+          "name": "Hall",
+          "panoramaAssetId": "22222222-0000-4000-8000-000000000004"
+        },
+        {
+          "projectId": "22222222-1111-4000-8000-000000000004",
+          "sortOrder": 2,
+          "isPrimary": false,
+          "initialView": {
+            "headingDegrees": 0,
+            "pitchDegrees": 0,
+            "horizontalFovDegrees": 70
+          },
+          "viewLimits": {},
+          "hotspots": [],
+          "overlays": [],
+          "connections": [],
+          "spatialData": {},
+          "runtimeHints": {},
+          "id": "22222222-2222-4000-8000-000000000042",
+          "name": "Terrace",
+          "panoramaAssetId": "22222222-0000-4000-8000-000000000004"
+        }
+      ],
+      "publication": {
+        "slug": "golden-gallery",
+        "visibility": "public"
+      }
+    },
+    "assets": [
+      {
+        "id": "22222222-0000-4000-8000-000000000004",
+        "ownerId": "00000000-0000-4000-8000-000000000001",
+        "projectId": null,
+        "mediaType": "panorama_image",
+        "projection": "equirectangular",
+        "processingStatus": "ready",
+        "metadata": {
+          "width": 4096,
+          "height": 2048,
+          "is360": true,
+          "isFullSphere": true
+        },
+        "derivatives": [
+          {
+            "id": "22222222-0000-4000-8000-000000000004-thumbnail",
+            "assetId": "22222222-0000-4000-8000-000000000004",
+            "kind": "thumbnail",
+            "version": 1,
+            "storageKey": "reference/22222222-0000-4000-8000-000000000004/thumbnail.jpg",
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "sizeBytes": 512000,
+            "readiness": "ready",
+            "metadata": {
+              "checksumSha256": "ce44479322d85b3d606d1777dbee16952b08a50604efc4e39583dc5edd1e2b28"
+            }
+          },
+          {
+            "id": "22222222-0000-4000-8000-000000000004-lowResolutionBase",
+            "assetId": "22222222-0000-4000-8000-000000000004",
+            "kind": "lowResolutionBase",
+            "version": 1,
+            "storageKey": "reference/22222222-0000-4000-8000-000000000004/lowResolutionBase.jpg",
+            "mimeType": "image/jpeg",
+            "width": 1024,
+            "height": 512,
+            "sizeBytes": 512000,
+            "readiness": "ready",
+            "metadata": {
+              "checksumSha256": "7d70ab0ee418a8c23cac6a199010bce18c1b3d18ce76c60333731e2803e3c58f"
+            }
+          },
+          {
+            "id": "22222222-0000-4000-8000-000000000004-standardWeb",
+            "assetId": "22222222-0000-4000-8000-000000000004",
+            "kind": "standardWeb",
+            "version": 1,
+            "storageKey": "reference/22222222-0000-4000-8000-000000000004/standardWeb.jpg",
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "sizeBytes": 512000,
+            "readiness": "ready",
+            "metadata": {
+              "checksumSha256": "6727d684b3a911926f0dc3d32b2862231644937582fd3ece67022a4731a6ef88"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "outcome": "compiled",
+  "manifest": {
+    "manifestVersion": 4,
+    "schemaVersion": 1,
+    "experienceId": "22222222-1111-4000-8000-000000000004",
+    "experienceName": "Gallery",
+    "experienceType": "image360",
+    "projectRevision": 1,
+    "publicationRevision": 1,
+    "target": "publication",
+    "visibility": "public",
+    "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+    "initialSceneId": "22222222-2222-4000-8000-000000000040",
+    "settings": {
+      "gallery": {
+        "enabled": true,
+        "showSceneNames": true,
+        "showThumbnails": true
+      },
+      "quality": {
+        "preference": "high"
+      }
+    },
+    "branding": {
+      "properties": {}
+    },
+    "scenes": [
+      {
+        "id": "22222222-2222-4000-8000-000000000040",
+        "name": "Atrium",
+        "sortOrder": 0,
+        "isPrimary": true,
+        "panorama": {
+          "assetId": "22222222-0000-4000-8000-000000000004",
+          "projection": "equirectangular",
+          "family": "standardEquirectangular",
+          "fallbackFamilies": [],
+          "base": {
+            "assetId": "22222222-0000-4000-8000-000000000004",
+            "derivativeId": "22222222-0000-4000-8000-000000000004-lowResolutionBase",
+            "kind": "lowResolutionBase",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 1024,
+            "height": 512,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-lowResolutionBase",
+            "access": "public"
+          },
+          "primary": {
+            "assetId": "22222222-0000-4000-8000-000000000004",
+            "derivativeId": "22222222-0000-4000-8000-000000000004-standardWeb",
+            "kind": "standardWeb",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-standardWeb",
+            "access": "public"
+          }
+        },
+        "initialView": {
+          "headingDegrees": 0,
+          "pitchDegrees": 0,
+          "horizontalFovDegrees": 70
+        },
+        "hotspots": [],
+        "overlays": [],
+        "connections": [],
+        "spatialData": {},
+        "runtimeHints": {},
+        "preloadSceneIds": []
+      },
+      {
+        "id": "22222222-2222-4000-8000-000000000041",
+        "name": "Hall",
+        "sortOrder": 1,
+        "isPrimary": false,
+        "panorama": {
+          "assetId": "22222222-0000-4000-8000-000000000004",
+          "projection": "equirectangular",
+          "family": "standardEquirectangular",
+          "fallbackFamilies": [],
+          "base": {
+            "assetId": "22222222-0000-4000-8000-000000000004",
+            "derivativeId": "22222222-0000-4000-8000-000000000004-lowResolutionBase",
+            "kind": "lowResolutionBase",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 1024,
+            "height": 512,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-lowResolutionBase",
+            "access": "public"
+          },
+          "primary": {
+            "assetId": "22222222-0000-4000-8000-000000000004",
+            "derivativeId": "22222222-0000-4000-8000-000000000004-standardWeb",
+            "kind": "standardWeb",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-standardWeb",
+            "access": "public"
+          }
+        },
+        "initialView": {
+          "headingDegrees": 0,
+          "pitchDegrees": 0,
+          "horizontalFovDegrees": 70
+        },
+        "hotspots": [],
+        "overlays": [],
+        "connections": [],
+        "spatialData": {},
+        "runtimeHints": {},
+        "preloadSceneIds": []
+      },
+      {
+        "id": "22222222-2222-4000-8000-000000000042",
+        "name": "Terrace",
+        "sortOrder": 2,
+        "isPrimary": false,
+        "panorama": {
+          "assetId": "22222222-0000-4000-8000-000000000004",
+          "projection": "equirectangular",
+          "family": "standardEquirectangular",
+          "fallbackFamilies": [],
+          "base": {
+            "assetId": "22222222-0000-4000-8000-000000000004",
+            "derivativeId": "22222222-0000-4000-8000-000000000004-lowResolutionBase",
+            "kind": "lowResolutionBase",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 1024,
+            "height": 512,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-lowResolutionBase",
+            "access": "public"
+          },
+          "primary": {
+            "assetId": "22222222-0000-4000-8000-000000000004",
+            "derivativeId": "22222222-0000-4000-8000-000000000004-standardWeb",
+            "kind": "standardWeb",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-standardWeb",
+            "access": "public"
+          }
+        },
+        "initialView": {
+          "headingDegrees": 0,
+          "pitchDegrees": 0,
+          "horizontalFovDegrees": 70
+        },
+        "hotspots": [],
+        "overlays": [],
+        "connections": [],
+        "spatialData": {},
+        "runtimeHints": {},
+        "preloadSceneIds": []
+      }
+    ],
+    "tour": {
+      "strategy": "embedded",
+      "sceneIndexVersion": "scene-index-2-1",
+      "sceneIndex": [
+        {
+          "id": "22222222-2222-4000-8000-000000000040",
+          "name": "Atrium",
+          "sortOrder": 0,
+          "isPrimary": true,
+          "panoramaAssetId": "22222222-0000-4000-8000-000000000004",
+          "thumbnail": {
+            "assetId": "22222222-0000-4000-8000-000000000004",
+            "derivativeId": "22222222-0000-4000-8000-000000000004-thumbnail",
+            "kind": "thumbnail",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-thumbnail",
+            "access": "public"
+          },
+          "hasHotspots": false,
+          "hasOverlays": false,
+          "connectionTargetSceneIds": []
+        },
+        {
+          "id": "22222222-2222-4000-8000-000000000041",
+          "name": "Hall",
+          "sortOrder": 1,
+          "isPrimary": false,
+          "panoramaAssetId": "22222222-0000-4000-8000-000000000004",
+          "thumbnail": {
+            "assetId": "22222222-0000-4000-8000-000000000004",
+            "derivativeId": "22222222-0000-4000-8000-000000000004-thumbnail",
+            "kind": "thumbnail",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-thumbnail",
+            "access": "public"
+          },
+          "hasHotspots": false,
+          "hasOverlays": false,
+          "connectionTargetSceneIds": []
+        },
+        {
+          "id": "22222222-2222-4000-8000-000000000042",
+          "name": "Terrace",
+          "sortOrder": 2,
+          "isPrimary": false,
+          "panoramaAssetId": "22222222-0000-4000-8000-000000000004",
+          "thumbnail": {
+            "assetId": "22222222-0000-4000-8000-000000000004",
+            "derivativeId": "22222222-0000-4000-8000-000000000004-thumbnail",
+            "kind": "thumbnail",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-thumbnail",
+            "access": "public"
+          },
+          "hasHotspots": false,
+          "hasOverlays": false,
+          "connectionTargetSceneIds": []
+        }
+      ],
+      "sceneCount": 3
+    },
+    "plans": [],
+    "spatialIndex": {
+      "hasWorldCoordinates": false,
+      "hasPlanCoordinates": false,
+      "entries": []
+    },
+    "capabilities": [
+      {
+        "id": "basicPanorama",
+        "required": true,
+        "resolution": "compile-time"
+      },
+      {
+        "id": "sceneNavigation",
+        "required": false,
+        "resolution": "compile-time"
+      },
+      {
+        "id": "gallery",
+        "required": false,
+        "resolution": "compile-time"
+      }
+    ],
+    "runtime": {
+      "modules": [
+        "core-panorama",
+        "virtual-tour",
+        "gallery"
+      ],
+      "moduleDeclarations": [
+        {
+          "id": "core-panorama",
+          "load": "eager",
+          "capabilities": [
+            "basicPanorama"
+          ]
+        },
+        {
+          "id": "virtual-tour",
+          "load": "eager",
+          "capabilities": [
+            "sceneNavigation"
+          ]
+        },
+        {
+          "id": "gallery",
+          "load": "lazy",
+          "capabilities": [
+            "gallery"
+          ]
+        }
+      ],
+      "capabilityFallbacks": [
+        {
+          "capabilityId": "tiledPanorama",
+          "behavior": "disable-capability",
+          "reason": "CONTENT_ASSET_NOT_FOUND",
+          "message": "The experience will use the standard panorama quality."
+        },
+        {
+          "capabilityId": "highResolution",
+          "behavior": "disable-capability",
+          "reason": "CONTENT_ASSET_NOT_FOUND",
+          "message": "Automatic quality selection will be used."
+        }
+      ],
+      "deferredDeviceCapabilities": [],
+      "preload": {
+        "strategy": "selective-adjacent",
+        "maxScenesPerSource": 2,
+        "content": "scene-definition-and-base-media"
+      },
+      "cache": {
+        "defaultProfile": "standard",
+        "profiles": {
+          "constrained": {
+            "policyVersion": 1,
+            "deviceClass": "constrained",
+            "mediaClass": "image-tour",
+            "maxRecentScenes": 2,
+            "maxEstimatedBytes": 67108864,
+            "evictionStrategy": "least-recently-used",
+            "duplicateRequestStrategy": "coalesce",
+            "suppressDuplicateRequests": true
+          },
+          "standard": {
+            "policyVersion": 1,
+            "deviceClass": "standard",
+            "mediaClass": "image-tour",
+            "maxRecentScenes": 4,
+            "maxEstimatedBytes": 201326592,
+            "evictionStrategy": "least-recently-used",
+            "duplicateRequestStrategy": "coalesce",
+            "suppressDuplicateRequests": true
+          },
+          "capable": {
+            "policyVersion": 1,
+            "deviceClass": "capable",
+            "mediaClass": "image-tour",
+            "maxRecentScenes": 6,
+            "maxEstimatedBytes": 402653184,
+            "evictionStrategy": "least-recently-used",
+            "duplicateRequestStrategy": "coalesce",
+            "suppressDuplicateRequests": true
+          }
+        }
+      },
+      "fallbackPolicy": {
+        "panorama": "low-resolution-base-then-standard-or-tiled-detail",
+        "optionalCapabilities": "continue-without-capability",
+        "immersive": "continue-in-normal-360"
+      }
+    },
+    "telemetry": {
+      "enabled": true,
+      "experienceId": "22222222-1111-4000-8000-000000000004",
+      "projectRevision": 1,
+      "publicationRevision": 1,
+      "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+      "events": [
+        "experience_load_started",
+        "first_panorama_visible",
+        "time_to_interactive",
+        "scene_changed",
+        "hotspot_clicked",
+        "asset_failed",
+        "scene_transition_failed",
+        "viewer_error",
+        "experience_exited",
+        "capability_fallback"
+      ],
+      "sceneTransitionFailureCategories": [
+        "scene_definition_unavailable",
+        "scene_definition_invalid",
+        "asset_unavailable",
+        "asset_decode_failed",
+        "unsupported_media",
+        "viewer_error",
+        "transition_timeout",
+        "unknown"
+      ]
+    },
+    "pinnedExtensions": {},
+    "viewerIntegration": {
+      "rendererId": "photo-sphere-viewer",
+      "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+      "config": {
+        "adapter": "equirectangular",
+        "initialSceneId": "22222222-2222-4000-8000-000000000040",
+        "navbar": [
+          "move",
+          "zoom",
+          "fullscreen",
+          "gallery"
+        ],
+        "mousewheel": true,
+        "mousemove": true,
+        "touchControlsEnabled": true,
+        "keyboard": true,
+        "sceneNavigation": true,
+        "gallery": {
+          "enabled": true,
+          "showSceneNames": true,
+          "showThumbnails": true,
+          "items": [
+            {
+              "id": "22222222-2222-4000-8000-000000000040",
+              "name": "Atrium",
+              "thumbnail": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-thumbnail"
+            },
+            {
+              "id": "22222222-2222-4000-8000-000000000041",
+              "name": "Hall",
+              "thumbnail": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-thumbnail"
+            },
+            {
+              "id": "22222222-2222-4000-8000-000000000042",
+              "name": "Terrace",
+              "thumbnail": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-thumbnail"
+            }
+          ]
+        },
+        "startup": {
+          "id": "22222222-2222-4000-8000-000000000040",
+          "adapter": "equirectangular",
+          "panorama": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-standardWeb",
+          "basePanorama": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-lowResolutionBase",
+          "defaultYaw": 0,
+          "defaultPitch": 0,
+          "defaultZoomLvl": 61.236,
+          "markers": [],
+          "links": [],
+          "preloadSceneIds": []
+        },
+        "scenes": [
+          {
+            "id": "22222222-2222-4000-8000-000000000040",
+            "adapter": "equirectangular",
+            "panorama": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-standardWeb",
+            "basePanorama": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-lowResolutionBase",
+            "defaultYaw": 0,
+            "defaultPitch": 0,
+            "defaultZoomLvl": 61.236,
+            "markers": [],
+            "links": [],
+            "preloadSceneIds": []
+          },
+          {
+            "id": "22222222-2222-4000-8000-000000000041",
+            "adapter": "equirectangular",
+            "panorama": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-standardWeb",
+            "basePanorama": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-lowResolutionBase",
+            "defaultYaw": 0,
+            "defaultPitch": 0,
+            "defaultZoomLvl": 61.236,
+            "markers": [],
+            "links": [],
+            "preloadSceneIds": []
+          },
+          {
+            "id": "22222222-2222-4000-8000-000000000042",
+            "adapter": "equirectangular",
+            "panorama": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-standardWeb",
+            "basePanorama": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-lowResolutionBase",
+            "defaultYaw": 0,
+            "defaultPitch": 0,
+            "defaultZoomLvl": 61.236,
+            "markers": [],
+            "links": [],
+            "preloadSceneIds": []
+          }
+        ]
+      }
+    }
+  },
+  "viewerIntegration": {
+    "rendererId": "photo-sphere-viewer",
+    "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+    "config": {
+      "adapter": "equirectangular",
+      "initialSceneId": "22222222-2222-4000-8000-000000000040",
+      "navbar": [
+        "move",
+        "zoom",
+        "fullscreen",
+        "gallery"
+      ],
+      "mousewheel": true,
+      "mousemove": true,
+      "touchControlsEnabled": true,
+      "keyboard": true,
+      "sceneNavigation": true,
+      "gallery": {
+        "enabled": true,
+        "showSceneNames": true,
+        "showThumbnails": true,
+        "items": [
+          {
+            "id": "22222222-2222-4000-8000-000000000040",
+            "name": "Atrium",
+            "thumbnail": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-thumbnail"
+          },
+          {
+            "id": "22222222-2222-4000-8000-000000000041",
+            "name": "Hall",
+            "thumbnail": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-thumbnail"
+          },
+          {
+            "id": "22222222-2222-4000-8000-000000000042",
+            "name": "Terrace",
+            "thumbnail": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-thumbnail"
+          }
+        ]
+      },
+      "startup": {
+        "id": "22222222-2222-4000-8000-000000000040",
+        "adapter": "equirectangular",
+        "panorama": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-standardWeb",
+        "basePanorama": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-lowResolutionBase",
+        "defaultYaw": 0,
+        "defaultPitch": 0,
+        "defaultZoomLvl": 61.236,
+        "markers": [],
+        "links": [],
+        "preloadSceneIds": []
+      },
+      "scenes": [
+        {
+          "id": "22222222-2222-4000-8000-000000000040",
+          "adapter": "equirectangular",
+          "panorama": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-standardWeb",
+          "basePanorama": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-lowResolutionBase",
+          "defaultYaw": 0,
+          "defaultPitch": 0,
+          "defaultZoomLvl": 61.236,
+          "markers": [],
+          "links": [],
+          "preloadSceneIds": []
+        },
+        {
+          "id": "22222222-2222-4000-8000-000000000041",
+          "adapter": "equirectangular",
+          "panorama": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-standardWeb",
+          "basePanorama": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-lowResolutionBase",
+          "defaultYaw": 0,
+          "defaultPitch": 0,
+          "defaultZoomLvl": 61.236,
+          "markers": [],
+          "links": [],
+          "preloadSceneIds": []
+        },
+        {
+          "id": "22222222-2222-4000-8000-000000000042",
+          "adapter": "equirectangular",
+          "panorama": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-standardWeb",
+          "basePanorama": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-lowResolutionBase",
+          "defaultYaw": 0,
+          "defaultPitch": 0,
+          "defaultZoomLvl": 61.236,
+          "markers": [],
+          "links": [],
+          "preloadSceneIds": []
+        }
+      ]
+    }
+  },
+  "sceneDefinitions": [
+    {
+      "sceneDefinitionVersion": 2,
+      "experienceId": "22222222-1111-4000-8000-000000000004",
+      "publicationRevision": 1,
+      "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+      "scene": {
+        "id": "22222222-2222-4000-8000-000000000040",
+        "name": "Atrium",
+        "sortOrder": 0,
+        "isPrimary": true,
+        "panorama": {
+          "assetId": "22222222-0000-4000-8000-000000000004",
+          "projection": "equirectangular",
+          "family": "standardEquirectangular",
+          "fallbackFamilies": [],
+          "base": {
+            "assetId": "22222222-0000-4000-8000-000000000004",
+            "derivativeId": "22222222-0000-4000-8000-000000000004-lowResolutionBase",
+            "kind": "lowResolutionBase",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 1024,
+            "height": 512,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-lowResolutionBase",
+            "access": "public"
+          },
+          "primary": {
+            "assetId": "22222222-0000-4000-8000-000000000004",
+            "derivativeId": "22222222-0000-4000-8000-000000000004-standardWeb",
+            "kind": "standardWeb",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-standardWeb",
+            "access": "public"
+          }
+        },
+        "initialView": {
+          "headingDegrees": 0,
+          "pitchDegrees": 0,
+          "horizontalFovDegrees": 70
+        },
+        "hotspots": [],
+        "overlays": [],
+        "connections": [],
+        "spatialData": {},
+        "runtimeHints": {},
+        "preloadSceneIds": []
+      },
+      "viewerIntegration": {
+        "rendererId": "photo-sphere-viewer",
+        "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+        "sceneId": "22222222-2222-4000-8000-000000000040",
+        "config": {
+          "id": "22222222-2222-4000-8000-000000000040",
+          "adapter": "equirectangular",
+          "panorama": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-standardWeb",
+          "basePanorama": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-lowResolutionBase",
+          "defaultYaw": 0,
+          "defaultPitch": 0,
+          "defaultZoomLvl": 61.236,
+          "markers": [],
+          "links": [],
+          "preloadSceneIds": []
+        }
+      }
+    },
+    {
+      "sceneDefinitionVersion": 2,
+      "experienceId": "22222222-1111-4000-8000-000000000004",
+      "publicationRevision": 1,
+      "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+      "scene": {
+        "id": "22222222-2222-4000-8000-000000000041",
+        "name": "Hall",
+        "sortOrder": 1,
+        "isPrimary": false,
+        "panorama": {
+          "assetId": "22222222-0000-4000-8000-000000000004",
+          "projection": "equirectangular",
+          "family": "standardEquirectangular",
+          "fallbackFamilies": [],
+          "base": {
+            "assetId": "22222222-0000-4000-8000-000000000004",
+            "derivativeId": "22222222-0000-4000-8000-000000000004-lowResolutionBase",
+            "kind": "lowResolutionBase",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 1024,
+            "height": 512,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-lowResolutionBase",
+            "access": "public"
+          },
+          "primary": {
+            "assetId": "22222222-0000-4000-8000-000000000004",
+            "derivativeId": "22222222-0000-4000-8000-000000000004-standardWeb",
+            "kind": "standardWeb",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-standardWeb",
+            "access": "public"
+          }
+        },
+        "initialView": {
+          "headingDegrees": 0,
+          "pitchDegrees": 0,
+          "horizontalFovDegrees": 70
+        },
+        "hotspots": [],
+        "overlays": [],
+        "connections": [],
+        "spatialData": {},
+        "runtimeHints": {},
+        "preloadSceneIds": []
+      },
+      "viewerIntegration": {
+        "rendererId": "photo-sphere-viewer",
+        "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+        "sceneId": "22222222-2222-4000-8000-000000000041",
+        "config": {
+          "id": "22222222-2222-4000-8000-000000000041",
+          "adapter": "equirectangular",
+          "panorama": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-standardWeb",
+          "basePanorama": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-lowResolutionBase",
+          "defaultYaw": 0,
+          "defaultPitch": 0,
+          "defaultZoomLvl": 61.236,
+          "markers": [],
+          "links": [],
+          "preloadSceneIds": []
+        }
+      }
+    },
+    {
+      "sceneDefinitionVersion": 2,
+      "experienceId": "22222222-1111-4000-8000-000000000004",
+      "publicationRevision": 1,
+      "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+      "scene": {
+        "id": "22222222-2222-4000-8000-000000000042",
+        "name": "Terrace",
+        "sortOrder": 2,
+        "isPrimary": false,
+        "panorama": {
+          "assetId": "22222222-0000-4000-8000-000000000004",
+          "projection": "equirectangular",
+          "family": "standardEquirectangular",
+          "fallbackFamilies": [],
+          "base": {
+            "assetId": "22222222-0000-4000-8000-000000000004",
+            "derivativeId": "22222222-0000-4000-8000-000000000004-lowResolutionBase",
+            "kind": "lowResolutionBase",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 1024,
+            "height": 512,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-lowResolutionBase",
+            "access": "public"
+          },
+          "primary": {
+            "assetId": "22222222-0000-4000-8000-000000000004",
+            "derivativeId": "22222222-0000-4000-8000-000000000004-standardWeb",
+            "kind": "standardWeb",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-standardWeb",
+            "access": "public"
+          }
+        },
+        "initialView": {
+          "headingDegrees": 0,
+          "pitchDegrees": 0,
+          "horizontalFovDegrees": 70
+        },
+        "hotspots": [],
+        "overlays": [],
+        "connections": [],
+        "spatialData": {},
+        "runtimeHints": {},
+        "preloadSceneIds": []
+      },
+      "viewerIntegration": {
+        "rendererId": "photo-sphere-viewer",
+        "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+        "sceneId": "22222222-2222-4000-8000-000000000042",
+        "config": {
+          "id": "22222222-2222-4000-8000-000000000042",
+          "adapter": "equirectangular",
+          "panorama": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-standardWeb",
+          "basePanorama": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-lowResolutionBase",
+          "defaultYaw": 0,
+          "defaultPitch": 0,
+          "defaultZoomLvl": 61.236,
+          "markers": [],
+          "links": [],
+          "preloadSceneIds": []
+        }
+      }
+    }
+  ],
+  "sceneIndex": [
+    {
+      "id": "22222222-2222-4000-8000-000000000040",
+      "name": "Atrium",
+      "sortOrder": 0,
+      "isPrimary": true,
+      "panoramaAssetId": "22222222-0000-4000-8000-000000000004",
+      "thumbnail": {
+        "assetId": "22222222-0000-4000-8000-000000000004",
+        "derivativeId": "22222222-0000-4000-8000-000000000004-thumbnail",
+        "kind": "thumbnail",
+        "version": 1,
+        "mimeType": "image/jpeg",
+        "width": 4096,
+        "height": 2048,
+        "url": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-thumbnail",
+        "access": "public"
+      },
+      "hasHotspots": false,
+      "hasOverlays": false,
+      "connectionTargetSceneIds": []
+    },
+    {
+      "id": "22222222-2222-4000-8000-000000000041",
+      "name": "Hall",
+      "sortOrder": 1,
+      "isPrimary": false,
+      "panoramaAssetId": "22222222-0000-4000-8000-000000000004",
+      "thumbnail": {
+        "assetId": "22222222-0000-4000-8000-000000000004",
+        "derivativeId": "22222222-0000-4000-8000-000000000004-thumbnail",
+        "kind": "thumbnail",
+        "version": 1,
+        "mimeType": "image/jpeg",
+        "width": 4096,
+        "height": 2048,
+        "url": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-thumbnail",
+        "access": "public"
+      },
+      "hasHotspots": false,
+      "hasOverlays": false,
+      "connectionTargetSceneIds": []
+    },
+    {
+      "id": "22222222-2222-4000-8000-000000000042",
+      "name": "Terrace",
+      "sortOrder": 2,
+      "isPrimary": false,
+      "panoramaAssetId": "22222222-0000-4000-8000-000000000004",
+      "thumbnail": {
+        "assetId": "22222222-0000-4000-8000-000000000004",
+        "derivativeId": "22222222-0000-4000-8000-000000000004-thumbnail",
+        "kind": "thumbnail",
+        "version": 1,
+        "mimeType": "image/jpeg",
+        "width": 4096,
+        "height": 2048,
+        "url": "/api/v1/publications/22222222-1111-4000-8000-000000000004/1/media/22222222-0000-4000-8000-000000000004-thumbnail",
+        "access": "public"
+      },
+      "hasHotspots": false,
+      "hasOverlays": false,
+      "connectionTargetSceneIds": []
+    }
+  ],
+  "diagnostics": [],
+  "hashes": {
+    "input": "e3ab6890891865f935a6d4d38b9a975d0790ad1248fb1be62cee0aaedd4fd7f3",
+    "manifest": "7e070e64ab846fd5343a60d65e0f828981b1149127bb384e04bbce07020f1804",
+    "viewerIntegration": "70f76eaab813b0f78bde2704a2e385a1e34053a9b1e3607a2dcd4ac6b69bdead",
+    "sceneDefinitions": "07b8b898a3cd27d780cc63fe0321b151085925f3b588d55427b49ceb2f9dc67a",
+    "sceneIndex": "013c2a4ff219085d7df8ee0cd13089f78d48b0bd981eebaa847baf95bb850f5f",
+    "content": "248524c3ec34ac2f45c0d6d35909353caa2e2644cf8d3708aee8493cb108d8ce"
+  }
+}

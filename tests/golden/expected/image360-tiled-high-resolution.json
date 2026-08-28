@@ -1,0 +1,1253 @@
+{
+  "id": "image360-tiled-high-resolution",
+  "description": "image360 with a tiled panorama and templated tile delivery.",
+  "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+  "input": {
+    "target": "publication",
+    "visibility": "public",
+    "publicationRevision": 1,
+    "publicationSlug": "golden-tiled",
+    "schemaVersion": 1,
+    "project": {
+      "id": "22222222-1111-4000-8000-000000000006",
+      "ownerId": "00000000-0000-4000-8000-000000000001",
+      "type": "image360",
+      "name": "High resolution",
+      "schemaVersion": 1,
+      "revision": 1,
+      "settings": {
+        "quality": {
+          "preference": "high"
+        }
+      },
+      "branding": {},
+      "scenes": [
+        {
+          "projectId": "22222222-1111-4000-8000-000000000006",
+          "sortOrder": 0,
+          "isPrimary": true,
+          "initialView": {
+            "headingDegrees": 0,
+            "pitchDegrees": 0,
+            "horizontalFovDegrees": 70
+          },
+          "viewLimits": {},
+          "hotspots": [],
+          "overlays": [],
+          "connections": [],
+          "spatialData": {},
+          "runtimeHints": {},
+          "id": "22222222-2222-4000-8000-000000000006",
+          "name": "Atrium",
+          "panoramaAssetId": "22222222-0000-4000-8000-000000000006"
+        }
+      ],
+      "publication": {
+        "slug": "golden-tiled",
+        "visibility": "public"
+      }
+    },
+    "assets": [
+      {
+        "id": "22222222-0000-4000-8000-000000000006",
+        "ownerId": "00000000-0000-4000-8000-000000000001",
+        "projectId": null,
+        "mediaType": "panorama_image",
+        "projection": "equirectangular",
+        "processingStatus": "ready",
+        "metadata": {
+          "width": 12288,
+          "height": 6144,
+          "is360": true,
+          "isFullSphere": true
+        },
+        "derivatives": [
+          {
+            "id": "22222222-0000-4000-8000-000000000006-thumbnail",
+            "assetId": "22222222-0000-4000-8000-000000000006",
+            "kind": "thumbnail",
+            "version": 1,
+            "storageKey": "reference/22222222-0000-4000-8000-000000000006/thumbnail.jpg",
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "sizeBytes": 512000,
+            "readiness": "ready",
+            "metadata": {
+              "checksumSha256": "655c5a4a7389a866fc1f621cff06ae8c413d469fcb87ca0721446d66b19b33a2"
+            }
+          },
+          {
+            "id": "22222222-0000-4000-8000-000000000006-lowResolutionBase",
+            "assetId": "22222222-0000-4000-8000-000000000006",
+            "kind": "lowResolutionBase",
+            "version": 1,
+            "storageKey": "reference/22222222-0000-4000-8000-000000000006/lowResolutionBase.jpg",
+            "mimeType": "image/jpeg",
+            "width": 1024,
+            "height": 512,
+            "sizeBytes": 512000,
+            "readiness": "ready",
+            "metadata": {
+              "checksumSha256": "baf5a41f56da56c5db1802460134e914040221e41c16d34b4cf97876dea71c40"
+            }
+          },
+          {
+            "id": "22222222-0000-4000-8000-000000000006-standardWeb",
+            "assetId": "22222222-0000-4000-8000-000000000006",
+            "kind": "standardWeb",
+            "version": 1,
+            "storageKey": "reference/22222222-0000-4000-8000-000000000006/standardWeb.jpg",
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "sizeBytes": 512000,
+            "readiness": "ready",
+            "metadata": {
+              "checksumSha256": "cbe60468baffa64ddd30bf42efc02ef1df7975508b7f7d867346112adfecf83c"
+            }
+          },
+          {
+            "id": "22222222-0000-4000-8000-000000000006-tiledLevels",
+            "assetId": "22222222-0000-4000-8000-000000000006",
+            "kind": "tiledLevels",
+            "version": 1,
+            "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/manifest.json",
+            "mimeType": "application/json",
+            "width": 4096,
+            "height": 2048,
+            "sizeBytes": 4096,
+            "readiness": "ready",
+            "metadata": {
+              "tileSize": 512,
+              "levels": [
+                {
+                  "level": 0,
+                  "width": 2048,
+                  "height": 1024,
+                  "columns": 4,
+                  "rows": 2,
+                  "tileCount": 8
+                },
+                {
+                  "level": 1,
+                  "width": 4096,
+                  "height": 2048,
+                  "columns": 8,
+                  "rows": 4,
+                  "tileCount": 32
+                }
+              ],
+              "tileCount": 40,
+              "tiles": [
+                {
+                  "level": 0,
+                  "x": 0,
+                  "y": 0,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 2048,
+                  "levelHeight": 1024,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/0/0/0.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "b3ff2eb8e3dba74425196b40e59771fe81ff485e9ee5ef1617383ef0fc9c3696"
+                },
+                {
+                  "level": 0,
+                  "x": 1,
+                  "y": 0,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 2048,
+                  "levelHeight": 1024,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/0/1/0.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "b7846bc4565d2a4d186cbf893e7aee99ef0f7ecaed5739bf76fdd6d832dcfe1e"
+                },
+                {
+                  "level": 0,
+                  "x": 2,
+                  "y": 0,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 2048,
+                  "levelHeight": 1024,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/0/2/0.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "49c382ed901736943902defbf302aa5ab0d37def9eb9724f0eafe7e83b77aea4"
+                },
+                {
+                  "level": 0,
+                  "x": 3,
+                  "y": 0,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 2048,
+                  "levelHeight": 1024,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/0/3/0.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "c328528c999e48b23d0cc861dd7cc45c7501eb9d7e28387dc218afe6a780390c"
+                },
+                {
+                  "level": 0,
+                  "x": 0,
+                  "y": 1,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 2048,
+                  "levelHeight": 1024,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/0/0/1.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "a3c793beeef83e569fda37ee911165648d011d13e11ee52d39072c23956d90d2"
+                },
+                {
+                  "level": 0,
+                  "x": 1,
+                  "y": 1,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 2048,
+                  "levelHeight": 1024,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/0/1/1.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "b21aff6a8114ca98d901adde4ad26bb337269216b342b7a7fe1884b8bd790215"
+                },
+                {
+                  "level": 0,
+                  "x": 2,
+                  "y": 1,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 2048,
+                  "levelHeight": 1024,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/0/2/1.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "6cf7afe361c6fe93591e93bb103e75e90ee4ccd2a7ff54597df65609de3b1f1d"
+                },
+                {
+                  "level": 0,
+                  "x": 3,
+                  "y": 1,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 2048,
+                  "levelHeight": 1024,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/0/3/1.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "5457a7b65570c0983dbc7f31825d42ad56158de42f1d825aff229ee98e00bb94"
+                },
+                {
+                  "level": 1,
+                  "x": 0,
+                  "y": 0,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 4096,
+                  "levelHeight": 2048,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/1/0/0.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "e3ce514699139100dfed892ab631308b15fefad0b4275938f20767d7375d46af"
+                },
+                {
+                  "level": 1,
+                  "x": 1,
+                  "y": 0,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 4096,
+                  "levelHeight": 2048,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/1/1/0.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "7cf5ee7c58925d4947ab032b2932fc392beb678744aa2dba521edbeac76034db"
+                },
+                {
+                  "level": 1,
+                  "x": 2,
+                  "y": 0,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 4096,
+                  "levelHeight": 2048,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/1/2/0.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "91fb246bcbc407a10ba6e32215c574f365bd1c1d1f8e52be1d553236fada6db2"
+                },
+                {
+                  "level": 1,
+                  "x": 3,
+                  "y": 0,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 4096,
+                  "levelHeight": 2048,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/1/3/0.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "c834420db82185effe9002fd3210b70ffacdce7a750812b26a2647319fc6c341"
+                },
+                {
+                  "level": 1,
+                  "x": 4,
+                  "y": 0,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 4096,
+                  "levelHeight": 2048,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/1/4/0.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "2d34e64bd4e887727df3cad5bc5f15cebbdf8610aeba637b5615a341a7dd84cf"
+                },
+                {
+                  "level": 1,
+                  "x": 5,
+                  "y": 0,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 4096,
+                  "levelHeight": 2048,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/1/5/0.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "e128cdd7e32ff6316bd858317f605ae7078ff5e58754c80f4d5c245c520d55a9"
+                },
+                {
+                  "level": 1,
+                  "x": 6,
+                  "y": 0,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 4096,
+                  "levelHeight": 2048,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/1/6/0.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "604fa0eb86d04bf21abf131eb98d6b7d7d3baca99968773bdac3ce54d8b18b71"
+                },
+                {
+                  "level": 1,
+                  "x": 7,
+                  "y": 0,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 4096,
+                  "levelHeight": 2048,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/1/7/0.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "46505a33ab149d9540e929662bb88e4a5f21788369dae4f9ecdc948e71f680e5"
+                },
+                {
+                  "level": 1,
+                  "x": 0,
+                  "y": 1,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 4096,
+                  "levelHeight": 2048,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/1/0/1.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "41dacd1906974948661109f571a3941b9bb8f0ba5b804cfc7a40f87e419add7f"
+                },
+                {
+                  "level": 1,
+                  "x": 1,
+                  "y": 1,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 4096,
+                  "levelHeight": 2048,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/1/1/1.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "81da621e2140138834ff95a63de3eb56432e8fe50e32d8a1677272391028c1c0"
+                },
+                {
+                  "level": 1,
+                  "x": 2,
+                  "y": 1,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 4096,
+                  "levelHeight": 2048,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/1/2/1.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "ef2283d68522e8d5b27ecb4b395f8c2b7acaa5cab795582de92bb8dd0412ab6c"
+                },
+                {
+                  "level": 1,
+                  "x": 3,
+                  "y": 1,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 4096,
+                  "levelHeight": 2048,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/1/3/1.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "478e5c42b32851394071320d545c9caf506ba0276826cd3051a48bad25660dd3"
+                },
+                {
+                  "level": 1,
+                  "x": 4,
+                  "y": 1,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 4096,
+                  "levelHeight": 2048,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/1/4/1.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "c7f4f6cb46700e2ff95d49a072814825c1d2c30edc19bcb0b029e259c2cc5771"
+                },
+                {
+                  "level": 1,
+                  "x": 5,
+                  "y": 1,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 4096,
+                  "levelHeight": 2048,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/1/5/1.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "dc3979e2984f0519706591103210865e37d1fc48494d3981a44eb9c787a20d8f"
+                },
+                {
+                  "level": 1,
+                  "x": 6,
+                  "y": 1,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 4096,
+                  "levelHeight": 2048,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/1/6/1.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "7ac69fbc9d318406232cb5515734e4c8f54e1f8b8218aa6006f4685c39f6e39f"
+                },
+                {
+                  "level": 1,
+                  "x": 7,
+                  "y": 1,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 4096,
+                  "levelHeight": 2048,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/1/7/1.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "5e6adf57270898198aaa19a5c8bb5a67dafe1d6cfd07e93fddf8966bc0e2591b"
+                },
+                {
+                  "level": 1,
+                  "x": 0,
+                  "y": 2,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 4096,
+                  "levelHeight": 2048,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/1/0/2.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "19aa401eaf7c830eb6f2ff3469f690e95d54214b5f191d75e2b186c981950ade"
+                },
+                {
+                  "level": 1,
+                  "x": 1,
+                  "y": 2,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 4096,
+                  "levelHeight": 2048,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/1/1/2.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "db5fce0d1b63fa1c33128f713b9f4700ae851748f56c5ca9cf378d0bf3c4f993"
+                },
+                {
+                  "level": 1,
+                  "x": 2,
+                  "y": 2,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 4096,
+                  "levelHeight": 2048,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/1/2/2.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "b78eb32af6db7c4346f733f7d250bfc5cf498230a79515bf1c447037f2fee1d3"
+                },
+                {
+                  "level": 1,
+                  "x": 3,
+                  "y": 2,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 4096,
+                  "levelHeight": 2048,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/1/3/2.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "6b7167437e763490ac81ec2ea761b2653788c758715832f8387ec0bbc9c96398"
+                },
+                {
+                  "level": 1,
+                  "x": 4,
+                  "y": 2,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 4096,
+                  "levelHeight": 2048,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/1/4/2.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "ead2fd1170e9c22c2d8ee28c4d3311fdf19ea17e3db8f9e8c1bc6d542c1314f1"
+                },
+                {
+                  "level": 1,
+                  "x": 5,
+                  "y": 2,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 4096,
+                  "levelHeight": 2048,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/1/5/2.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "ee8203aa0d6f9396996c3049541d4475f43ffd9e0f26875403306fb2ef99bf11"
+                },
+                {
+                  "level": 1,
+                  "x": 6,
+                  "y": 2,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 4096,
+                  "levelHeight": 2048,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/1/6/2.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "882e15bf191c6e37ba4ea526052c5cdc0ddf7b9c19a9d11ddf3f40bde74b3f91"
+                },
+                {
+                  "level": 1,
+                  "x": 7,
+                  "y": 2,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 4096,
+                  "levelHeight": 2048,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/1/7/2.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "92225f91a7b41f9c4f26c90b5ffd0da88a6195b5261603f2e1573e489b707b4f"
+                },
+                {
+                  "level": 1,
+                  "x": 0,
+                  "y": 3,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 4096,
+                  "levelHeight": 2048,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/1/0/3.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "2ba7ad6dcf1d2471f092a6c4efbe39dc0d1b32f7b19e24594ddf9fc378e94357"
+                },
+                {
+                  "level": 1,
+                  "x": 1,
+                  "y": 3,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 4096,
+                  "levelHeight": 2048,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/1/1/3.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "7fa364d600fcebc93e67e911db0a4e4e65aa4e078075d04e4d91ab517763cc44"
+                },
+                {
+                  "level": 1,
+                  "x": 2,
+                  "y": 3,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 4096,
+                  "levelHeight": 2048,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/1/2/3.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "b1b35cbab307cabee5e977576fe809bcbd836a66ff305d8cac2b98cc0bfa220f"
+                },
+                {
+                  "level": 1,
+                  "x": 3,
+                  "y": 3,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 4096,
+                  "levelHeight": 2048,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/1/3/3.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "efc4c4f81fd023491e6ec2b6f3f2078c0aaa8619a21a20209fc47483b2caf484"
+                },
+                {
+                  "level": 1,
+                  "x": 4,
+                  "y": 3,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 4096,
+                  "levelHeight": 2048,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/1/4/3.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "4d7c6d497454b109d9e338f6fb95b0fb4d30d35a2360b0f09b48fb46c744645b"
+                },
+                {
+                  "level": 1,
+                  "x": 5,
+                  "y": 3,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 4096,
+                  "levelHeight": 2048,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/1/5/3.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "ad1f85e844739ddfdae67ee9e1c4201445220cfce2d208dd7885326fd6e7cfa2"
+                },
+                {
+                  "level": 1,
+                  "x": 6,
+                  "y": 3,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 4096,
+                  "levelHeight": 2048,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/1/6/3.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "45ee07f581f9dc33b10c260dfaac369b8114f44bfca4cd142c68fc66d45094ca"
+                },
+                {
+                  "level": 1,
+                  "x": 7,
+                  "y": 3,
+                  "width": 512,
+                  "height": 512,
+                  "levelWidth": 4096,
+                  "levelHeight": 2048,
+                  "storageKey": "reference/22222222-0000-4000-8000-000000000006/tiles/1/7/3.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": 24000,
+                  "checksumSha256": "11d94db7a57b104c6d04c2ffe7429768aed66efda7b7befec0317f63ce81ba68"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "outcome": "compiled",
+  "manifest": {
+    "manifestVersion": 4,
+    "schemaVersion": 1,
+    "experienceId": "22222222-1111-4000-8000-000000000006",
+    "experienceName": "High resolution",
+    "experienceType": "image360",
+    "projectRevision": 1,
+    "publicationRevision": 1,
+    "target": "publication",
+    "visibility": "public",
+    "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+    "initialSceneId": "22222222-2222-4000-8000-000000000006",
+    "settings": {
+      "quality": {
+        "preference": "high"
+      }
+    },
+    "branding": {
+      "properties": {}
+    },
+    "scenes": [
+      {
+        "id": "22222222-2222-4000-8000-000000000006",
+        "name": "Atrium",
+        "sortOrder": 0,
+        "isPrimary": true,
+        "panorama": {
+          "assetId": "22222222-0000-4000-8000-000000000006",
+          "projection": "equirectangular",
+          "family": "tiledEquirectangular",
+          "fallbackFamilies": [
+            "standardEquirectangular"
+          ],
+          "base": {
+            "assetId": "22222222-0000-4000-8000-000000000006",
+            "derivativeId": "22222222-0000-4000-8000-000000000006-lowResolutionBase",
+            "kind": "lowResolutionBase",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 1024,
+            "height": 512,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000006/1/media/22222222-0000-4000-8000-000000000006-lowResolutionBase",
+            "access": "public"
+          },
+          "primary": {
+            "assetId": "22222222-0000-4000-8000-000000000006",
+            "derivativeId": "22222222-0000-4000-8000-000000000006-standardWeb",
+            "kind": "standardWeb",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000006/1/media/22222222-0000-4000-8000-000000000006-standardWeb",
+            "access": "public"
+          },
+          "tiles": {
+            "manifest": {
+              "assetId": "22222222-0000-4000-8000-000000000006",
+              "derivativeId": "22222222-0000-4000-8000-000000000006-tiledLevels",
+              "kind": "tiledLevels",
+              "version": 1,
+              "mimeType": "application/json",
+              "width": 4096,
+              "height": 2048,
+              "url": "/api/v1/publications/22222222-1111-4000-8000-000000000006/1/media/22222222-0000-4000-8000-000000000006-tiledLevels",
+              "access": "public"
+            },
+            "tileUrlTemplate": "/api/v1/publications/22222222-1111-4000-8000-000000000006/1/media/22222222-0000-4000-8000-000000000006-tiledLevels/tiles/{level}/{x}/{y}",
+            "tileSize": 512,
+            "levels": [
+              {
+                "level": 0,
+                "width": 2048,
+                "height": 1024,
+                "columns": 4,
+                "rows": 2
+              },
+              {
+                "level": 1,
+                "width": 4096,
+                "height": 2048,
+                "columns": 8,
+                "rows": 4
+              }
+            ]
+          }
+        },
+        "initialView": {
+          "headingDegrees": 0,
+          "pitchDegrees": 0,
+          "horizontalFovDegrees": 70
+        },
+        "hotspots": [],
+        "overlays": [],
+        "connections": [],
+        "spatialData": {},
+        "runtimeHints": {},
+        "preloadSceneIds": []
+      }
+    ],
+    "tour": {
+      "strategy": "embedded",
+      "sceneIndexVersion": "scene-index-2-1",
+      "sceneIndex": [
+        {
+          "id": "22222222-2222-4000-8000-000000000006",
+          "name": "Atrium",
+          "sortOrder": 0,
+          "isPrimary": true,
+          "panoramaAssetId": "22222222-0000-4000-8000-000000000006",
+          "thumbnail": {
+            "assetId": "22222222-0000-4000-8000-000000000006",
+            "derivativeId": "22222222-0000-4000-8000-000000000006-thumbnail",
+            "kind": "thumbnail",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000006/1/media/22222222-0000-4000-8000-000000000006-thumbnail",
+            "access": "public"
+          },
+          "hasHotspots": false,
+          "hasOverlays": false,
+          "connectionTargetSceneIds": []
+        }
+      ],
+      "sceneCount": 1
+    },
+    "plans": [],
+    "spatialIndex": {
+      "hasWorldCoordinates": false,
+      "hasPlanCoordinates": false,
+      "entries": []
+    },
+    "capabilities": [
+      {
+        "id": "basicPanorama",
+        "required": true,
+        "resolution": "compile-time"
+      },
+      {
+        "id": "tiledPanorama",
+        "required": false,
+        "resolution": "compile-time"
+      },
+      {
+        "id": "highResolution",
+        "required": false,
+        "resolution": "compile-time"
+      }
+    ],
+    "runtime": {
+      "modules": [
+        "core-panorama",
+        "equirectangular-tiles",
+        "resolution-selection"
+      ],
+      "moduleDeclarations": [
+        {
+          "id": "core-panorama",
+          "load": "eager",
+          "capabilities": [
+            "basicPanorama"
+          ]
+        },
+        {
+          "id": "equirectangular-tiles",
+          "load": "lazy",
+          "capabilities": [
+            "tiledPanorama"
+          ]
+        },
+        {
+          "id": "resolution-selection",
+          "load": "lazy",
+          "capabilities": [
+            "highResolution"
+          ]
+        }
+      ],
+      "capabilityFallbacks": [],
+      "deferredDeviceCapabilities": [],
+      "preload": {
+        "strategy": "selective-adjacent",
+        "maxScenesPerSource": 2,
+        "content": "scene-definition-and-base-media"
+      },
+      "cache": {
+        "defaultProfile": "standard",
+        "profiles": {
+          "constrained": {
+            "policyVersion": 1,
+            "deviceClass": "constrained",
+            "mediaClass": "image-tour",
+            "maxRecentScenes": 2,
+            "maxEstimatedBytes": 67108864,
+            "evictionStrategy": "least-recently-used",
+            "duplicateRequestStrategy": "coalesce",
+            "suppressDuplicateRequests": true
+          },
+          "standard": {
+            "policyVersion": 1,
+            "deviceClass": "standard",
+            "mediaClass": "image-tour",
+            "maxRecentScenes": 4,
+            "maxEstimatedBytes": 201326592,
+            "evictionStrategy": "least-recently-used",
+            "duplicateRequestStrategy": "coalesce",
+            "suppressDuplicateRequests": true
+          },
+          "capable": {
+            "policyVersion": 1,
+            "deviceClass": "capable",
+            "mediaClass": "image-tour",
+            "maxRecentScenes": 6,
+            "maxEstimatedBytes": 402653184,
+            "evictionStrategy": "least-recently-used",
+            "duplicateRequestStrategy": "coalesce",
+            "suppressDuplicateRequests": true
+          }
+        }
+      },
+      "fallbackPolicy": {
+        "panorama": "low-resolution-base-then-standard-or-tiled-detail",
+        "optionalCapabilities": "continue-without-capability",
+        "immersive": "continue-in-normal-360"
+      }
+    },
+    "telemetry": {
+      "enabled": true,
+      "experienceId": "22222222-1111-4000-8000-000000000006",
+      "projectRevision": 1,
+      "publicationRevision": 1,
+      "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+      "events": [
+        "experience_load_started",
+        "first_panorama_visible",
+        "time_to_interactive",
+        "scene_changed",
+        "hotspot_clicked",
+        "asset_failed",
+        "scene_transition_failed",
+        "viewer_error",
+        "experience_exited",
+        "capability_fallback"
+      ],
+      "sceneTransitionFailureCategories": [
+        "scene_definition_unavailable",
+        "scene_definition_invalid",
+        "asset_unavailable",
+        "asset_decode_failed",
+        "unsupported_media",
+        "viewer_error",
+        "transition_timeout",
+        "unknown"
+      ]
+    },
+    "pinnedExtensions": {},
+    "viewerIntegration": {
+      "rendererId": "photo-sphere-viewer",
+      "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+      "config": {
+        "adapter": "equirectangular-tiles",
+        "initialSceneId": "22222222-2222-4000-8000-000000000006",
+        "navbar": [
+          "move",
+          "zoom",
+          "fullscreen"
+        ],
+        "mousewheel": true,
+        "mousemove": true,
+        "touchControlsEnabled": true,
+        "keyboard": true,
+        "sceneNavigation": false,
+        "startup": {
+          "id": "22222222-2222-4000-8000-000000000006",
+          "adapter": "equirectangular-tiles",
+          "panorama": {
+            "baseUrl": "/api/v1/publications/22222222-1111-4000-8000-000000000006/1/media/22222222-0000-4000-8000-000000000006-lowResolutionBase",
+            "tileUrlTemplate": "/api/v1/publications/22222222-1111-4000-8000-000000000006/1/media/22222222-0000-4000-8000-000000000006-tiledLevels/tiles/{level}/{x}/{y}",
+            "tileSize": 512,
+            "levels": [
+              {
+                "level": 0,
+                "width": 2048,
+                "height": 1024,
+                "columns": 4,
+                "rows": 2
+              },
+              {
+                "level": 1,
+                "width": 4096,
+                "height": 2048,
+                "columns": 8,
+                "rows": 4
+              }
+            ]
+          },
+          "basePanorama": "/api/v1/publications/22222222-1111-4000-8000-000000000006/1/media/22222222-0000-4000-8000-000000000006-lowResolutionBase",
+          "defaultYaw": 0,
+          "defaultPitch": 0,
+          "defaultZoomLvl": 61.236,
+          "markers": [],
+          "links": [],
+          "preloadSceneIds": []
+        },
+        "scenes": [
+          {
+            "id": "22222222-2222-4000-8000-000000000006",
+            "adapter": "equirectangular-tiles",
+            "panorama": {
+              "baseUrl": "/api/v1/publications/22222222-1111-4000-8000-000000000006/1/media/22222222-0000-4000-8000-000000000006-lowResolutionBase",
+              "tileUrlTemplate": "/api/v1/publications/22222222-1111-4000-8000-000000000006/1/media/22222222-0000-4000-8000-000000000006-tiledLevels/tiles/{level}/{x}/{y}",
+              "tileSize": 512,
+              "levels": [
+                {
+                  "level": 0,
+                  "width": 2048,
+                  "height": 1024,
+                  "columns": 4,
+                  "rows": 2
+                },
+                {
+                  "level": 1,
+                  "width": 4096,
+                  "height": 2048,
+                  "columns": 8,
+                  "rows": 4
+                }
+              ]
+            },
+            "basePanorama": "/api/v1/publications/22222222-1111-4000-8000-000000000006/1/media/22222222-0000-4000-8000-000000000006-lowResolutionBase",
+            "defaultYaw": 0,
+            "defaultPitch": 0,
+            "defaultZoomLvl": 61.236,
+            "markers": [],
+            "links": [],
+            "preloadSceneIds": []
+          }
+        ]
+      }
+    }
+  },
+  "viewerIntegration": {
+    "rendererId": "photo-sphere-viewer",
+    "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+    "config": {
+      "adapter": "equirectangular-tiles",
+      "initialSceneId": "22222222-2222-4000-8000-000000000006",
+      "navbar": [
+        "move",
+        "zoom",
+        "fullscreen"
+      ],
+      "mousewheel": true,
+      "mousemove": true,
+      "touchControlsEnabled": true,
+      "keyboard": true,
+      "sceneNavigation": false,
+      "startup": {
+        "id": "22222222-2222-4000-8000-000000000006",
+        "adapter": "equirectangular-tiles",
+        "panorama": {
+          "baseUrl": "/api/v1/publications/22222222-1111-4000-8000-000000000006/1/media/22222222-0000-4000-8000-000000000006-lowResolutionBase",
+          "tileUrlTemplate": "/api/v1/publications/22222222-1111-4000-8000-000000000006/1/media/22222222-0000-4000-8000-000000000006-tiledLevels/tiles/{level}/{x}/{y}",
+          "tileSize": 512,
+          "levels": [
+            {
+              "level": 0,
+              "width": 2048,
+              "height": 1024,
+              "columns": 4,
+              "rows": 2
+            },
+            {
+              "level": 1,
+              "width": 4096,
+              "height": 2048,
+              "columns": 8,
+              "rows": 4
+            }
+          ]
+        },
+        "basePanorama": "/api/v1/publications/22222222-1111-4000-8000-000000000006/1/media/22222222-0000-4000-8000-000000000006-lowResolutionBase",
+        "defaultYaw": 0,
+        "defaultPitch": 0,
+        "defaultZoomLvl": 61.236,
+        "markers": [],
+        "links": [],
+        "preloadSceneIds": []
+      },
+      "scenes": [
+        {
+          "id": "22222222-2222-4000-8000-000000000006",
+          "adapter": "equirectangular-tiles",
+          "panorama": {
+            "baseUrl": "/api/v1/publications/22222222-1111-4000-8000-000000000006/1/media/22222222-0000-4000-8000-000000000006-lowResolutionBase",
+            "tileUrlTemplate": "/api/v1/publications/22222222-1111-4000-8000-000000000006/1/media/22222222-0000-4000-8000-000000000006-tiledLevels/tiles/{level}/{x}/{y}",
+            "tileSize": 512,
+            "levels": [
+              {
+                "level": 0,
+                "width": 2048,
+                "height": 1024,
+                "columns": 4,
+                "rows": 2
+              },
+              {
+                "level": 1,
+                "width": 4096,
+                "height": 2048,
+                "columns": 8,
+                "rows": 4
+              }
+            ]
+          },
+          "basePanorama": "/api/v1/publications/22222222-1111-4000-8000-000000000006/1/media/22222222-0000-4000-8000-000000000006-lowResolutionBase",
+          "defaultYaw": 0,
+          "defaultPitch": 0,
+          "defaultZoomLvl": 61.236,
+          "markers": [],
+          "links": [],
+          "preloadSceneIds": []
+        }
+      ]
+    }
+  },
+  "sceneDefinitions": [
+    {
+      "sceneDefinitionVersion": 2,
+      "experienceId": "22222222-1111-4000-8000-000000000006",
+      "publicationRevision": 1,
+      "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+      "scene": {
+        "id": "22222222-2222-4000-8000-000000000006",
+        "name": "Atrium",
+        "sortOrder": 0,
+        "isPrimary": true,
+        "panorama": {
+          "assetId": "22222222-0000-4000-8000-000000000006",
+          "projection": "equirectangular",
+          "family": "tiledEquirectangular",
+          "fallbackFamilies": [
+            "standardEquirectangular"
+          ],
+          "base": {
+            "assetId": "22222222-0000-4000-8000-000000000006",
+            "derivativeId": "22222222-0000-4000-8000-000000000006-lowResolutionBase",
+            "kind": "lowResolutionBase",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 1024,
+            "height": 512,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000006/1/media/22222222-0000-4000-8000-000000000006-lowResolutionBase",
+            "access": "public"
+          },
+          "primary": {
+            "assetId": "22222222-0000-4000-8000-000000000006",
+            "derivativeId": "22222222-0000-4000-8000-000000000006-standardWeb",
+            "kind": "standardWeb",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000006/1/media/22222222-0000-4000-8000-000000000006-standardWeb",
+            "access": "public"
+          },
+          "tiles": {
+            "manifest": {
+              "assetId": "22222222-0000-4000-8000-000000000006",
+              "derivativeId": "22222222-0000-4000-8000-000000000006-tiledLevels",
+              "kind": "tiledLevels",
+              "version": 1,
+              "mimeType": "application/json",
+              "width": 4096,
+              "height": 2048,
+              "url": "/api/v1/publications/22222222-1111-4000-8000-000000000006/1/media/22222222-0000-4000-8000-000000000006-tiledLevels",
+              "access": "public"
+            },
+            "tileUrlTemplate": "/api/v1/publications/22222222-1111-4000-8000-000000000006/1/media/22222222-0000-4000-8000-000000000006-tiledLevels/tiles/{level}/{x}/{y}",
+            "tileSize": 512,
+            "levels": [
+              {
+                "level": 0,
+                "width": 2048,
+                "height": 1024,
+                "columns": 4,
+                "rows": 2
+              },
+              {
+                "level": 1,
+                "width": 4096,
+                "height": 2048,
+                "columns": 8,
+                "rows": 4
+              }
+            ]
+          }
+        },
+        "initialView": {
+          "headingDegrees": 0,
+          "pitchDegrees": 0,
+          "horizontalFovDegrees": 70
+        },
+        "hotspots": [],
+        "overlays": [],
+        "connections": [],
+        "spatialData": {},
+        "runtimeHints": {},
+        "preloadSceneIds": []
+      },
+      "viewerIntegration": {
+        "rendererId": "photo-sphere-viewer",
+        "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+        "sceneId": "22222222-2222-4000-8000-000000000006",
+        "config": {
+          "id": "22222222-2222-4000-8000-000000000006",
+          "adapter": "equirectangular-tiles",
+          "panorama": {
+            "baseUrl": "/api/v1/publications/22222222-1111-4000-8000-000000000006/1/media/22222222-0000-4000-8000-000000000006-lowResolutionBase",
+            "tileUrlTemplate": "/api/v1/publications/22222222-1111-4000-8000-000000000006/1/media/22222222-0000-4000-8000-000000000006-tiledLevels/tiles/{level}/{x}/{y}",
+            "tileSize": 512,
+            "levels": [
+              {
+                "level": 0,
+                "width": 2048,
+                "height": 1024,
+                "columns": 4,
+                "rows": 2
+              },
+              {
+                "level": 1,
+                "width": 4096,
+                "height": 2048,
+                "columns": 8,
+                "rows": 4
+              }
+            ]
+          },
+          "basePanorama": "/api/v1/publications/22222222-1111-4000-8000-000000000006/1/media/22222222-0000-4000-8000-000000000006-lowResolutionBase",
+          "defaultYaw": 0,
+          "defaultPitch": 0,
+          "defaultZoomLvl": 61.236,
+          "markers": [],
+          "links": [],
+          "preloadSceneIds": []
+        }
+      }
+    }
+  ],
+  "sceneIndex": [
+    {
+      "id": "22222222-2222-4000-8000-000000000006",
+      "name": "Atrium",
+      "sortOrder": 0,
+      "isPrimary": true,
+      "panoramaAssetId": "22222222-0000-4000-8000-000000000006",
+      "thumbnail": {
+        "assetId": "22222222-0000-4000-8000-000000000006",
+        "derivativeId": "22222222-0000-4000-8000-000000000006-thumbnail",
+        "kind": "thumbnail",
+        "version": 1,
+        "mimeType": "image/jpeg",
+        "width": 4096,
+        "height": 2048,
+        "url": "/api/v1/publications/22222222-1111-4000-8000-000000000006/1/media/22222222-0000-4000-8000-000000000006-thumbnail",
+        "access": "public"
+      },
+      "hasHotspots": false,
+      "hasOverlays": false,
+      "connectionTargetSceneIds": []
+    }
+  ],
+  "diagnostics": [],
+  "hashes": {
+    "input": "94e9481856073866d17939908644b95ca99cd935afce67c64a3acaec7b6e6bf5",
+    "manifest": "a50d7869f942416250952e39e64ffb28506eb7c4dc19721a48cfdb0680f9885c",
+    "viewerIntegration": "e0327146e3297e04cf69276f63076019d165dd0e2adfe24d6f56bdc32e068fc7",
+    "sceneDefinitions": "709733f347863b67153d13f074aaf5e757fcc2473d1b97cbfceadec5c49b717b",
+    "sceneIndex": "f8b5c3eec7250cb1666fcfa65a63aef039e600d253bd7c8f795d63522c05f88e",
+    "content": "6318d11bb066838581d60d1beeaa3fa4f0888521d4d9edbabbdba49eba444811"
+  }
+}

@@ -1,0 +1,618 @@
+{
+  "id": "video360-timeline",
+  "description": "video360 with timeline interactions.",
+  "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+  "input": {
+    "target": "publication",
+    "visibility": "public",
+    "publicationRevision": 1,
+    "publicationSlug": "golden-video-timeline",
+    "schemaVersion": 1,
+    "project": {
+      "id": "22222222-1111-4000-8000-00000000000c",
+      "ownerId": "00000000-0000-4000-8000-000000000001",
+      "type": "video360",
+      "name": "360 video",
+      "schemaVersion": 1,
+      "revision": 1,
+      "settings": {
+        "video": {
+          "autoplay": false,
+          "showControls": true,
+          "showTimeline": true
+        }
+      },
+      "branding": {},
+      "scenes": [],
+      "publication": {
+        "slug": "golden-video-timeline",
+        "visibility": "public"
+      },
+      "videoAssetId": "22222222-0000-4000-8000-00000000000c",
+      "timeline": [
+        {
+          "id": "22222222-7777-4000-8000-000000000001",
+          "projectId": "22222222-1111-4000-8000-00000000000c",
+          "kind": "information",
+          "timeMs": 12000,
+          "endTimeMs": 18000,
+          "content": {
+            "title": "Engine room",
+            "description": "Take a closer look.",
+            "ctaLabel": "Learn more",
+            "ctaUrl": "https://example.com/engine"
+          },
+          "action": {
+            "kind": "showInformation"
+          },
+          "visibilityRules": {
+            "enabled": true,
+            "pauseVideoWhenShown": true
+          },
+          "sortOrder": 0
+        },
+        {
+          "id": "22222222-7777-4000-8000-000000000002",
+          "projectId": "22222222-1111-4000-8000-00000000000c",
+          "kind": "viewpoint",
+          "timeMs": 30000,
+          "endTimeMs": null,
+          "viewpoint": {
+            "headingDegrees": 120,
+            "pitchDegrees": -5,
+            "transition": "smooth",
+            "transitionMs": 800
+          },
+          "action": {
+            "kind": "setViewpoint"
+          },
+          "visibilityRules": {
+            "enabled": true
+          },
+          "sortOrder": 1
+        }
+      ]
+    },
+    "assets": [
+      {
+        "id": "22222222-0000-4000-8000-00000000000c",
+        "ownerId": "00000000-0000-4000-8000-000000000001",
+        "projectId": null,
+        "mediaType": "video360",
+        "projection": "equirectangular",
+        "processingStatus": "ready",
+        "metadata": {
+          "width": 7680,
+          "height": 3840,
+          "durationMs": 154000,
+          "frameRate": 30,
+          "audioPresent": true,
+          "stereoMode": "mono",
+          "is360": true
+        },
+        "derivatives": [
+          {
+            "id": "22222222-0000-4000-8000-00000000000c-videoPoster",
+            "assetId": "22222222-0000-4000-8000-00000000000c",
+            "kind": "videoPoster",
+            "version": 1,
+            "storageKey": "reference/22222222-0000-4000-8000-00000000000c/poster.jpg",
+            "mimeType": "image/jpeg",
+            "width": 1920,
+            "height": 960,
+            "sizeBytes": 180000,
+            "readiness": "ready",
+            "metadata": {
+              "checksumSha256": "e23d28c96d0bf7df6818938563f95e12009277dce3595761d46dbfc684a961db"
+            }
+          },
+          {
+            "id": "22222222-0000-4000-8000-00000000000c-desktopVideoProfile",
+            "assetId": "22222222-0000-4000-8000-00000000000c",
+            "kind": "desktopVideoProfile",
+            "version": 1,
+            "storageKey": "reference/22222222-0000-4000-8000-00000000000c/desktopVideoProfile.mp4",
+            "mimeType": "video/mp4",
+            "width": 7680,
+            "height": 3840,
+            "sizeBytes": 24000000,
+            "readiness": "ready",
+            "metadata": {
+              "handheldSafe": false,
+              "checksumSha256": "3647e99008b916068adff2876189e3ffb7d293e3f6982be7c28a02de96276ec4"
+            }
+          },
+          {
+            "id": "22222222-0000-4000-8000-00000000000c-mobileVideoProfile",
+            "assetId": "22222222-0000-4000-8000-00000000000c",
+            "kind": "mobileVideoProfile",
+            "version": 1,
+            "storageKey": "reference/22222222-0000-4000-8000-00000000000c/mobileVideoProfile.mp4",
+            "mimeType": "video/mp4",
+            "width": 4096,
+            "height": 2048,
+            "sizeBytes": 24000000,
+            "readiness": "ready",
+            "metadata": {
+              "handheldSafe": true,
+              "checksumSha256": "c6b2d8469160aa5de442af3fbb8837bf786e74f30c0b3ed23a0721dfaf14e591"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "outcome": "compiled",
+  "manifest": {
+    "manifestVersion": 4,
+    "schemaVersion": 1,
+    "experienceId": "22222222-1111-4000-8000-00000000000c",
+    "experienceName": "360 video",
+    "experienceType": "video360",
+    "projectRevision": 1,
+    "publicationRevision": 1,
+    "target": "publication",
+    "visibility": "public",
+    "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+    "settings": {
+      "video": {
+        "autoplay": false,
+        "showControls": true,
+        "showTimeline": true
+      }
+    },
+    "branding": {
+      "properties": {}
+    },
+    "video": {
+      "assetId": "22222222-0000-4000-8000-00000000000c",
+      "projection": "equirectangular",
+      "durationMs": 154000,
+      "width": 7680,
+      "height": 3840,
+      "frameRate": 30,
+      "audioPresent": true,
+      "stereoMode": "mono",
+      "poster": {
+        "assetId": "22222222-0000-4000-8000-00000000000c",
+        "derivativeId": "22222222-0000-4000-8000-00000000000c-videoPoster",
+        "kind": "videoPoster",
+        "version": 1,
+        "mimeType": "image/jpeg",
+        "width": 1920,
+        "height": 960,
+        "url": "/api/v1/publications/22222222-1111-4000-8000-00000000000c/1/media/22222222-0000-4000-8000-00000000000c-videoPoster",
+        "access": "public"
+      },
+      "profiles": [
+        {
+          "profileId": "mobile",
+          "media": {
+            "assetId": "22222222-0000-4000-8000-00000000000c",
+            "derivativeId": "22222222-0000-4000-8000-00000000000c-mobileVideoProfile",
+            "kind": "mobileVideoProfile",
+            "version": 1,
+            "mimeType": "video/mp4",
+            "width": 4096,
+            "height": 2048,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-00000000000c/1/media/22222222-0000-4000-8000-00000000000c-mobileVideoProfile",
+            "access": "public"
+          },
+          "constraints": {
+            "maxWidth": 4096,
+            "handheldSafe": true,
+            "mimeType": "video/mp4"
+          }
+        },
+        {
+          "profileId": "desktop",
+          "media": {
+            "assetId": "22222222-0000-4000-8000-00000000000c",
+            "derivativeId": "22222222-0000-4000-8000-00000000000c-desktopVideoProfile",
+            "kind": "desktopVideoProfile",
+            "version": 1,
+            "mimeType": "video/mp4",
+            "width": 7680,
+            "height": 3840,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-00000000000c/1/media/22222222-0000-4000-8000-00000000000c-desktopVideoProfile",
+            "access": "public"
+          },
+          "constraints": {
+            "maxWidth": 7680,
+            "handheldSafe": false,
+            "mimeType": "video/mp4"
+          }
+        }
+      ],
+      "selectionPolicy": {
+        "policyVersion": 1,
+        "strategy": "ordered-candidates-client-selects",
+        "handheldMaxWidth": 4096,
+        "defaultProfileId": "mobile",
+        "fallbackProfileId": "mobile",
+        "selectionUrl": "/view/golden-video-timeline/playback-profile"
+      }
+    },
+    "timeline": [
+      {
+        "id": "22222222-7777-4000-8000-000000000001",
+        "kind": "information",
+        "timeMs": 12000,
+        "endTimeMs": 18000,
+        "sortOrder": 0,
+        "content": {
+          "title": "Engine room",
+          "description": "Take a closer look.",
+          "properties": {
+            "title": "Engine room",
+            "description": "Take a closer look.",
+            "ctaLabel": "Learn more",
+            "ctaUrl": "https://example.com/engine"
+          },
+          "ctaLabel": "Learn more",
+          "ctaUrl": "https://example.com/engine"
+        },
+        "action": {
+          "kind": "showInformation"
+        },
+        "enabled": true,
+        "visibilityRules": {
+          "enabled": true,
+          "pauseVideoWhenShown": true
+        }
+      },
+      {
+        "id": "22222222-7777-4000-8000-000000000002",
+        "kind": "viewpoint",
+        "timeMs": 30000,
+        "endTimeMs": null,
+        "sortOrder": 1,
+        "viewpoint": {
+          "headingDegrees": 120,
+          "pitchDegrees": -5,
+          "transition": "smooth",
+          "transitionMs": 800
+        },
+        "action": {
+          "kind": "setViewpoint"
+        },
+        "enabled": true,
+        "visibilityRules": {
+          "enabled": true
+        }
+      }
+    ],
+    "capabilities": [
+      {
+        "id": "externalLink",
+        "required": false,
+        "resolution": "compile-time"
+      },
+      {
+        "id": "video360",
+        "required": true,
+        "resolution": "compile-time",
+        "deviceRequirements": [
+          "video-playback"
+        ]
+      },
+      {
+        "id": "videoTimeline",
+        "required": false,
+        "resolution": "compile-time"
+      },
+      {
+        "id": "timedViewpoint",
+        "required": false,
+        "resolution": "compile-time"
+      }
+    ],
+    "runtime": {
+      "modules": [
+        "content-actions",
+        "video-panorama",
+        "video-timeline"
+      ],
+      "moduleDeclarations": [
+        {
+          "id": "content-actions",
+          "load": "eager",
+          "capabilities": [
+            "externalLink"
+          ]
+        },
+        {
+          "id": "video-panorama",
+          "load": "lazy",
+          "capabilities": [
+            "video360"
+          ]
+        },
+        {
+          "id": "video-timeline",
+          "load": "lazy",
+          "capabilities": [
+            "videoTimeline",
+            "timedViewpoint"
+          ]
+        }
+      ],
+      "capabilityFallbacks": [],
+      "deferredDeviceCapabilities": [],
+      "preload": {
+        "strategy": "video-progressive",
+        "maxScenesPerSource": 0,
+        "content": "poster-and-first-video-segments"
+      },
+      "cache": {
+        "defaultProfile": "standard",
+        "profiles": {
+          "constrained": {
+            "policyVersion": 1,
+            "deviceClass": "constrained",
+            "mediaClass": "video-tour",
+            "maxRecentScenes": 1,
+            "maxEstimatedBytes": 33554432,
+            "evictionStrategy": "least-recently-used",
+            "duplicateRequestStrategy": "coalesce",
+            "suppressDuplicateRequests": true
+          },
+          "standard": {
+            "policyVersion": 1,
+            "deviceClass": "standard",
+            "mediaClass": "video-tour",
+            "maxRecentScenes": 2,
+            "maxEstimatedBytes": 100663296,
+            "evictionStrategy": "least-recently-used",
+            "duplicateRequestStrategy": "coalesce",
+            "suppressDuplicateRequests": true
+          },
+          "capable": {
+            "policyVersion": 1,
+            "deviceClass": "capable",
+            "mediaClass": "video-tour",
+            "maxRecentScenes": 3,
+            "maxEstimatedBytes": 201326592,
+            "evictionStrategy": "least-recently-used",
+            "duplicateRequestStrategy": "coalesce",
+            "suppressDuplicateRequests": true
+          }
+        }
+      },
+      "fallbackPolicy": {
+        "video": "ordered-playback-profile-candidates",
+        "optionalCapabilities": "continue-without-capability",
+        "immersive": "continue-in-normal-360"
+      }
+    },
+    "telemetry": {
+      "enabled": true,
+      "experienceId": "22222222-1111-4000-8000-00000000000c",
+      "projectRevision": 1,
+      "publicationRevision": 1,
+      "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+      "events": [
+        "experience_load_started",
+        "first_panorama_visible",
+        "time_to_interactive",
+        "scene_changed",
+        "hotspot_clicked",
+        "asset_failed",
+        "scene_transition_failed",
+        "viewer_error",
+        "experience_exited",
+        "capability_fallback",
+        "video_started",
+        "video_paused",
+        "video_resumed",
+        "video_seeked",
+        "video_stalled",
+        "video_ended",
+        "video_profile_selected",
+        "video_playback_failed",
+        "timeline_interaction_shown",
+        "timeline_interaction_clicked"
+      ],
+      "sceneTransitionFailureCategories": [
+        "scene_definition_unavailable",
+        "scene_definition_invalid",
+        "asset_unavailable",
+        "asset_decode_failed",
+        "unsupported_media",
+        "viewer_error",
+        "transition_timeout",
+        "unknown"
+      ],
+      "videoPlaybackFailureCategories": [
+        "profile_unavailable",
+        "media_unavailable",
+        "decode_failed",
+        "codec_unsupported",
+        "network_error",
+        "autoplay_blocked",
+        "viewer_error",
+        "unknown"
+      ]
+    },
+    "pinnedExtensions": {},
+    "viewerIntegration": {
+      "rendererId": "photo-sphere-viewer",
+      "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+      "config": {
+        "adapter": "equirectangular-video",
+        "panorama": {
+          "source": "/api/v1/publications/22222222-1111-4000-8000-00000000000c/1/media/22222222-0000-4000-8000-00000000000c-mobileVideoProfile",
+          "sources": [
+            {
+              "profileId": "mobile",
+              "url": "/api/v1/publications/22222222-1111-4000-8000-00000000000c/1/media/22222222-0000-4000-8000-00000000000c-mobileVideoProfile",
+              "type": "video/mp4",
+              "width": 4096,
+              "height": 2048,
+              "handheldSafe": true
+            },
+            {
+              "profileId": "desktop",
+              "url": "/api/v1/publications/22222222-1111-4000-8000-00000000000c/1/media/22222222-0000-4000-8000-00000000000c-desktopVideoProfile",
+              "type": "video/mp4",
+              "width": 7680,
+              "height": 3840,
+              "handheldSafe": false
+            }
+          ],
+          "poster": "/api/v1/publications/22222222-1111-4000-8000-00000000000c/1/media/22222222-0000-4000-8000-00000000000c-videoPoster"
+        },
+        "navbar": [
+          "video",
+          "videoTime",
+          "zoom",
+          "fullscreen"
+        ],
+        "mousewheel": true,
+        "mousemove": true,
+        "touchControlsEnabled": true,
+        "keyboard": true,
+        "video": {
+          "autoplay": false,
+          "loop": false,
+          "muted": false,
+          "progressbar": true,
+          "bigbutton": true,
+          "durationMs": 154000
+        },
+        "timeline": [
+          {
+            "id": "22222222-7777-4000-8000-000000000001",
+            "kind": "information",
+            "startTime": 12,
+            "endTime": 18,
+            "visible": true,
+            "data": {
+              "action": {
+                "kind": "showInformation"
+              },
+              "content": {
+                "title": "Engine room",
+                "description": "Take a closer look.",
+                "ctaLabel": "Learn more",
+                "ctaUrl": "https://example.com/engine"
+              }
+            }
+          },
+          {
+            "id": "22222222-7777-4000-8000-000000000002",
+            "kind": "viewpoint",
+            "startTime": 30,
+            "visible": true,
+            "viewpoint": {
+              "yaw": 2.0943951023931953,
+              "pitch": -0.08726646259971647,
+              "transition": 800
+            },
+            "data": {
+              "action": {
+                "kind": "setViewpoint"
+              }
+            }
+          }
+        ],
+        "markers": []
+      }
+    }
+  },
+  "viewerIntegration": {
+    "rendererId": "photo-sphere-viewer",
+    "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+    "config": {
+      "adapter": "equirectangular-video",
+      "panorama": {
+        "source": "/api/v1/publications/22222222-1111-4000-8000-00000000000c/1/media/22222222-0000-4000-8000-00000000000c-mobileVideoProfile",
+        "sources": [
+          {
+            "profileId": "mobile",
+            "url": "/api/v1/publications/22222222-1111-4000-8000-00000000000c/1/media/22222222-0000-4000-8000-00000000000c-mobileVideoProfile",
+            "type": "video/mp4",
+            "width": 4096,
+            "height": 2048,
+            "handheldSafe": true
+          },
+          {
+            "profileId": "desktop",
+            "url": "/api/v1/publications/22222222-1111-4000-8000-00000000000c/1/media/22222222-0000-4000-8000-00000000000c-desktopVideoProfile",
+            "type": "video/mp4",
+            "width": 7680,
+            "height": 3840,
+            "handheldSafe": false
+          }
+        ],
+        "poster": "/api/v1/publications/22222222-1111-4000-8000-00000000000c/1/media/22222222-0000-4000-8000-00000000000c-videoPoster"
+      },
+      "navbar": [
+        "video",
+        "videoTime",
+        "zoom",
+        "fullscreen"
+      ],
+      "mousewheel": true,
+      "mousemove": true,
+      "touchControlsEnabled": true,
+      "keyboard": true,
+      "video": {
+        "autoplay": false,
+        "loop": false,
+        "muted": false,
+        "progressbar": true,
+        "bigbutton": true,
+        "durationMs": 154000
+      },
+      "timeline": [
+        {
+          "id": "22222222-7777-4000-8000-000000000001",
+          "kind": "information",
+          "startTime": 12,
+          "endTime": 18,
+          "visible": true,
+          "data": {
+            "action": {
+              "kind": "showInformation"
+            },
+            "content": {
+              "title": "Engine room",
+              "description": "Take a closer look.",
+              "ctaLabel": "Learn more",
+              "ctaUrl": "https://example.com/engine"
+            }
+          }
+        },
+        {
+          "id": "22222222-7777-4000-8000-000000000002",
+          "kind": "viewpoint",
+          "startTime": 30,
+          "visible": true,
+          "viewpoint": {
+            "yaw": 2.0943951023931953,
+            "pitch": -0.08726646259971647,
+            "transition": 800
+          },
+          "data": {
+            "action": {
+              "kind": "setViewpoint"
+            }
+          }
+        }
+      ],
+      "markers": []
+    }
+  },
+  "sceneDefinitions": [],
+  "sceneIndex": [],
+  "diagnostics": [],
+  "hashes": {
+    "input": "fa7ccde80ee174ba3f43e2b653f569eed2def7756ce479543a92bb2fcd62c18d",
+    "manifest": "c42703cd061d9e3c64cb75edf81062b7caea1c580d7fd573c36269af776fa7f0",
+    "viewerIntegration": "88d4aa7daa2fe487bdefe4451a394a80a44ee51b1d2e496ae37a054f957f6878",
+    "sceneDefinitions": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "sceneIndex": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "content": "8662b905f7b46b2983708c5e71c3900c4342ed9e4997a14fdba7520881ad16fc"
+  }
+}

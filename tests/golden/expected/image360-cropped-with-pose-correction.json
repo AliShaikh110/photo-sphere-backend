@@ -1,0 +1,598 @@
+{
+  "id": "image360-cropped-with-pose-correction",
+  "description": "image360 with cropped panorama and pose correction.",
+  "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+  "input": {
+    "target": "publication",
+    "visibility": "public",
+    "publicationRevision": 1,
+    "publicationSlug": "golden-cropped-pose",
+    "schemaVersion": 1,
+    "project": {
+      "id": "22222222-1111-4000-8000-000000000003",
+      "ownerId": "00000000-0000-4000-8000-000000000001",
+      "type": "image360",
+      "name": "Cropped and straightened",
+      "schemaVersion": 1,
+      "revision": 1,
+      "settings": {},
+      "branding": {},
+      "scenes": [
+        {
+          "projectId": "22222222-1111-4000-8000-000000000003",
+          "sortOrder": 0,
+          "isPrimary": true,
+          "initialView": {},
+          "viewLimits": {},
+          "hotspots": [],
+          "overlays": [],
+          "connections": [],
+          "spatialData": {},
+          "runtimeHints": {},
+          "id": "22222222-2222-4000-8000-000000000003",
+          "name": "Balcony",
+          "panoramaAssetId": "22222222-0000-4000-8000-000000000003"
+        }
+      ],
+      "publication": {
+        "slug": "golden-cropped-pose",
+        "visibility": "public"
+      }
+    },
+    "assets": [
+      {
+        "id": "22222222-0000-4000-8000-000000000003",
+        "ownerId": "00000000-0000-4000-8000-000000000001",
+        "projectId": null,
+        "mediaType": "panorama_image",
+        "projection": "cropped_equirectangular",
+        "processingStatus": "ready",
+        "metadata": {
+          "width": 4096,
+          "height": 1024,
+          "is360": true,
+          "isFullSphere": false,
+          "xmp": {
+            "fullPanoWidthPixels": 4096,
+            "fullPanoHeightPixels": 2048,
+            "croppedAreaImageWidthPixels": 4096,
+            "croppedAreaImageHeightPixels": 1024,
+            "croppedAreaLeftPixels": 0,
+            "croppedAreaTopPixels": 512,
+            "poseHeadingDegrees": 42.5,
+            "posePitchDegrees": -3.25,
+            "poseRollDegrees": 1.75,
+            "initialViewHeadingDegrees": 120,
+            "initialViewPitchDegrees": -10,
+            "initialViewFovDegrees": 85
+          }
+        },
+        "derivatives": [
+          {
+            "id": "22222222-0000-4000-8000-000000000003-thumbnail",
+            "assetId": "22222222-0000-4000-8000-000000000003",
+            "kind": "thumbnail",
+            "version": 1,
+            "storageKey": "reference/22222222-0000-4000-8000-000000000003/thumbnail.jpg",
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "sizeBytes": 512000,
+            "readiness": "ready",
+            "metadata": {
+              "checksumSha256": "691b9b9e2d33addb4dde15a2552762f55b6c507625a3b973668001cbdbc02887"
+            }
+          },
+          {
+            "id": "22222222-0000-4000-8000-000000000003-lowResolutionBase",
+            "assetId": "22222222-0000-4000-8000-000000000003",
+            "kind": "lowResolutionBase",
+            "version": 1,
+            "storageKey": "reference/22222222-0000-4000-8000-000000000003/lowResolutionBase.jpg",
+            "mimeType": "image/jpeg",
+            "width": 1024,
+            "height": 512,
+            "sizeBytes": 512000,
+            "readiness": "ready",
+            "metadata": {
+              "checksumSha256": "44d5ac745455af6a5255a1e3e0291575ef58310233681d92b7074d0a3aed58ec"
+            }
+          },
+          {
+            "id": "22222222-0000-4000-8000-000000000003-standardWeb",
+            "assetId": "22222222-0000-4000-8000-000000000003",
+            "kind": "standardWeb",
+            "version": 1,
+            "storageKey": "reference/22222222-0000-4000-8000-000000000003/standardWeb.jpg",
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "sizeBytes": 512000,
+            "readiness": "ready",
+            "metadata": {
+              "checksumSha256": "e2a4e1b934c5b8350e97d1e8b174ff09283095ac2a74212a1121a916934842fb"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "outcome": "compiled",
+  "manifest": {
+    "manifestVersion": 4,
+    "schemaVersion": 1,
+    "experienceId": "22222222-1111-4000-8000-000000000003",
+    "experienceName": "Cropped and straightened",
+    "experienceType": "image360",
+    "projectRevision": 1,
+    "publicationRevision": 1,
+    "target": "publication",
+    "visibility": "public",
+    "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+    "initialSceneId": "22222222-2222-4000-8000-000000000003",
+    "settings": {},
+    "branding": {
+      "properties": {}
+    },
+    "scenes": [
+      {
+        "id": "22222222-2222-4000-8000-000000000003",
+        "name": "Balcony",
+        "sortOrder": 0,
+        "isPrimary": true,
+        "panorama": {
+          "assetId": "22222222-0000-4000-8000-000000000003",
+          "projection": "cropped_equirectangular",
+          "family": "standardEquirectangular",
+          "fallbackFamilies": [],
+          "crop": {
+            "fullWidthPixels": 4096,
+            "fullHeightPixels": 2048,
+            "croppedWidthPixels": 4096,
+            "croppedHeightPixels": 1024,
+            "croppedLeftPixels": 0,
+            "croppedTopPixels": 512
+          },
+          "sphereCorrection": {
+            "headingDegrees": 42.5,
+            "pitchDegrees": -3.25,
+            "rollDegrees": 1.75
+          },
+          "base": {
+            "assetId": "22222222-0000-4000-8000-000000000003",
+            "derivativeId": "22222222-0000-4000-8000-000000000003-lowResolutionBase",
+            "kind": "lowResolutionBase",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 1024,
+            "height": 512,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000003/1/media/22222222-0000-4000-8000-000000000003-lowResolutionBase",
+            "access": "public"
+          },
+          "primary": {
+            "assetId": "22222222-0000-4000-8000-000000000003",
+            "derivativeId": "22222222-0000-4000-8000-000000000003-standardWeb",
+            "kind": "standardWeb",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000003/1/media/22222222-0000-4000-8000-000000000003-standardWeb",
+            "access": "public"
+          }
+        },
+        "initialView": {
+          "headingDegrees": 120,
+          "pitchDegrees": -10,
+          "horizontalFovDegrees": 85
+        },
+        "hotspots": [],
+        "overlays": [],
+        "connections": [],
+        "spatialData": {},
+        "runtimeHints": {},
+        "preloadSceneIds": []
+      }
+    ],
+    "tour": {
+      "strategy": "embedded",
+      "sceneIndexVersion": "scene-index-2-1",
+      "sceneIndex": [
+        {
+          "id": "22222222-2222-4000-8000-000000000003",
+          "name": "Balcony",
+          "sortOrder": 0,
+          "isPrimary": true,
+          "panoramaAssetId": "22222222-0000-4000-8000-000000000003",
+          "thumbnail": {
+            "assetId": "22222222-0000-4000-8000-000000000003",
+            "derivativeId": "22222222-0000-4000-8000-000000000003-thumbnail",
+            "kind": "thumbnail",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000003/1/media/22222222-0000-4000-8000-000000000003-thumbnail",
+            "access": "public"
+          },
+          "hasHotspots": false,
+          "hasOverlays": false,
+          "connectionTargetSceneIds": []
+        }
+      ],
+      "sceneCount": 1
+    },
+    "plans": [],
+    "spatialIndex": {
+      "hasWorldCoordinates": false,
+      "hasPlanCoordinates": false,
+      "entries": []
+    },
+    "capabilities": [
+      {
+        "id": "basicPanorama",
+        "required": true,
+        "resolution": "compile-time"
+      }
+    ],
+    "runtime": {
+      "modules": [
+        "core-panorama"
+      ],
+      "moduleDeclarations": [
+        {
+          "id": "core-panorama",
+          "load": "eager",
+          "capabilities": [
+            "basicPanorama"
+          ]
+        }
+      ],
+      "capabilityFallbacks": [],
+      "deferredDeviceCapabilities": [],
+      "preload": {
+        "strategy": "selective-adjacent",
+        "maxScenesPerSource": 2,
+        "content": "scene-definition-and-base-media"
+      },
+      "cache": {
+        "defaultProfile": "standard",
+        "profiles": {
+          "constrained": {
+            "policyVersion": 1,
+            "deviceClass": "constrained",
+            "mediaClass": "image-tour",
+            "maxRecentScenes": 2,
+            "maxEstimatedBytes": 67108864,
+            "evictionStrategy": "least-recently-used",
+            "duplicateRequestStrategy": "coalesce",
+            "suppressDuplicateRequests": true
+          },
+          "standard": {
+            "policyVersion": 1,
+            "deviceClass": "standard",
+            "mediaClass": "image-tour",
+            "maxRecentScenes": 4,
+            "maxEstimatedBytes": 201326592,
+            "evictionStrategy": "least-recently-used",
+            "duplicateRequestStrategy": "coalesce",
+            "suppressDuplicateRequests": true
+          },
+          "capable": {
+            "policyVersion": 1,
+            "deviceClass": "capable",
+            "mediaClass": "image-tour",
+            "maxRecentScenes": 6,
+            "maxEstimatedBytes": 402653184,
+            "evictionStrategy": "least-recently-used",
+            "duplicateRequestStrategy": "coalesce",
+            "suppressDuplicateRequests": true
+          }
+        }
+      },
+      "fallbackPolicy": {
+        "panorama": "low-resolution-base-then-standard-or-tiled-detail",
+        "optionalCapabilities": "continue-without-capability",
+        "immersive": "continue-in-normal-360"
+      }
+    },
+    "telemetry": {
+      "enabled": true,
+      "experienceId": "22222222-1111-4000-8000-000000000003",
+      "projectRevision": 1,
+      "publicationRevision": 1,
+      "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+      "events": [
+        "experience_load_started",
+        "first_panorama_visible",
+        "time_to_interactive",
+        "scene_changed",
+        "hotspot_clicked",
+        "asset_failed",
+        "scene_transition_failed",
+        "viewer_error",
+        "experience_exited",
+        "capability_fallback"
+      ],
+      "sceneTransitionFailureCategories": [
+        "scene_definition_unavailable",
+        "scene_definition_invalid",
+        "asset_unavailable",
+        "asset_decode_failed",
+        "unsupported_media",
+        "viewer_error",
+        "transition_timeout",
+        "unknown"
+      ]
+    },
+    "pinnedExtensions": {},
+    "viewerIntegration": {
+      "rendererId": "photo-sphere-viewer",
+      "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+      "config": {
+        "adapter": "equirectangular",
+        "initialSceneId": "22222222-2222-4000-8000-000000000003",
+        "navbar": [
+          "move",
+          "zoom",
+          "fullscreen"
+        ],
+        "mousewheel": true,
+        "mousemove": true,
+        "touchControlsEnabled": true,
+        "keyboard": true,
+        "sceneNavigation": false,
+        "startup": {
+          "id": "22222222-2222-4000-8000-000000000003",
+          "adapter": "equirectangular",
+          "panorama": "/api/v1/publications/22222222-1111-4000-8000-000000000003/1/media/22222222-0000-4000-8000-000000000003-standardWeb",
+          "basePanorama": "/api/v1/publications/22222222-1111-4000-8000-000000000003/1/media/22222222-0000-4000-8000-000000000003-lowResolutionBase",
+          "panoData": {
+            "fullWidth": 4096,
+            "fullHeight": 4096,
+            "croppedWidth": 4096,
+            "croppedHeight": 2048,
+            "croppedX": 0,
+            "croppedY": 1024
+          },
+          "sphereCorrection": {
+            "pan": -0.7417649320975901,
+            "tilt": 0.05672320068981571,
+            "roll": -0.030543261909900768
+          },
+          "defaultYaw": 2.0943951023931953,
+          "defaultPitch": -0.17453292519943295,
+          "defaultZoomLvl": 52.809,
+          "markers": [],
+          "links": [],
+          "preloadSceneIds": []
+        },
+        "scenes": [
+          {
+            "id": "22222222-2222-4000-8000-000000000003",
+            "adapter": "equirectangular",
+            "panorama": "/api/v1/publications/22222222-1111-4000-8000-000000000003/1/media/22222222-0000-4000-8000-000000000003-standardWeb",
+            "basePanorama": "/api/v1/publications/22222222-1111-4000-8000-000000000003/1/media/22222222-0000-4000-8000-000000000003-lowResolutionBase",
+            "panoData": {
+              "fullWidth": 4096,
+              "fullHeight": 4096,
+              "croppedWidth": 4096,
+              "croppedHeight": 2048,
+              "croppedX": 0,
+              "croppedY": 1024
+            },
+            "sphereCorrection": {
+              "pan": -0.7417649320975901,
+              "tilt": 0.05672320068981571,
+              "roll": -0.030543261909900768
+            },
+            "defaultYaw": 2.0943951023931953,
+            "defaultPitch": -0.17453292519943295,
+            "defaultZoomLvl": 52.809,
+            "markers": [],
+            "links": [],
+            "preloadSceneIds": []
+          }
+        ]
+      }
+    }
+  },
+  "viewerIntegration": {
+    "rendererId": "photo-sphere-viewer",
+    "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+    "config": {
+      "adapter": "equirectangular",
+      "initialSceneId": "22222222-2222-4000-8000-000000000003",
+      "navbar": [
+        "move",
+        "zoom",
+        "fullscreen"
+      ],
+      "mousewheel": true,
+      "mousemove": true,
+      "touchControlsEnabled": true,
+      "keyboard": true,
+      "sceneNavigation": false,
+      "startup": {
+        "id": "22222222-2222-4000-8000-000000000003",
+        "adapter": "equirectangular",
+        "panorama": "/api/v1/publications/22222222-1111-4000-8000-000000000003/1/media/22222222-0000-4000-8000-000000000003-standardWeb",
+        "basePanorama": "/api/v1/publications/22222222-1111-4000-8000-000000000003/1/media/22222222-0000-4000-8000-000000000003-lowResolutionBase",
+        "panoData": {
+          "fullWidth": 4096,
+          "fullHeight": 4096,
+          "croppedWidth": 4096,
+          "croppedHeight": 2048,
+          "croppedX": 0,
+          "croppedY": 1024
+        },
+        "sphereCorrection": {
+          "pan": -0.7417649320975901,
+          "tilt": 0.05672320068981571,
+          "roll": -0.030543261909900768
+        },
+        "defaultYaw": 2.0943951023931953,
+        "defaultPitch": -0.17453292519943295,
+        "defaultZoomLvl": 52.809,
+        "markers": [],
+        "links": [],
+        "preloadSceneIds": []
+      },
+      "scenes": [
+        {
+          "id": "22222222-2222-4000-8000-000000000003",
+          "adapter": "equirectangular",
+          "panorama": "/api/v1/publications/22222222-1111-4000-8000-000000000003/1/media/22222222-0000-4000-8000-000000000003-standardWeb",
+          "basePanorama": "/api/v1/publications/22222222-1111-4000-8000-000000000003/1/media/22222222-0000-4000-8000-000000000003-lowResolutionBase",
+          "panoData": {
+            "fullWidth": 4096,
+            "fullHeight": 4096,
+            "croppedWidth": 4096,
+            "croppedHeight": 2048,
+            "croppedX": 0,
+            "croppedY": 1024
+          },
+          "sphereCorrection": {
+            "pan": -0.7417649320975901,
+            "tilt": 0.05672320068981571,
+            "roll": -0.030543261909900768
+          },
+          "defaultYaw": 2.0943951023931953,
+          "defaultPitch": -0.17453292519943295,
+          "defaultZoomLvl": 52.809,
+          "markers": [],
+          "links": [],
+          "preloadSceneIds": []
+        }
+      ]
+    }
+  },
+  "sceneDefinitions": [
+    {
+      "sceneDefinitionVersion": 2,
+      "experienceId": "22222222-1111-4000-8000-000000000003",
+      "publicationRevision": 1,
+      "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+      "scene": {
+        "id": "22222222-2222-4000-8000-000000000003",
+        "name": "Balcony",
+        "sortOrder": 0,
+        "isPrimary": true,
+        "panorama": {
+          "assetId": "22222222-0000-4000-8000-000000000003",
+          "projection": "cropped_equirectangular",
+          "family": "standardEquirectangular",
+          "fallbackFamilies": [],
+          "crop": {
+            "fullWidthPixels": 4096,
+            "fullHeightPixels": 2048,
+            "croppedWidthPixels": 4096,
+            "croppedHeightPixels": 1024,
+            "croppedLeftPixels": 0,
+            "croppedTopPixels": 512
+          },
+          "sphereCorrection": {
+            "headingDegrees": 42.5,
+            "pitchDegrees": -3.25,
+            "rollDegrees": 1.75
+          },
+          "base": {
+            "assetId": "22222222-0000-4000-8000-000000000003",
+            "derivativeId": "22222222-0000-4000-8000-000000000003-lowResolutionBase",
+            "kind": "lowResolutionBase",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 1024,
+            "height": 512,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000003/1/media/22222222-0000-4000-8000-000000000003-lowResolutionBase",
+            "access": "public"
+          },
+          "primary": {
+            "assetId": "22222222-0000-4000-8000-000000000003",
+            "derivativeId": "22222222-0000-4000-8000-000000000003-standardWeb",
+            "kind": "standardWeb",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000003/1/media/22222222-0000-4000-8000-000000000003-standardWeb",
+            "access": "public"
+          }
+        },
+        "initialView": {
+          "headingDegrees": 120,
+          "pitchDegrees": -10,
+          "horizontalFovDegrees": 85
+        },
+        "hotspots": [],
+        "overlays": [],
+        "connections": [],
+        "spatialData": {},
+        "runtimeHints": {},
+        "preloadSceneIds": []
+      },
+      "viewerIntegration": {
+        "rendererId": "photo-sphere-viewer",
+        "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+        "sceneId": "22222222-2222-4000-8000-000000000003",
+        "config": {
+          "id": "22222222-2222-4000-8000-000000000003",
+          "adapter": "equirectangular",
+          "panorama": "/api/v1/publications/22222222-1111-4000-8000-000000000003/1/media/22222222-0000-4000-8000-000000000003-standardWeb",
+          "basePanorama": "/api/v1/publications/22222222-1111-4000-8000-000000000003/1/media/22222222-0000-4000-8000-000000000003-lowResolutionBase",
+          "panoData": {
+            "fullWidth": 4096,
+            "fullHeight": 4096,
+            "croppedWidth": 4096,
+            "croppedHeight": 2048,
+            "croppedX": 0,
+            "croppedY": 1024
+          },
+          "sphereCorrection": {
+            "pan": -0.7417649320975901,
+            "tilt": 0.05672320068981571,
+            "roll": -0.030543261909900768
+          },
+          "defaultYaw": 2.0943951023931953,
+          "defaultPitch": -0.17453292519943295,
+          "defaultZoomLvl": 52.809,
+          "markers": [],
+          "links": [],
+          "preloadSceneIds": []
+        }
+      }
+    }
+  ],
+  "sceneIndex": [
+    {
+      "id": "22222222-2222-4000-8000-000000000003",
+      "name": "Balcony",
+      "sortOrder": 0,
+      "isPrimary": true,
+      "panoramaAssetId": "22222222-0000-4000-8000-000000000003",
+      "thumbnail": {
+        "assetId": "22222222-0000-4000-8000-000000000003",
+        "derivativeId": "22222222-0000-4000-8000-000000000003-thumbnail",
+        "kind": "thumbnail",
+        "version": 1,
+        "mimeType": "image/jpeg",
+        "width": 4096,
+        "height": 2048,
+        "url": "/api/v1/publications/22222222-1111-4000-8000-000000000003/1/media/22222222-0000-4000-8000-000000000003-thumbnail",
+        "access": "public"
+      },
+      "hasHotspots": false,
+      "hasOverlays": false,
+      "connectionTargetSceneIds": []
+    }
+  ],
+  "diagnostics": [],
+  "hashes": {
+    "input": "1f7553ce2723cf7e47a960daedd030e01ad58a5d0ecf7fd8e6fc43bc76d40643",
+    "manifest": "2601cc60557e70ac696f615ad168291365315df321565548fba2bce223358a5a",
+    "viewerIntegration": "b942aeda99e5f7944e3e4017cdfdeff7a98e15de2fe05ab950512727d6f6840b",
+    "sceneDefinitions": "bdc9115adcb001567373accbc8265f484223dbb4306e4dafb7132061b4f09431",
+    "sceneIndex": "36908ad5af86642d2fc0e4bbd81b73b1bfa9622fde1cfc5c4c18917cc9696e6d",
+    "content": "d3edf935d7b57d610ec931c7e0f6175453f57e749bfc97040f6c079f467452a4"
+  }
+}

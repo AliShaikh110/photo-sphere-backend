@@ -1,0 +1,497 @@
+{
+  "id": "image360-private-publication",
+  "description": "image360 private publication.",
+  "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+  "input": {
+    "target": "publication",
+    "visibility": "private",
+    "publicationRevision": 3,
+    "publicationSlug": "golden-private",
+    "schemaVersion": 1,
+    "project": {
+      "id": "22222222-1111-4000-8000-000000000005",
+      "ownerId": "00000000-0000-4000-8000-000000000001",
+      "type": "image360",
+      "name": "Private experience",
+      "schemaVersion": 1,
+      "revision": 1,
+      "settings": {},
+      "branding": {},
+      "scenes": [
+        {
+          "projectId": "22222222-1111-4000-8000-000000000005",
+          "sortOrder": 0,
+          "isPrimary": true,
+          "initialView": {
+            "headingDegrees": 0,
+            "pitchDegrees": 0,
+            "horizontalFovDegrees": 70
+          },
+          "viewLimits": {},
+          "hotspots": [],
+          "overlays": [],
+          "connections": [],
+          "spatialData": {},
+          "runtimeHints": {},
+          "id": "22222222-2222-4000-8000-000000000005",
+          "name": "Boardroom",
+          "panoramaAssetId": "22222222-0000-4000-8000-000000000005"
+        }
+      ],
+      "publication": {
+        "slug": "golden-private",
+        "visibility": "private"
+      }
+    },
+    "assets": [
+      {
+        "id": "22222222-0000-4000-8000-000000000005",
+        "ownerId": "00000000-0000-4000-8000-000000000001",
+        "projectId": null,
+        "mediaType": "panorama_image",
+        "projection": "equirectangular",
+        "processingStatus": "ready",
+        "metadata": {
+          "width": 4096,
+          "height": 2048,
+          "is360": true,
+          "isFullSphere": true
+        },
+        "derivatives": [
+          {
+            "id": "22222222-0000-4000-8000-000000000005-thumbnail",
+            "assetId": "22222222-0000-4000-8000-000000000005",
+            "kind": "thumbnail",
+            "version": 1,
+            "storageKey": "reference/22222222-0000-4000-8000-000000000005/thumbnail.jpg",
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "sizeBytes": 512000,
+            "readiness": "ready",
+            "metadata": {
+              "checksumSha256": "17ea4c81bcac08a313acf68896fb180132b584d7d54a45acd8a317f697c56ff4"
+            }
+          },
+          {
+            "id": "22222222-0000-4000-8000-000000000005-lowResolutionBase",
+            "assetId": "22222222-0000-4000-8000-000000000005",
+            "kind": "lowResolutionBase",
+            "version": 1,
+            "storageKey": "reference/22222222-0000-4000-8000-000000000005/lowResolutionBase.jpg",
+            "mimeType": "image/jpeg",
+            "width": 1024,
+            "height": 512,
+            "sizeBytes": 512000,
+            "readiness": "ready",
+            "metadata": {
+              "checksumSha256": "79ee270a6ba02fa115b12823a0d8c8f2f8ae796e0a1eea990b5992c298bd26d4"
+            }
+          },
+          {
+            "id": "22222222-0000-4000-8000-000000000005-standardWeb",
+            "assetId": "22222222-0000-4000-8000-000000000005",
+            "kind": "standardWeb",
+            "version": 1,
+            "storageKey": "reference/22222222-0000-4000-8000-000000000005/standardWeb.jpg",
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "sizeBytes": 512000,
+            "readiness": "ready",
+            "metadata": {
+              "checksumSha256": "e745d7d846f32368a73b1296ab1b9772c22e13c82648d2b0a0690f27e0c7236b"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "outcome": "compiled",
+  "manifest": {
+    "manifestVersion": 4,
+    "schemaVersion": 1,
+    "experienceId": "22222222-1111-4000-8000-000000000005",
+    "experienceName": "Private experience",
+    "experienceType": "image360",
+    "projectRevision": 1,
+    "publicationRevision": 3,
+    "target": "publication",
+    "visibility": "private",
+    "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+    "initialSceneId": "22222222-2222-4000-8000-000000000005",
+    "settings": {},
+    "branding": {
+      "properties": {}
+    },
+    "scenes": [
+      {
+        "id": "22222222-2222-4000-8000-000000000005",
+        "name": "Boardroom",
+        "sortOrder": 0,
+        "isPrimary": true,
+        "panorama": {
+          "assetId": "22222222-0000-4000-8000-000000000005",
+          "projection": "equirectangular",
+          "family": "standardEquirectangular",
+          "fallbackFamilies": [],
+          "base": {
+            "assetId": "22222222-0000-4000-8000-000000000005",
+            "derivativeId": "22222222-0000-4000-8000-000000000005-lowResolutionBase",
+            "kind": "lowResolutionBase",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 1024,
+            "height": 512,
+            "url": "/api/v1/media/22222222-0000-4000-8000-000000000005-lowResolutionBase",
+            "access": "protected"
+          },
+          "primary": {
+            "assetId": "22222222-0000-4000-8000-000000000005",
+            "derivativeId": "22222222-0000-4000-8000-000000000005-standardWeb",
+            "kind": "standardWeb",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "url": "/api/v1/media/22222222-0000-4000-8000-000000000005-standardWeb",
+            "access": "protected"
+          }
+        },
+        "initialView": {
+          "headingDegrees": 0,
+          "pitchDegrees": 0,
+          "horizontalFovDegrees": 70
+        },
+        "hotspots": [],
+        "overlays": [],
+        "connections": [],
+        "spatialData": {},
+        "runtimeHints": {},
+        "preloadSceneIds": []
+      }
+    ],
+    "tour": {
+      "strategy": "embedded",
+      "sceneIndexVersion": "scene-index-2-3",
+      "sceneIndex": [
+        {
+          "id": "22222222-2222-4000-8000-000000000005",
+          "name": "Boardroom",
+          "sortOrder": 0,
+          "isPrimary": true,
+          "panoramaAssetId": "22222222-0000-4000-8000-000000000005",
+          "thumbnail": {
+            "assetId": "22222222-0000-4000-8000-000000000005",
+            "derivativeId": "22222222-0000-4000-8000-000000000005-thumbnail",
+            "kind": "thumbnail",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "url": "/api/v1/media/22222222-0000-4000-8000-000000000005-thumbnail",
+            "access": "protected"
+          },
+          "hasHotspots": false,
+          "hasOverlays": false,
+          "connectionTargetSceneIds": []
+        }
+      ],
+      "sceneCount": 1
+    },
+    "plans": [],
+    "spatialIndex": {
+      "hasWorldCoordinates": false,
+      "hasPlanCoordinates": false,
+      "entries": []
+    },
+    "capabilities": [
+      {
+        "id": "basicPanorama",
+        "required": true,
+        "resolution": "compile-time"
+      }
+    ],
+    "runtime": {
+      "modules": [
+        "core-panorama"
+      ],
+      "moduleDeclarations": [
+        {
+          "id": "core-panorama",
+          "load": "eager",
+          "capabilities": [
+            "basicPanorama"
+          ]
+        }
+      ],
+      "capabilityFallbacks": [],
+      "deferredDeviceCapabilities": [],
+      "preload": {
+        "strategy": "selective-adjacent",
+        "maxScenesPerSource": 2,
+        "content": "scene-definition-and-base-media"
+      },
+      "cache": {
+        "defaultProfile": "standard",
+        "profiles": {
+          "constrained": {
+            "policyVersion": 1,
+            "deviceClass": "constrained",
+            "mediaClass": "image-tour",
+            "maxRecentScenes": 2,
+            "maxEstimatedBytes": 67108864,
+            "evictionStrategy": "least-recently-used",
+            "duplicateRequestStrategy": "coalesce",
+            "suppressDuplicateRequests": true
+          },
+          "standard": {
+            "policyVersion": 1,
+            "deviceClass": "standard",
+            "mediaClass": "image-tour",
+            "maxRecentScenes": 4,
+            "maxEstimatedBytes": 201326592,
+            "evictionStrategy": "least-recently-used",
+            "duplicateRequestStrategy": "coalesce",
+            "suppressDuplicateRequests": true
+          },
+          "capable": {
+            "policyVersion": 1,
+            "deviceClass": "capable",
+            "mediaClass": "image-tour",
+            "maxRecentScenes": 6,
+            "maxEstimatedBytes": 402653184,
+            "evictionStrategy": "least-recently-used",
+            "duplicateRequestStrategy": "coalesce",
+            "suppressDuplicateRequests": true
+          }
+        }
+      },
+      "fallbackPolicy": {
+        "panorama": "low-resolution-base-then-standard-or-tiled-detail",
+        "optionalCapabilities": "continue-without-capability",
+        "immersive": "continue-in-normal-360"
+      }
+    },
+    "telemetry": {
+      "enabled": true,
+      "experienceId": "22222222-1111-4000-8000-000000000005",
+      "projectRevision": 1,
+      "publicationRevision": 3,
+      "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+      "events": [
+        "experience_load_started",
+        "first_panorama_visible",
+        "time_to_interactive",
+        "scene_changed",
+        "hotspot_clicked",
+        "asset_failed",
+        "scene_transition_failed",
+        "viewer_error",
+        "experience_exited",
+        "capability_fallback"
+      ],
+      "sceneTransitionFailureCategories": [
+        "scene_definition_unavailable",
+        "scene_definition_invalid",
+        "asset_unavailable",
+        "asset_decode_failed",
+        "unsupported_media",
+        "viewer_error",
+        "transition_timeout",
+        "unknown"
+      ]
+    },
+    "pinnedExtensions": {},
+    "viewerIntegration": {
+      "rendererId": "photo-sphere-viewer",
+      "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+      "config": {
+        "adapter": "equirectangular",
+        "initialSceneId": "22222222-2222-4000-8000-000000000005",
+        "navbar": [
+          "move",
+          "zoom",
+          "fullscreen"
+        ],
+        "mousewheel": true,
+        "mousemove": true,
+        "touchControlsEnabled": true,
+        "keyboard": true,
+        "sceneNavigation": false,
+        "startup": {
+          "id": "22222222-2222-4000-8000-000000000005",
+          "adapter": "equirectangular",
+          "panorama": "/api/v1/media/22222222-0000-4000-8000-000000000005-standardWeb",
+          "basePanorama": "/api/v1/media/22222222-0000-4000-8000-000000000005-lowResolutionBase",
+          "defaultYaw": 0,
+          "defaultPitch": 0,
+          "defaultZoomLvl": 61.236,
+          "markers": [],
+          "links": [],
+          "preloadSceneIds": []
+        },
+        "scenes": [
+          {
+            "id": "22222222-2222-4000-8000-000000000005",
+            "adapter": "equirectangular",
+            "panorama": "/api/v1/media/22222222-0000-4000-8000-000000000005-standardWeb",
+            "basePanorama": "/api/v1/media/22222222-0000-4000-8000-000000000005-lowResolutionBase",
+            "defaultYaw": 0,
+            "defaultPitch": 0,
+            "defaultZoomLvl": 61.236,
+            "markers": [],
+            "links": [],
+            "preloadSceneIds": []
+          }
+        ]
+      }
+    }
+  },
+  "viewerIntegration": {
+    "rendererId": "photo-sphere-viewer",
+    "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+    "config": {
+      "adapter": "equirectangular",
+      "initialSceneId": "22222222-2222-4000-8000-000000000005",
+      "navbar": [
+        "move",
+        "zoom",
+        "fullscreen"
+      ],
+      "mousewheel": true,
+      "mousemove": true,
+      "touchControlsEnabled": true,
+      "keyboard": true,
+      "sceneNavigation": false,
+      "startup": {
+        "id": "22222222-2222-4000-8000-000000000005",
+        "adapter": "equirectangular",
+        "panorama": "/api/v1/media/22222222-0000-4000-8000-000000000005-standardWeb",
+        "basePanorama": "/api/v1/media/22222222-0000-4000-8000-000000000005-lowResolutionBase",
+        "defaultYaw": 0,
+        "defaultPitch": 0,
+        "defaultZoomLvl": 61.236,
+        "markers": [],
+        "links": [],
+        "preloadSceneIds": []
+      },
+      "scenes": [
+        {
+          "id": "22222222-2222-4000-8000-000000000005",
+          "adapter": "equirectangular",
+          "panorama": "/api/v1/media/22222222-0000-4000-8000-000000000005-standardWeb",
+          "basePanorama": "/api/v1/media/22222222-0000-4000-8000-000000000005-lowResolutionBase",
+          "defaultYaw": 0,
+          "defaultPitch": 0,
+          "defaultZoomLvl": 61.236,
+          "markers": [],
+          "links": [],
+          "preloadSceneIds": []
+        }
+      ]
+    }
+  },
+  "sceneDefinitions": [
+    {
+      "sceneDefinitionVersion": 2,
+      "experienceId": "22222222-1111-4000-8000-000000000005",
+      "publicationRevision": 3,
+      "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+      "scene": {
+        "id": "22222222-2222-4000-8000-000000000005",
+        "name": "Boardroom",
+        "sortOrder": 0,
+        "isPrimary": true,
+        "panorama": {
+          "assetId": "22222222-0000-4000-8000-000000000005",
+          "projection": "equirectangular",
+          "family": "standardEquirectangular",
+          "fallbackFamilies": [],
+          "base": {
+            "assetId": "22222222-0000-4000-8000-000000000005",
+            "derivativeId": "22222222-0000-4000-8000-000000000005-lowResolutionBase",
+            "kind": "lowResolutionBase",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 1024,
+            "height": 512,
+            "url": "/api/v1/media/22222222-0000-4000-8000-000000000005-lowResolutionBase",
+            "access": "protected"
+          },
+          "primary": {
+            "assetId": "22222222-0000-4000-8000-000000000005",
+            "derivativeId": "22222222-0000-4000-8000-000000000005-standardWeb",
+            "kind": "standardWeb",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "url": "/api/v1/media/22222222-0000-4000-8000-000000000005-standardWeb",
+            "access": "protected"
+          }
+        },
+        "initialView": {
+          "headingDegrees": 0,
+          "pitchDegrees": 0,
+          "horizontalFovDegrees": 70
+        },
+        "hotspots": [],
+        "overlays": [],
+        "connections": [],
+        "spatialData": {},
+        "runtimeHints": {},
+        "preloadSceneIds": []
+      },
+      "viewerIntegration": {
+        "rendererId": "photo-sphere-viewer",
+        "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+        "sceneId": "22222222-2222-4000-8000-000000000005",
+        "config": {
+          "id": "22222222-2222-4000-8000-000000000005",
+          "adapter": "equirectangular",
+          "panorama": "/api/v1/media/22222222-0000-4000-8000-000000000005-standardWeb",
+          "basePanorama": "/api/v1/media/22222222-0000-4000-8000-000000000005-lowResolutionBase",
+          "defaultYaw": 0,
+          "defaultPitch": 0,
+          "defaultZoomLvl": 61.236,
+          "markers": [],
+          "links": [],
+          "preloadSceneIds": []
+        }
+      }
+    }
+  ],
+  "sceneIndex": [
+    {
+      "id": "22222222-2222-4000-8000-000000000005",
+      "name": "Boardroom",
+      "sortOrder": 0,
+      "isPrimary": true,
+      "panoramaAssetId": "22222222-0000-4000-8000-000000000005",
+      "thumbnail": {
+        "assetId": "22222222-0000-4000-8000-000000000005",
+        "derivativeId": "22222222-0000-4000-8000-000000000005-thumbnail",
+        "kind": "thumbnail",
+        "version": 1,
+        "mimeType": "image/jpeg",
+        "width": 4096,
+        "height": 2048,
+        "url": "/api/v1/media/22222222-0000-4000-8000-000000000005-thumbnail",
+        "access": "protected"
+      },
+      "hasHotspots": false,
+      "hasOverlays": false,
+      "connectionTargetSceneIds": []
+    }
+  ],
+  "diagnostics": [],
+  "hashes": {
+    "input": "3120d06886c6c3f2a48ff9cbf93409a6f43b43c505fb5be9aeebb399ca9045d8",
+    "manifest": "8c757f83223cef3a662acd79a78f6e4f8cfb79a2206a2378eb62af687cb2c77d",
+    "viewerIntegration": "f5ad3ffdc5d7e39d347671ffad25a5d6467df644d7df4ad737040a819cb1e147",
+    "sceneDefinitions": "bc1ff10e6cb01faf8cd2385442cf51067b76070c40044a2e04cb70347428f756",
+    "sceneIndex": "e687a17b78ac73cdff33a31c0819354a874c0eb542dd78e18dae6aafac6db3cb",
+    "content": "37b7ab346fe27ada31fc44385cbdb66ac68f58cb1e088344e08c7e0bd551580a"
+  }
+}

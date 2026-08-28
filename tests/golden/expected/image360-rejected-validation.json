@@ -1,0 +1,93 @@
+{
+  "id": "image360-rejected-validation",
+  "description": "project failing validation.",
+  "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+  "input": {
+    "target": "publication",
+    "visibility": "public",
+    "publicationRevision": 1,
+    "publicationSlug": "golden-rejected",
+    "schemaVersion": 1,
+    "project": {
+      "id": "22222222-1111-4000-8000-00000000000e",
+      "ownerId": "00000000-0000-4000-8000-000000000001",
+      "type": "image360",
+      "name": "Not ready yet",
+      "schemaVersion": 1,
+      "revision": 1,
+      "settings": {},
+      "branding": {},
+      "scenes": [
+        {
+          "projectId": "22222222-1111-4000-8000-00000000000e",
+          "sortOrder": 0,
+          "isPrimary": true,
+          "initialView": {
+            "headingDegrees": 0,
+            "pitchDegrees": 0,
+            "horizontalFovDegrees": 70
+          },
+          "viewLimits": {},
+          "hotspots": [],
+          "overlays": [],
+          "connections": [],
+          "spatialData": {},
+          "runtimeHints": {},
+          "id": "22222222-2222-4000-8000-00000000000e",
+          "name": "Unprocessed",
+          "panoramaAssetId": "22222222-0000-4000-8000-00000000000e"
+        }
+      ],
+      "publication": {
+        "slug": "golden-rejected",
+        "visibility": "public"
+      }
+    },
+    "assets": [
+      {
+        "id": "22222222-0000-4000-8000-00000000000e",
+        "ownerId": "00000000-0000-4000-8000-000000000001",
+        "projectId": null,
+        "mediaType": "panorama_image",
+        "projection": "equirectangular",
+        "processingStatus": "processing",
+        "metadata": {
+          "width": 4096,
+          "height": 2048,
+          "is360": true,
+          "isFullSphere": true
+        },
+        "derivatives": []
+      }
+    ]
+  },
+  "outcome": "rejected",
+  "manifest": null,
+  "viewerIntegration": null,
+  "sceneDefinitions": [],
+  "sceneIndex": [],
+  "diagnostics": [
+    {
+      "code": "ASSET_NOT_READY",
+      "message": "The referenced asset is still processing.",
+      "entityType": "scene",
+      "entityId": "22222222-2222-4000-8000-00000000000e",
+      "path": "scenes[0].panoramaAssetId",
+      "retryable": true
+    },
+    {
+      "code": "CONTENT_ASSET_NOT_READY",
+      "severity": "error",
+      "message": "A referenced asset for Panorama viewing is not ready.",
+      "entityType": "scene",
+      "entityId": "22222222-2222-4000-8000-00000000000e",
+      "path": "scenes[0].panoramaAssetId",
+      "retryable": true,
+      "alternatives": []
+    }
+  ],
+  "hashes": {
+    "input": "26e9f0128df1f90579c5ba84ad86ddc4f9658efadf287ec6a90ebe91b166c086",
+    "diagnostics": "a983791f39432e532409a6343b1c4463fecdb7170ad3c60590a58d4e94917ed2"
+  }
+}

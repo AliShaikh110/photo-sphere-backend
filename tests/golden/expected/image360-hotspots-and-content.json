@@ -1,0 +1,1051 @@
+{
+  "id": "image360-hotspots-and-content",
+  "description": "image360 with rich hotspot content, asset actions and external links.",
+  "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+  "input": {
+    "target": "publication",
+    "visibility": "public",
+    "publicationRevision": 1,
+    "publicationSlug": "golden-hotspots",
+    "schemaVersion": 1,
+    "project": {
+      "id": "22222222-1111-4000-8000-000000000007",
+      "ownerId": "00000000-0000-4000-8000-000000000001",
+      "type": "image360",
+      "name": "Hotspots",
+      "schemaVersion": 1,
+      "revision": 1,
+      "settings": {
+        "information": {
+          "title": "About",
+          "bodyHtml": "<p>Guided tour<script>steal()</script></p>",
+          "externalUrl": "https://example.com/about"
+        }
+      },
+      "branding": {
+        "companyName": "Museum",
+        "welcomeMessage": "<strong>Welcome</strong><img src=x onerror=alert(1)>"
+      },
+      "scenes": [
+        {
+          "projectId": "22222222-1111-4000-8000-000000000007",
+          "sortOrder": 0,
+          "isPrimary": true,
+          "initialView": {
+            "headingDegrees": 0,
+            "pitchDegrees": 0,
+            "horizontalFovDegrees": 70
+          },
+          "viewLimits": {},
+          "hotspots": [
+            {
+              "id": "22222222-4444-4000-8000-000000000001",
+              "sceneId": "22222222-2222-4000-8000-000000000007",
+              "geometry": {
+                "kind": "point"
+              },
+              "position": {
+                "coordinateSystem": "spherical_degrees",
+                "longitudeDegrees": 35,
+                "latitudeDegrees": 5
+              },
+              "appearance": {
+                "label": "Exhibit",
+                "color": "#224466",
+                "emphasis": "prominent"
+              },
+              "content": {
+                "title": "About this hall",
+                "description": "Built in 1890.",
+                "bodyHtml": "<p>Safe copy<script>bad()</script></p>",
+                "tooltip": "Read more",
+                "externalUrl": "https://example.com/hall"
+              },
+              "action": {
+                "kind": "showInformation"
+              },
+              "visibilityRules": {
+                "enabled": true
+              }
+            },
+            {
+              "id": "22222222-4444-4000-8000-000000000002",
+              "sceneId": "22222222-2222-4000-8000-000000000007",
+              "geometry": {
+                "kind": "point"
+              },
+              "position": {
+                "coordinateSystem": "spherical_degrees",
+                "longitudeDegrees": -40,
+                "latitudeDegrees": -8
+              },
+              "appearance": {
+                "label": "Painting"
+              },
+              "content": {
+                "title": "Portrait",
+                "imageAssetId": "22222222-0000-4000-8000-000000000017"
+              },
+              "action": {
+                "kind": "openAsset",
+                "assetId": "22222222-0000-4000-8000-000000000017"
+              },
+              "visibilityRules": {
+                "enabled": true
+              }
+            }
+          ],
+          "overlays": [],
+          "connections": [],
+          "spatialData": {},
+          "runtimeHints": {},
+          "id": "22222222-2222-4000-8000-000000000007",
+          "name": "Great hall",
+          "panoramaAssetId": "22222222-0000-4000-8000-000000000007"
+        }
+      ],
+      "publication": {
+        "slug": "golden-hotspots",
+        "visibility": "public"
+      }
+    },
+    "assets": [
+      {
+        "id": "22222222-0000-4000-8000-000000000007",
+        "ownerId": "00000000-0000-4000-8000-000000000001",
+        "projectId": null,
+        "mediaType": "panorama_image",
+        "projection": "equirectangular",
+        "processingStatus": "ready",
+        "metadata": {
+          "width": 4096,
+          "height": 2048,
+          "is360": true,
+          "isFullSphere": true
+        },
+        "derivatives": [
+          {
+            "id": "22222222-0000-4000-8000-000000000007-thumbnail",
+            "assetId": "22222222-0000-4000-8000-000000000007",
+            "kind": "thumbnail",
+            "version": 1,
+            "storageKey": "reference/22222222-0000-4000-8000-000000000007/thumbnail.jpg",
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "sizeBytes": 512000,
+            "readiness": "ready",
+            "metadata": {
+              "checksumSha256": "61feb2b6123bd1fb8b3f424f07db3de90dc3ffc31b93dae3be9b49f23253a3df"
+            }
+          },
+          {
+            "id": "22222222-0000-4000-8000-000000000007-lowResolutionBase",
+            "assetId": "22222222-0000-4000-8000-000000000007",
+            "kind": "lowResolutionBase",
+            "version": 1,
+            "storageKey": "reference/22222222-0000-4000-8000-000000000007/lowResolutionBase.jpg",
+            "mimeType": "image/jpeg",
+            "width": 1024,
+            "height": 512,
+            "sizeBytes": 512000,
+            "readiness": "ready",
+            "metadata": {
+              "checksumSha256": "d7a60562ec36ea30e02c9041969423fa61db1cc7b0f724bd1adead4bd7c4eee3"
+            }
+          },
+          {
+            "id": "22222222-0000-4000-8000-000000000007-standardWeb",
+            "assetId": "22222222-0000-4000-8000-000000000007",
+            "kind": "standardWeb",
+            "version": 1,
+            "storageKey": "reference/22222222-0000-4000-8000-000000000007/standardWeb.jpg",
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "sizeBytes": 512000,
+            "readiness": "ready",
+            "metadata": {
+              "checksumSha256": "48604b5e8c5a07b683faf8cfeeb7e4ffd42679273c375bbf8204f396a3dbac93"
+            }
+          }
+        ]
+      },
+      {
+        "id": "22222222-0000-4000-8000-000000000017",
+        "ownerId": "00000000-0000-4000-8000-000000000001",
+        "projectId": null,
+        "mediaType": "image",
+        "projection": "unknown",
+        "processingStatus": "ready",
+        "metadata": {
+          "width": 1600,
+          "height": 900
+        },
+        "derivatives": [
+          {
+            "id": "22222222-0000-4000-8000-000000000017-thumbnail",
+            "assetId": "22222222-0000-4000-8000-000000000017",
+            "kind": "thumbnail",
+            "version": 1,
+            "storageKey": "reference/22222222-0000-4000-8000-000000000017/thumbnail.jpg",
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "sizeBytes": 512000,
+            "readiness": "ready",
+            "metadata": {
+              "checksumSha256": "a635577f9318ebe8ce747e25e4fba15d8892e9f65904527cd5fcb99381498b1f"
+            }
+          },
+          {
+            "id": "22222222-0000-4000-8000-000000000017-standardWeb",
+            "assetId": "22222222-0000-4000-8000-000000000017",
+            "kind": "standardWeb",
+            "version": 1,
+            "storageKey": "reference/22222222-0000-4000-8000-000000000017/standardWeb.jpg",
+            "mimeType": "image/jpeg",
+            "width": 1600,
+            "height": 900,
+            "sizeBytes": 512000,
+            "readiness": "ready",
+            "metadata": {
+              "checksumSha256": "90f9753610b78780c90eef54cb1fdbd2732b3c6824d93c12810c24fc68e78f7a"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "outcome": "compiled",
+  "manifest": {
+    "manifestVersion": 4,
+    "schemaVersion": 1,
+    "experienceId": "22222222-1111-4000-8000-000000000007",
+    "experienceName": "Hotspots",
+    "experienceType": "image360",
+    "projectRevision": 1,
+    "publicationRevision": 1,
+    "target": "publication",
+    "visibility": "public",
+    "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+    "initialSceneId": "22222222-2222-4000-8000-000000000007",
+    "settings": {
+      "information": {
+        "title": "About",
+        "bodyHtml": "<p>Guided tour</p>",
+        "externalUrl": "https://example.com/about"
+      }
+    },
+    "branding": {
+      "companyName": "Museum",
+      "welcomeMessage": "<strong>Welcome</strong>",
+      "properties": {
+        "companyName": "Museum",
+        "welcomeMessage": "<strong>Welcome</strong>"
+      }
+    },
+    "scenes": [
+      {
+        "id": "22222222-2222-4000-8000-000000000007",
+        "name": "Great hall",
+        "sortOrder": 0,
+        "isPrimary": true,
+        "panorama": {
+          "assetId": "22222222-0000-4000-8000-000000000007",
+          "projection": "equirectangular",
+          "family": "standardEquirectangular",
+          "fallbackFamilies": [],
+          "base": {
+            "assetId": "22222222-0000-4000-8000-000000000007",
+            "derivativeId": "22222222-0000-4000-8000-000000000007-lowResolutionBase",
+            "kind": "lowResolutionBase",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 1024,
+            "height": 512,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000007/1/media/22222222-0000-4000-8000-000000000007-lowResolutionBase",
+            "access": "public"
+          },
+          "primary": {
+            "assetId": "22222222-0000-4000-8000-000000000007",
+            "derivativeId": "22222222-0000-4000-8000-000000000007-standardWeb",
+            "kind": "standardWeb",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000007/1/media/22222222-0000-4000-8000-000000000007-standardWeb",
+            "access": "public"
+          }
+        },
+        "initialView": {
+          "headingDegrees": 0,
+          "pitchDegrees": 0,
+          "horizontalFovDegrees": 70
+        },
+        "hotspots": [
+          {
+            "id": "22222222-4444-4000-8000-000000000001",
+            "geometry": {
+              "kind": "point"
+            },
+            "position": {
+              "coordinateSystem": "spherical_degrees",
+              "longitudeDegrees": 35,
+              "latitudeDegrees": 5
+            },
+            "appearance": {
+              "label": "Exhibit",
+              "color": "#224466",
+              "emphasis": "prominent",
+              "properties": {
+                "label": "Exhibit",
+                "color": "#224466",
+                "emphasis": "prominent"
+              }
+            },
+            "content": {
+              "title": "About this hall",
+              "description": "Built in 1890.",
+              "bodyHtml": "<p>Safe copy</p>",
+              "tooltip": "Read more",
+              "externalUrl": "https://example.com/hall",
+              "properties": {
+                "title": "About this hall",
+                "description": "Built in 1890.",
+                "bodyHtml": "<p>Safe copy</p>",
+                "tooltip": "Read more",
+                "externalUrl": "https://example.com/hall"
+              }
+            },
+            "action": {
+              "kind": "showInformation"
+            },
+            "enabled": true,
+            "visibilityRules": {
+              "enabled": true
+            }
+          },
+          {
+            "id": "22222222-4444-4000-8000-000000000002",
+            "geometry": {
+              "kind": "point"
+            },
+            "position": {
+              "coordinateSystem": "spherical_degrees",
+              "longitudeDegrees": -40,
+              "latitudeDegrees": -8
+            },
+            "appearance": {
+              "label": "Painting",
+              "properties": {
+                "label": "Painting"
+              }
+            },
+            "content": {
+              "title": "Portrait",
+              "imageAssetId": "22222222-0000-4000-8000-000000000017",
+              "image": {
+                "assetId": "22222222-0000-4000-8000-000000000017",
+                "derivativeId": "22222222-0000-4000-8000-000000000017-standardWeb",
+                "kind": "standardWeb",
+                "version": 1,
+                "mimeType": "image/jpeg",
+                "width": 1600,
+                "height": 900,
+                "url": "/api/v1/publications/22222222-1111-4000-8000-000000000007/1/media/22222222-0000-4000-8000-000000000017-standardWeb",
+                "access": "public"
+              },
+              "properties": {
+                "title": "Portrait",
+                "imageAssetId": "22222222-0000-4000-8000-000000000017"
+              }
+            },
+            "action": {
+              "kind": "openAsset",
+              "media": {
+                "assetId": "22222222-0000-4000-8000-000000000017",
+                "derivativeId": "22222222-0000-4000-8000-000000000017-standardWeb",
+                "kind": "standardWeb",
+                "version": 1,
+                "mimeType": "image/jpeg",
+                "width": 1600,
+                "height": 900,
+                "url": "/api/v1/publications/22222222-1111-4000-8000-000000000007/1/media/22222222-0000-4000-8000-000000000017-standardWeb",
+                "access": "public"
+              }
+            },
+            "enabled": true,
+            "visibilityRules": {
+              "enabled": true
+            }
+          }
+        ],
+        "overlays": [],
+        "connections": [],
+        "spatialData": {},
+        "runtimeHints": {},
+        "preloadSceneIds": []
+      }
+    ],
+    "tour": {
+      "strategy": "embedded",
+      "sceneIndexVersion": "scene-index-2-1",
+      "sceneIndex": [
+        {
+          "id": "22222222-2222-4000-8000-000000000007",
+          "name": "Great hall",
+          "sortOrder": 0,
+          "isPrimary": true,
+          "panoramaAssetId": "22222222-0000-4000-8000-000000000007",
+          "thumbnail": {
+            "assetId": "22222222-0000-4000-8000-000000000007",
+            "derivativeId": "22222222-0000-4000-8000-000000000007-thumbnail",
+            "kind": "thumbnail",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000007/1/media/22222222-0000-4000-8000-000000000007-thumbnail",
+            "access": "public"
+          },
+          "hasHotspots": true,
+          "hasOverlays": false,
+          "connectionTargetSceneIds": []
+        }
+      ],
+      "sceneCount": 1
+    },
+    "plans": [],
+    "spatialIndex": {
+      "hasWorldCoordinates": false,
+      "hasPlanCoordinates": false,
+      "entries": []
+    },
+    "capabilities": [
+      {
+        "id": "basicPanorama",
+        "required": true,
+        "resolution": "compile-time"
+      },
+      {
+        "id": "hotspots",
+        "required": false,
+        "resolution": "compile-time"
+      },
+      {
+        "id": "imageContent",
+        "required": false,
+        "resolution": "compile-time"
+      },
+      {
+        "id": "externalLink",
+        "required": false,
+        "resolution": "compile-time"
+      }
+    ],
+    "runtime": {
+      "modules": [
+        "core-panorama",
+        "hotspots",
+        "image-content",
+        "content-actions"
+      ],
+      "moduleDeclarations": [
+        {
+          "id": "core-panorama",
+          "load": "eager",
+          "capabilities": [
+            "basicPanorama"
+          ]
+        },
+        {
+          "id": "hotspots",
+          "load": "eager",
+          "capabilities": [
+            "hotspots"
+          ]
+        },
+        {
+          "id": "image-content",
+          "load": "lazy",
+          "capabilities": [
+            "imageContent"
+          ]
+        },
+        {
+          "id": "content-actions",
+          "load": "eager",
+          "capabilities": [
+            "externalLink"
+          ]
+        }
+      ],
+      "capabilityFallbacks": [],
+      "deferredDeviceCapabilities": [],
+      "preload": {
+        "strategy": "selective-adjacent",
+        "maxScenesPerSource": 2,
+        "content": "scene-definition-and-base-media"
+      },
+      "cache": {
+        "defaultProfile": "standard",
+        "profiles": {
+          "constrained": {
+            "policyVersion": 1,
+            "deviceClass": "constrained",
+            "mediaClass": "image-tour",
+            "maxRecentScenes": 2,
+            "maxEstimatedBytes": 67108864,
+            "evictionStrategy": "least-recently-used",
+            "duplicateRequestStrategy": "coalesce",
+            "suppressDuplicateRequests": true
+          },
+          "standard": {
+            "policyVersion": 1,
+            "deviceClass": "standard",
+            "mediaClass": "image-tour",
+            "maxRecentScenes": 4,
+            "maxEstimatedBytes": 201326592,
+            "evictionStrategy": "least-recently-used",
+            "duplicateRequestStrategy": "coalesce",
+            "suppressDuplicateRequests": true
+          },
+          "capable": {
+            "policyVersion": 1,
+            "deviceClass": "capable",
+            "mediaClass": "image-tour",
+            "maxRecentScenes": 6,
+            "maxEstimatedBytes": 402653184,
+            "evictionStrategy": "least-recently-used",
+            "duplicateRequestStrategy": "coalesce",
+            "suppressDuplicateRequests": true
+          }
+        }
+      },
+      "fallbackPolicy": {
+        "panorama": "low-resolution-base-then-standard-or-tiled-detail",
+        "optionalCapabilities": "continue-without-capability",
+        "immersive": "continue-in-normal-360"
+      }
+    },
+    "telemetry": {
+      "enabled": true,
+      "experienceId": "22222222-1111-4000-8000-000000000007",
+      "projectRevision": 1,
+      "publicationRevision": 1,
+      "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+      "events": [
+        "experience_load_started",
+        "first_panorama_visible",
+        "time_to_interactive",
+        "scene_changed",
+        "hotspot_clicked",
+        "asset_failed",
+        "scene_transition_failed",
+        "viewer_error",
+        "experience_exited",
+        "capability_fallback"
+      ],
+      "sceneTransitionFailureCategories": [
+        "scene_definition_unavailable",
+        "scene_definition_invalid",
+        "asset_unavailable",
+        "asset_decode_failed",
+        "unsupported_media",
+        "viewer_error",
+        "transition_timeout",
+        "unknown"
+      ]
+    },
+    "pinnedExtensions": {},
+    "viewerIntegration": {
+      "rendererId": "photo-sphere-viewer",
+      "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+      "config": {
+        "adapter": "equirectangular",
+        "initialSceneId": "22222222-2222-4000-8000-000000000007",
+        "navbar": [
+          "move",
+          "zoom",
+          "fullscreen"
+        ],
+        "mousewheel": true,
+        "mousemove": true,
+        "touchControlsEnabled": true,
+        "keyboard": true,
+        "sceneNavigation": false,
+        "startup": {
+          "id": "22222222-2222-4000-8000-000000000007",
+          "adapter": "equirectangular",
+          "panorama": "/api/v1/publications/22222222-1111-4000-8000-000000000007/1/media/22222222-0000-4000-8000-000000000007-standardWeb",
+          "basePanorama": "/api/v1/publications/22222222-1111-4000-8000-000000000007/1/media/22222222-0000-4000-8000-000000000007-lowResolutionBase",
+          "defaultYaw": 0,
+          "defaultPitch": 0,
+          "defaultZoomLvl": 61.236,
+          "markers": [
+            {
+              "id": "22222222-4444-4000-8000-000000000001",
+              "position": {
+                "yaw": 0.6108652381980153,
+                "pitch": 0.08726646259971647
+              },
+              "html": "Read more",
+              "visible": true,
+              "data": {
+                "action": {
+                  "kind": "showInformation"
+                }
+              }
+            },
+            {
+              "id": "22222222-4444-4000-8000-000000000002",
+              "position": {
+                "yaw": -0.6981317007977318,
+                "pitch": -0.13962634015954636
+              },
+              "html": "Portrait",
+              "visible": true,
+              "data": {
+                "action": {
+                  "kind": "openAsset",
+                  "media": {
+                    "assetId": "22222222-0000-4000-8000-000000000017",
+                    "derivativeId": "22222222-0000-4000-8000-000000000017-standardWeb",
+                    "kind": "standardWeb",
+                    "version": 1,
+                    "mimeType": "image/jpeg",
+                    "width": 1600,
+                    "height": 900,
+                    "url": "/api/v1/publications/22222222-1111-4000-8000-000000000007/1/media/22222222-0000-4000-8000-000000000017-standardWeb",
+                    "access": "public"
+                  }
+                }
+              }
+            }
+          ],
+          "links": [],
+          "preloadSceneIds": []
+        },
+        "scenes": [
+          {
+            "id": "22222222-2222-4000-8000-000000000007",
+            "adapter": "equirectangular",
+            "panorama": "/api/v1/publications/22222222-1111-4000-8000-000000000007/1/media/22222222-0000-4000-8000-000000000007-standardWeb",
+            "basePanorama": "/api/v1/publications/22222222-1111-4000-8000-000000000007/1/media/22222222-0000-4000-8000-000000000007-lowResolutionBase",
+            "defaultYaw": 0,
+            "defaultPitch": 0,
+            "defaultZoomLvl": 61.236,
+            "markers": [
+              {
+                "id": "22222222-4444-4000-8000-000000000001",
+                "position": {
+                  "yaw": 0.6108652381980153,
+                  "pitch": 0.08726646259971647
+                },
+                "html": "Read more",
+                "visible": true,
+                "data": {
+                  "action": {
+                    "kind": "showInformation"
+                  }
+                }
+              },
+              {
+                "id": "22222222-4444-4000-8000-000000000002",
+                "position": {
+                  "yaw": -0.6981317007977318,
+                  "pitch": -0.13962634015954636
+                },
+                "html": "Portrait",
+                "visible": true,
+                "data": {
+                  "action": {
+                    "kind": "openAsset",
+                    "media": {
+                      "assetId": "22222222-0000-4000-8000-000000000017",
+                      "derivativeId": "22222222-0000-4000-8000-000000000017-standardWeb",
+                      "kind": "standardWeb",
+                      "version": 1,
+                      "mimeType": "image/jpeg",
+                      "width": 1600,
+                      "height": 900,
+                      "url": "/api/v1/publications/22222222-1111-4000-8000-000000000007/1/media/22222222-0000-4000-8000-000000000017-standardWeb",
+                      "access": "public"
+                    }
+                  }
+                }
+              }
+            ],
+            "links": [],
+            "preloadSceneIds": []
+          }
+        ]
+      }
+    }
+  },
+  "viewerIntegration": {
+    "rendererId": "photo-sphere-viewer",
+    "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+    "config": {
+      "adapter": "equirectangular",
+      "initialSceneId": "22222222-2222-4000-8000-000000000007",
+      "navbar": [
+        "move",
+        "zoom",
+        "fullscreen"
+      ],
+      "mousewheel": true,
+      "mousemove": true,
+      "touchControlsEnabled": true,
+      "keyboard": true,
+      "sceneNavigation": false,
+      "startup": {
+        "id": "22222222-2222-4000-8000-000000000007",
+        "adapter": "equirectangular",
+        "panorama": "/api/v1/publications/22222222-1111-4000-8000-000000000007/1/media/22222222-0000-4000-8000-000000000007-standardWeb",
+        "basePanorama": "/api/v1/publications/22222222-1111-4000-8000-000000000007/1/media/22222222-0000-4000-8000-000000000007-lowResolutionBase",
+        "defaultYaw": 0,
+        "defaultPitch": 0,
+        "defaultZoomLvl": 61.236,
+        "markers": [
+          {
+            "id": "22222222-4444-4000-8000-000000000001",
+            "position": {
+              "yaw": 0.6108652381980153,
+              "pitch": 0.08726646259971647
+            },
+            "html": "Read more",
+            "visible": true,
+            "data": {
+              "action": {
+                "kind": "showInformation"
+              }
+            }
+          },
+          {
+            "id": "22222222-4444-4000-8000-000000000002",
+            "position": {
+              "yaw": -0.6981317007977318,
+              "pitch": -0.13962634015954636
+            },
+            "html": "Portrait",
+            "visible": true,
+            "data": {
+              "action": {
+                "kind": "openAsset",
+                "media": {
+                  "assetId": "22222222-0000-4000-8000-000000000017",
+                  "derivativeId": "22222222-0000-4000-8000-000000000017-standardWeb",
+                  "kind": "standardWeb",
+                  "version": 1,
+                  "mimeType": "image/jpeg",
+                  "width": 1600,
+                  "height": 900,
+                  "url": "/api/v1/publications/22222222-1111-4000-8000-000000000007/1/media/22222222-0000-4000-8000-000000000017-standardWeb",
+                  "access": "public"
+                }
+              }
+            }
+          }
+        ],
+        "links": [],
+        "preloadSceneIds": []
+      },
+      "scenes": [
+        {
+          "id": "22222222-2222-4000-8000-000000000007",
+          "adapter": "equirectangular",
+          "panorama": "/api/v1/publications/22222222-1111-4000-8000-000000000007/1/media/22222222-0000-4000-8000-000000000007-standardWeb",
+          "basePanorama": "/api/v1/publications/22222222-1111-4000-8000-000000000007/1/media/22222222-0000-4000-8000-000000000007-lowResolutionBase",
+          "defaultYaw": 0,
+          "defaultPitch": 0,
+          "defaultZoomLvl": 61.236,
+          "markers": [
+            {
+              "id": "22222222-4444-4000-8000-000000000001",
+              "position": {
+                "yaw": 0.6108652381980153,
+                "pitch": 0.08726646259971647
+              },
+              "html": "Read more",
+              "visible": true,
+              "data": {
+                "action": {
+                  "kind": "showInformation"
+                }
+              }
+            },
+            {
+              "id": "22222222-4444-4000-8000-000000000002",
+              "position": {
+                "yaw": -0.6981317007977318,
+                "pitch": -0.13962634015954636
+              },
+              "html": "Portrait",
+              "visible": true,
+              "data": {
+                "action": {
+                  "kind": "openAsset",
+                  "media": {
+                    "assetId": "22222222-0000-4000-8000-000000000017",
+                    "derivativeId": "22222222-0000-4000-8000-000000000017-standardWeb",
+                    "kind": "standardWeb",
+                    "version": 1,
+                    "mimeType": "image/jpeg",
+                    "width": 1600,
+                    "height": 900,
+                    "url": "/api/v1/publications/22222222-1111-4000-8000-000000000007/1/media/22222222-0000-4000-8000-000000000017-standardWeb",
+                    "access": "public"
+                  }
+                }
+              }
+            }
+          ],
+          "links": [],
+          "preloadSceneIds": []
+        }
+      ]
+    }
+  },
+  "sceneDefinitions": [
+    {
+      "sceneDefinitionVersion": 2,
+      "experienceId": "22222222-1111-4000-8000-000000000007",
+      "publicationRevision": 1,
+      "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+      "scene": {
+        "id": "22222222-2222-4000-8000-000000000007",
+        "name": "Great hall",
+        "sortOrder": 0,
+        "isPrimary": true,
+        "panorama": {
+          "assetId": "22222222-0000-4000-8000-000000000007",
+          "projection": "equirectangular",
+          "family": "standardEquirectangular",
+          "fallbackFamilies": [],
+          "base": {
+            "assetId": "22222222-0000-4000-8000-000000000007",
+            "derivativeId": "22222222-0000-4000-8000-000000000007-lowResolutionBase",
+            "kind": "lowResolutionBase",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 1024,
+            "height": 512,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000007/1/media/22222222-0000-4000-8000-000000000007-lowResolutionBase",
+            "access": "public"
+          },
+          "primary": {
+            "assetId": "22222222-0000-4000-8000-000000000007",
+            "derivativeId": "22222222-0000-4000-8000-000000000007-standardWeb",
+            "kind": "standardWeb",
+            "version": 1,
+            "mimeType": "image/jpeg",
+            "width": 4096,
+            "height": 2048,
+            "url": "/api/v1/publications/22222222-1111-4000-8000-000000000007/1/media/22222222-0000-4000-8000-000000000007-standardWeb",
+            "access": "public"
+          }
+        },
+        "initialView": {
+          "headingDegrees": 0,
+          "pitchDegrees": 0,
+          "horizontalFovDegrees": 70
+        },
+        "hotspots": [
+          {
+            "id": "22222222-4444-4000-8000-000000000001",
+            "geometry": {
+              "kind": "point"
+            },
+            "position": {
+              "coordinateSystem": "spherical_degrees",
+              "longitudeDegrees": 35,
+              "latitudeDegrees": 5
+            },
+            "appearance": {
+              "label": "Exhibit",
+              "color": "#224466",
+              "emphasis": "prominent",
+              "properties": {
+                "label": "Exhibit",
+                "color": "#224466",
+                "emphasis": "prominent"
+              }
+            },
+            "content": {
+              "title": "About this hall",
+              "description": "Built in 1890.",
+              "bodyHtml": "<p>Safe copy</p>",
+              "tooltip": "Read more",
+              "externalUrl": "https://example.com/hall",
+              "properties": {
+                "title": "About this hall",
+                "description": "Built in 1890.",
+                "bodyHtml": "<p>Safe copy</p>",
+                "tooltip": "Read more",
+                "externalUrl": "https://example.com/hall"
+              }
+            },
+            "action": {
+              "kind": "showInformation"
+            },
+            "enabled": true,
+            "visibilityRules": {
+              "enabled": true
+            }
+          },
+          {
+            "id": "22222222-4444-4000-8000-000000000002",
+            "geometry": {
+              "kind": "point"
+            },
+            "position": {
+              "coordinateSystem": "spherical_degrees",
+              "longitudeDegrees": -40,
+              "latitudeDegrees": -8
+            },
+            "appearance": {
+              "label": "Painting",
+              "properties": {
+                "label": "Painting"
+              }
+            },
+            "content": {
+              "title": "Portrait",
+              "imageAssetId": "22222222-0000-4000-8000-000000000017",
+              "image": {
+                "assetId": "22222222-0000-4000-8000-000000000017",
+                "derivativeId": "22222222-0000-4000-8000-000000000017-standardWeb",
+                "kind": "standardWeb",
+                "version": 1,
+                "mimeType": "image/jpeg",
+                "width": 1600,
+                "height": 900,
+                "url": "/api/v1/publications/22222222-1111-4000-8000-000000000007/1/media/22222222-0000-4000-8000-000000000017-standardWeb",
+                "access": "public"
+              },
+              "properties": {
+                "title": "Portrait",
+                "imageAssetId": "22222222-0000-4000-8000-000000000017"
+              }
+            },
+            "action": {
+              "kind": "openAsset",
+              "media": {
+                "assetId": "22222222-0000-4000-8000-000000000017",
+                "derivativeId": "22222222-0000-4000-8000-000000000017-standardWeb",
+                "kind": "standardWeb",
+                "version": 1,
+                "mimeType": "image/jpeg",
+                "width": 1600,
+                "height": 900,
+                "url": "/api/v1/publications/22222222-1111-4000-8000-000000000007/1/media/22222222-0000-4000-8000-000000000017-standardWeb",
+                "access": "public"
+              }
+            },
+            "enabled": true,
+            "visibilityRules": {
+              "enabled": true
+            }
+          }
+        ],
+        "overlays": [],
+        "connections": [],
+        "spatialData": {},
+        "runtimeHints": {},
+        "preloadSceneIds": []
+      },
+      "viewerIntegration": {
+        "rendererId": "photo-sphere-viewer",
+        "viewerIntegrationVersion": "psv-5.14.3-adapter-2",
+        "sceneId": "22222222-2222-4000-8000-000000000007",
+        "config": {
+          "id": "22222222-2222-4000-8000-000000000007",
+          "adapter": "equirectangular",
+          "panorama": "/api/v1/publications/22222222-1111-4000-8000-000000000007/1/media/22222222-0000-4000-8000-000000000007-standardWeb",
+          "basePanorama": "/api/v1/publications/22222222-1111-4000-8000-000000000007/1/media/22222222-0000-4000-8000-000000000007-lowResolutionBase",
+          "defaultYaw": 0,
+          "defaultPitch": 0,
+          "defaultZoomLvl": 61.236,
+          "markers": [
+            {
+              "id": "22222222-4444-4000-8000-000000000001",
+              "position": {
+                "yaw": 0.6108652381980153,
+                "pitch": 0.08726646259971647
+              },
+              "html": "Read more",
+              "visible": true,
+              "data": {
+                "action": {
+                  "kind": "showInformation"
+                }
+              }
+            },
+            {
+              "id": "22222222-4444-4000-8000-000000000002",
+              "position": {
+                "yaw": -0.6981317007977318,
+                "pitch": -0.13962634015954636
+              },
+              "html": "Portrait",
+              "visible": true,
+              "data": {
+                "action": {
+                  "kind": "openAsset",
+                  "media": {
+                    "assetId": "22222222-0000-4000-8000-000000000017",
+                    "derivativeId": "22222222-0000-4000-8000-000000000017-standardWeb",
+                    "kind": "standardWeb",
+                    "version": 1,
+                    "mimeType": "image/jpeg",
+                    "width": 1600,
+                    "height": 900,
+                    "url": "/api/v1/publications/22222222-1111-4000-8000-000000000007/1/media/22222222-0000-4000-8000-000000000017-standardWeb",
+                    "access": "public"
+                  }
+                }
+              }
+            }
+          ],
+          "links": [],
+          "preloadSceneIds": []
+        }
+      }
+    }
+  ],
+  "sceneIndex": [
+    {
+      "id": "22222222-2222-4000-8000-000000000007",
+      "name": "Great hall",
+      "sortOrder": 0,
+      "isPrimary": true,
+      "panoramaAssetId": "22222222-0000-4000-8000-000000000007",
+      "thumbnail": {
+        "assetId": "22222222-0000-4000-8000-000000000007",
+        "derivativeId": "22222222-0000-4000-8000-000000000007-thumbnail",
+        "kind": "thumbnail",
+        "version": 1,
+        "mimeType": "image/jpeg",
+        "width": 4096,
+        "height": 2048,
+        "url": "/api/v1/publications/22222222-1111-4000-8000-000000000007/1/media/22222222-0000-4000-8000-000000000007-thumbnail",
+        "access": "public"
+      },
+      "hasHotspots": true,
+      "hasOverlays": false,
+      "connectionTargetSceneIds": []
+    }
+  ],
+  "diagnostics": [],
+  "hashes": {
+    "input": "b8812a7193c465cb07099624ffebbcc4a499c306ed91566f30f3a3fa60020297",
+    "manifest": "8dd336b1f28abbba3e1efd3fd2f854b12e3aeb5349f49be0636363b245d48adc",
+    "viewerIntegration": "77065cf446bf5abdd1f42873b00c9a5543f6df6e69b3cc5cd65dc882dae3f95f",
+    "sceneDefinitions": "d6dbd9351758efc906511c12b8107fe3a617868f4d83300a983339a793d3946f",
+    "sceneIndex": "ab6932a4f73a996f3de2e254138a0214a0b9502f1397c9ab9871ff77a593169d",
+    "content": "ffef46934d263780cee511f5faf2e9bbe73454062f49d0adb09cc7308f61b5b7"
+  }
+}
