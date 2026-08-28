@@ -1,7 +1,14 @@
 import { createSequelize } from './connection';
 import { initializeModels } from '../models';
 
-export { createSequelize, DEFAULT_DATABASE_URL } from './connection';
+export {
+  createSequelize,
+  DEFAULT_DATABASE_HOST,
+  DEFAULT_DATABASE_PORT,
+  DEFAULT_DATABASE_NAME,
+  DEFAULT_DATABASE_USER,
+  DEFAULT_DATABASE_PASSWORD,
+} from './connection';
 export type { DatabaseConnectionOptions } from './connection';
 export { initializeModels } from '../models';
 export type { ModelRegistry } from '../models';

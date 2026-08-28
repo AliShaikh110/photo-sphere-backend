@@ -29,14 +29,14 @@ storage; canonical asset IDs and database records do not need to change.
 
 ~~~powershell
 npm ci
-Copy-Item .env.example .env
+Copy-Item .env.example .env.local
 docker compose up -d postgres
 npm run db:migrate:dev
 npm run dev
 ~~~
 
 Use an existing PostgreSQL instance instead of Docker when preferred; update
-<code>DATABASE_URL</code> first.
+the <code>DB_*</code> settings first.
 
 The backend-only development server exposes manifest JSON but not the player UI.
 To exercise direct/embed/QR targets locally, run or proxy a frontend runtime
@@ -58,7 +58,13 @@ The following inventory mirrors <code>.env.example</code>.
 | --- | --- | --- |
 | <code>NODE_ENV</code> | <code>development</code> | <code>development</code>, <code>test</code>, or <code>production</code>. |
 | <code>PORT</code> | <code>4000</code> | API listen port. |
-| <code>DATABASE_URL</code> | <code>postgres://sphere:sphere@127.0.0.1:5432/sphere</code> | PostgreSQL connection string. Treat credentials as secret. |
+| <code>DB_HOST</code> | <code>127.0.0.1</code> | PostgreSQL host. |
+| <code>DB_PORT</code> | <code>5432</code> | PostgreSQL port. |
+| <code>DB_NAME</code> | <code>sphere</code> | Application database name. |
+| <code>DB_USER</code> | <code>sphere</code> | Application database role. |
+| <code>DB_PASSWORD</code> | <code>sphere</code> | Password for that role. Treat as secret. |
+| <code>DB_SSL</code> | <code>false</code> | Set to <code>true</code> for a managed host that requires TLS. |
+| <code>DATABASE_URL</code> | unset | Optional single-string override. When set it wins over every <code>DB_*</code> setting above; use it only where a host hands out a connection string. |
 | <code>JWT_SECRET</code> | replacement placeholder | HMAC secret for access tokens; minimum 32 characters. Use a secret manager in production. |
 | <code>JWT_EXPIRES_IN</code> | <code>1h</code> | Access-token lifetime accepted by the JWT library. |
 | <code>PUBLIC_BASE_URL</code> | <code>http://localhost:4000</code> | Externally routed platform/player origin used for share targets. Production routing must provide the frontend shell at <code>/view/:slug</code> and route its manifest request to this backend. No trailing slash is required. |
@@ -106,8 +112,8 @@ values or any shipped/development JWT placeholder in production.
 
 ## Secrets
 
-- Never commit <code>.env</code>.
-- Supply <code>DATABASE_URL</code> and <code>JWT_SECRET</code> through the
+- Never commit <code>.env</code> or <code>.env.local</code>.
+- Supply <code>DB_PASSWORD</code> and <code>JWT_SECRET</code> through the
   deployment secret manager.
 - Restrict database credentials to the application database.
 - Restrict filesystem permissions on <code>STORAGE_ROOT</code> to the service
@@ -232,7 +238,7 @@ npm start
 npm run worker
 ~~~
 
-Both processes require the same <code>DATABASE_URL</code>, configuration policy,
+Both processes require the same <code>DB_*</code> settings, configuration policy,
 and storage volume. Scale external workers only after confirming database claim
 locking and storage throughput under representative panorama sizes.
 
@@ -574,7 +580,11 @@ data. Never point this sequence at production.
 
 ~~~powershell
 $env:NODE_ENV = 'test'
-$env:DATABASE_URL = 'postgres://sphere:sphere@127.0.0.1:5432/sphere_test'
+$env:DB_HOST = '127.0.0.1'
+$env:DB_PORT = '5432'
+$env:DB_NAME = 'sphere_test'
+$env:DB_USER = 'sphere'
+$env:DB_PASSWORD = 'sphere'
 $env:JWT_SECRET = 'test-only-secret-at-least-32-characters'
 npm run build
 npm run db:migrate

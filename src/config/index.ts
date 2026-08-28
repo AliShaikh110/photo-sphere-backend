@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import './env';
 import path from 'node:path';
 import { z } from 'zod';
 import type { PanoramaTilingPolicy } from '../media/panorama-quality-policy';
@@ -19,10 +19,15 @@ const envSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
     PORT: z.coerce.number().int().positive().max(65_535).default(4000),
-    DATABASE_URL: z
-      .string()
-      .min(1)
-      .default('postgres://sphere:sphere@127.0.0.1:5432/sphere'),
+    DB_HOST: z.string().min(1).default('127.0.0.1'),
+    DB_PORT: z.coerce.number().int().positive().max(65_535).default(5432),
+    DB_NAME: z.string().min(1).default('sphere'),
+    DB_USER: z.string().min(1).default('sphere'),
+    DB_PASSWORD: z.string().default('sphere'),
+    DB_SSL: booleanFromString,
+    // Optional single-string override for managed hosts and CI; the discrete
+    // DB_* settings are the normal path.
+    DATABASE_URL: z.string().min(1).optional(),
     JWT_SECRET: z.string().min(32).default('development-only-secret-change-me-now'),
     JWT_EXPIRES_IN: z.string().min(1).default('1h'),
     PUBLIC_BASE_URL: z.url().default('http://localhost:4000'),
@@ -108,7 +113,15 @@ const envSchema = z
 export type AppConfig = {
   nodeEnv: 'development' | 'test' | 'production';
   port: number;
-  databaseUrl: string;
+  database: {
+    host: string;
+    port: number;
+    name: string;
+    user: string;
+    password: string;
+    ssl: boolean;
+    url: string | undefined;
+  };
   jwtSecret: string;
   jwtExpiresIn: string;
   publicBaseUrl: string;
@@ -156,7 +169,15 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
   return {
     nodeEnv: value.NODE_ENV,
     port: value.PORT,
-    databaseUrl: value.DATABASE_URL,
+    database: {
+      host: value.DB_HOST,
+      port: value.DB_PORT,
+      name: value.DB_NAME,
+      user: value.DB_USER,
+      password: value.DB_PASSWORD,
+      ssl: value.DB_SSL,
+      url: value.DATABASE_URL
+    },
     jwtSecret: value.JWT_SECRET,
     jwtExpiresIn: value.JWT_EXPIRES_IN,
     publicBaseUrl: value.PUBLIC_BASE_URL.replace(/\/$/, ''),

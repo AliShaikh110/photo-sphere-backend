@@ -41,11 +41,12 @@ against the current publication.
 
    ~~~powershell
    npm ci
-   Copy-Item .env.example .env
+   Copy-Item .env.example .env.local
    ~~~
 
 2. Start PostgreSQL. Skip this command when using an existing database matching
-   <code>DATABASE_URL</code>.
+   the <code>DB_HOST</code>/<code>DB_PORT</code>/<code>DB_NAME</code>/<code>DB_USER</code>/<code>DB_PASSWORD</code>
+   settings.
 
    ~~~powershell
    docker compose up -d postgres
