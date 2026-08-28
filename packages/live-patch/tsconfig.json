@@ -9,6 +9,8 @@
   },
   "include": ["src/**/*.ts"],
   "references": [
-    { "path": "../experience-schema" }
+    { "path": "../experience-compiler" },
+    { "path": "../experience-schema" },
+    { "path": "../viewer-integration" }
   ]
 }

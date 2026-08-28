@@ -198,7 +198,7 @@ export class ExperienceCompiler {
     const assetsById = new Map(input.assets.map((asset) => [asset.id, asset]));
     const initialSceneId = input.project.scenes.find((scene) => scene.isPrimary)?.id
       ?? input.project.scenes[0]!.id;
-    const settings = deepFreeze(compileSettings(input.project.settings));
+    const settings = deepFreeze(compileCanonicalSettings(input.project.settings));
     const branding = deepFreeze(this.compileBranding(
       input.project.branding,
       input.project.id,
@@ -577,7 +577,7 @@ export class ExperienceCompiler {
       : 'public';
     const context: ResolutionContext = { input, access, cache: new Map() };
     const assetsById = new Map(input.assets.map((asset) => [asset.id, asset]));
-    const settings = deepFreeze(compileSettings(input.project.settings));
+    const settings = deepFreeze(compileCanonicalSettings(input.project.settings));
     const branding = deepFreeze(this.compileBranding(
       input.project.branding,
       input.project.id,
@@ -1161,20 +1161,7 @@ export class ExperienceCompiler {
     if (appearance === undefined) {
       return undefined;
     }
-    const compiled: CompiledHotspotAppearance = {
-      ...(appearance.label === undefined
-        ? {}
-        : { label: sanitizePlainText(appearance.label) }),
-      ...(appearance.iconAssetId === undefined ? {} : { iconAssetId: appearance.iconAssetId }),
-      ...(appearance.color === undefined ? {} : { color: appearance.color }),
-      ...(appearance.emphasis === undefined ? {} : { emphasis: appearance.emphasis }),
-      properties: {
-        ...(appearance.label === undefined ? {} : { label: sanitizePlainText(appearance.label) }),
-        ...(appearance.iconAssetId === undefined ? {} : { iconAssetId: appearance.iconAssetId }),
-        ...(appearance.color === undefined ? {} : { color: appearance.color }),
-        ...(appearance.emphasis === undefined ? {} : { emphasis: appearance.emphasis }),
-      },
-    };
+    const compiled = compileHotspotAppearanceValues(appearance);
     if (appearance.iconAssetId === undefined) {
       return compiled;
     }
@@ -1198,24 +1185,7 @@ export class ExperienceCompiler {
     if (content === undefined) {
       return undefined;
     }
-    const properties: Record<string, JsonValue> = {
-      ...(content.title === undefined ? {} : { title: sanitizePlainText(content.title) }),
-      ...(content.description === undefined
-        ? {}
-        : { description: sanitizePlainText(content.description) }),
-      ...(content.bodyHtml === undefined
-        ? {}
-        : { bodyHtml: sanitizeRichHtml(content.bodyHtml) }),
-      ...(content.tooltip === undefined ? {} : { tooltip: sanitizePlainText(content.tooltip) }),
-      ...(content.buttonLabel === undefined
-        ? {}
-        : { buttonLabel: sanitizePlainText(content.buttonLabel) }),
-      ...(content.externalUrl === undefined
-        ? {}
-        : { externalUrl: normalizeTrustedUrl(content.externalUrl) }),
-      ...(content.imageAssetId === undefined ? {} : { imageAssetId: content.imageAssetId }),
-      ...(content.videoAssetId === undefined ? {} : { videoAssetId: content.videoAssetId }),
-    };
+    const { properties, ...fields } = compileHotspotContentValues(content);
     const image = content.imageAssetId === undefined
       ? undefined
       : this.resolveDisplayAsset(
@@ -1241,22 +1211,7 @@ export class ExperienceCompiler {
         },
       );
     return {
-      ...(content.title === undefined ? {} : { title: sanitizePlainText(content.title) }),
-      ...(content.description === undefined
-        ? {}
-        : { description: sanitizePlainText(content.description) }),
-      ...(content.bodyHtml === undefined
-        ? {}
-        : { bodyHtml: sanitizeRichHtml(content.bodyHtml) }),
-      ...(content.tooltip === undefined ? {} : { tooltip: sanitizePlainText(content.tooltip) }),
-      ...(content.buttonLabel === undefined
-        ? {}
-        : { buttonLabel: sanitizePlainText(content.buttonLabel) }),
-      ...(content.externalUrl === undefined
-        ? {}
-        : { externalUrl: normalizeTrustedUrl(content.externalUrl) }),
-      ...(content.imageAssetId === undefined ? {} : { imageAssetId: content.imageAssetId }),
-      ...(content.videoAssetId === undefined ? {} : { videoAssetId: content.videoAssetId }),
+      ...fields,
       ...(image === undefined ? {} : { image }),
       ...(video === undefined ? {} : { video }),
       properties,
@@ -1387,6 +1342,53 @@ export function compileExperienceBundle(
 
 export const compileExperienceManifest = compileExperience;
 
+
+/**
+ * The compiled form of an authored appearance, without its resolved icon.
+ *
+ * Exported because the live-patch contract rebuilds an appearance when a
+ * creator recolours or retitles a hotspot. Sharing the builder is what makes
+ * "patch equals recompile" true by construction rather than by inspection.
+ */
+export function compileHotspotAppearanceValues(
+  appearance: NonNullable<CanonicalHotspot['appearance']>,
+): CompiledHotspotAppearance {
+  const values = {
+    ...(appearance.label === undefined
+      ? {}
+      : { label: sanitizePlainText(appearance.label) }),
+    ...(appearance.iconAssetId === undefined ? {} : { iconAssetId: appearance.iconAssetId }),
+    ...(appearance.color === undefined ? {} : { color: appearance.color }),
+    ...(appearance.emphasis === undefined ? {} : { emphasis: appearance.emphasis }),
+  };
+  return { ...values, properties: { ...values } };
+}
+
+/** The compiled form of authored content, without its resolved media. */
+export function compileHotspotContentValues(
+  content: NonNullable<CanonicalHotspot['content']>,
+): CompiledHotspotContent {
+  const values = {
+    ...(content.title === undefined ? {} : { title: sanitizePlainText(content.title) }),
+    ...(content.description === undefined
+      ? {}
+      : { description: sanitizePlainText(content.description) }),
+    ...(content.bodyHtml === undefined
+      ? {}
+      : { bodyHtml: sanitizeRichHtml(content.bodyHtml) }),
+    ...(content.tooltip === undefined ? {} : { tooltip: sanitizePlainText(content.tooltip) }),
+    ...(content.buttonLabel === undefined
+      ? {}
+      : { buttonLabel: sanitizePlainText(content.buttonLabel) }),
+    ...(content.externalUrl === undefined
+      ? {}
+      : { externalUrl: normalizeTrustedUrl(content.externalUrl) }),
+    ...(content.imageAssetId === undefined ? {} : { imageAssetId: content.imageAssetId }),
+    ...(content.videoAssetId === undefined ? {} : { videoAssetId: content.videoAssetId }),
+  };
+  return { ...values, properties: { ...values } };
+}
+
 /** Segmented delivery keeps the initial manifest small for enterprise tours. */
 export const SCENE_INDEX_SEGMENT_THRESHOLD = 250;
 
@@ -1482,7 +1484,7 @@ function buildSpatialIndex(scenes: readonly CompiledScene[]): CompiledSpatialInd
   };
 }
 
-function compileOverlayAppearance(
+export function compileOverlayAppearance(
   appearance: NonNullable<CanonicalOverlay['appearance']>,
 ): CompiledOverlayAppearance {
   const values = {
@@ -1522,7 +1524,7 @@ function publishedSceneIndexUrl(input: CompileExperienceInput): string {
   return `/view/${input.publicationSlug}/revisions/${input.publicationRevision}/scene-index`;
 }
 
-function compileSettings(
+export function compileCanonicalSettings(
   settings: CanonicalProjectSettings,
 ): CanonicalProjectSettings {
   const compiled: Record<string, JsonValue> = {};
